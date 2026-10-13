@@ -94,7 +94,7 @@ class TerminalSession {
     this._pinned = false,
     this.restoredScrollback,
     this.savedPtyId,
-    this.project,
+    this._project,
     this.agent,
     this.launch = const [],
     List<String> startupCommands = const [],
@@ -128,8 +128,14 @@ class TerminalSession {
   /// background limits keep-alive lifts. Cleared by the next command.
   final killed = ValueNotifier(false);
 
-  /// The project folder (guest path) this tab was opened for, if any.
-  final String? project;
+  /// The project folder (guest path) this tab belongs to, if any: it shows
+  /// in that project's workspace instead of the Terminal tab.
+  String? get project => _project;
+  String? _project;
+  set project(String? path) {
+    _project = path;
+    onMetaChanged?.call();
+  }
 
   /// The agent (catalog id) this tab runs, if any.
   final String? agent;

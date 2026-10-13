@@ -8,6 +8,10 @@ import 'terminal_session.dart';
 /// The open terminal tabs. Every tab comes back after the app restarts,
 /// with its title, folder and scrollback (and a fresh shell). Pinned tabs
 /// sit first and can't be closed by accident.
+///
+/// Tabs are grouped by scope: a project's tabs show in its workspace, the
+/// rest (scope null) in the Terminal tab, which always has at least one.
+/// Each scope remembers its selected tab.
 class TerminalTabs extends ChangeNotifier {
   TerminalTabs(String filesDir, {PtyBackend? backend})
       : _file = File('$filesDir/terminal_tabs.json'),
@@ -18,6 +22,7 @@ class TerminalTabs extends ChangeNotifier {
   final _tabs = <TerminalSession>[];
   int _nextId = 1;
   int _activeId = 0;
+  final _activeByScope = <String?, int>{};
   Timer? _saveTimer;
 
   /// Ports any tab's output mentioned (for the preview watcher).
@@ -28,8 +33,29 @@ class TerminalTabs extends ChangeNotifier {
 
   List<TerminalSession> get tabs => List.unmodifiable(_tabs);
   int get activeId => _activeId;
-  TerminalSession get active => _tabs.firstWhere((t) => t.id == _activeId, orElse: () => _tabs.first);
+
+  /// The tab selected last, in any scope.
+  TerminalSession get active => _tabs.firstWhere((t) => t.id == _activeId, orElse: () => activeIn(null)!);
   int get activeIndex => _tabs.indexWhere((t) => t.id == _activeId);
+
+  /// [project]'s tabs (null: the Terminal tab's).
+  List<TerminalSession> inScope(String? project) => [for (final t in _tabs) if (t.project == project) t];
+
+  /// The selected tab of [project] (null: the Terminal tab's), if it has any.
+  TerminalSession? activeIn(String? project) {
+    final list = inScope(project);
+    final id = _activeByScope[project];
+    return list.where((t) => t.id == id).firstOrNull ?? list.firstOrNull;
+  }
+
+  /// [project] was removed: its tabs move to the Terminal tab.
+  void detachProject(String project) {
+    for (final t in inScope(project)) {
+      t.project = null;
+    }
+    _activeByScope.remove(project);
+    notifyListeners();
+  }
 
   Future<void> load() async {
     var active = 0;
@@ -58,6 +84,13 @@ class TerminalTabs extends ChangeNotifier {
           );
         }
         active = saved['active'] as int? ?? 0;
+        if (saved['scopes'] case final Map<String, dynamic> scopes) {
+          for (final MapEntry(key: scope, value: index) in scopes.entries) {
+            if (index is int && index >= 0 && index < _tabs.length) {
+              _activeByScope[scope.isEmpty ? null : scope] = _tabs[index].id;
+            }
+          }
+        }
       }
     } catch (_) {
       // First run, or an unreadable file: start fresh.
@@ -67,8 +100,14 @@ class TerminalTabs extends ChangeNotifier {
       _tabs.clear();
       active = 0;
     }
-    if (_tabs.isEmpty) _add(_freshTitle());
+    _ensureGlobal();
     _activeId = _tabs[active.clamp(0, _tabs.length - 1)].id;
+    _activeByScope.putIfAbsent(_tabs.firstWhere((t) => t.id == _activeId).project, () => _activeId);
+  }
+
+  /// The Terminal tab always has a shell.
+  void _ensureGlobal() {
+    if (inScope(null).isEmpty) _add(_freshTitle());
   }
 
   TerminalSession _add(String title,
@@ -125,6 +164,7 @@ class TerminalTabs extends ChangeNotifier {
     final s = _add(name ?? _freshTitle(),
         cwd: cwd, customTitle: title != null, commands: commands, launch: commands, project: project, agent: agent);
     _activeId = s.id;
+    _activeByScope[project] = s.id;
     _scheduleSave();
     notifyListeners();
     return s;
@@ -136,25 +176,35 @@ class TerminalTabs extends ChangeNotifier {
       _tabs.where((t) => t.agent == agent && t.project == project).firstOrNull;
 
   void select(TerminalSession s) {
-    if (s.id == _activeId) return;
+    if (s.id == _activeId && _activeByScope[s.project] == s.id) return;
     _activeId = s.id;
+    _activeByScope[s.project] = s.id;
     _scheduleSave();
     notifyListeners();
   }
 
   void close(TerminalSession s) {
-    final i = _tabs.indexOf(s);
+    final scope = inScope(s.project);
+    final i = scope.indexOf(s);
     if (i < 0) return;
-    _tabs.removeAt(i);
+    _tabs.remove(s);
+    scope.removeAt(i);
     s.dispose(); // closing a tab ends its shell
-    if (_tabs.isEmpty) _add(_freshTitle());
-    if (s.id == _activeId) _activeId = _tabs[i.clamp(0, _tabs.length - 1)].id;
+    if (_activeByScope[s.project] == s.id) {
+      if (scope.isEmpty) {
+        _activeByScope.remove(s.project);
+      } else {
+        _activeByScope[s.project] = scope[i.clamp(0, scope.length - 1)].id;
+      }
+    }
+    _ensureGlobal();
+    if (s.id == _activeId) _activeId = (activeIn(s.project) ?? activeIn(null)!).id;
     _scheduleSave();
     notifyListeners();
   }
 
   void closeOthers(TerminalSession keep) {
-    for (final t in _tabs.where((t) => t != keep && !t.pinned).toList()) {
+    for (final t in inScope(keep.project).where((t) => t != keep && !t.pinned).toList()) {
       close(t);
     }
   }
@@ -171,7 +221,7 @@ class TerminalTabs extends ChangeNotifier {
   }
 
   String _freshTitle() {
-    final used = _tabs.map((t) => t.title).toSet();
+    final used = inScope(null).map((t) => t.title).toSet();
     if (!used.contains('shell')) return 'shell';
     var n = 2;
     while (used.contains('shell $n')) {
@@ -192,6 +242,10 @@ class TerminalTabs extends ChangeNotifier {
     final data = {
       'version': 2,
       'active': activeIndex,
+      'scopes': {
+        for (final MapEntry(key: scope, value: id) in _activeByScope.entries)
+          if (_tabs.indexWhere((t) => t.id == id) case final i when i >= 0) scope ?? '': i,
+      },
       'tabs': [
         for (final t in _tabs)
           {

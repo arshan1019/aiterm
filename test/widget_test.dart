@@ -353,6 +353,7 @@ void main() {
 
   testWidgets('a project opens its workspace; changes are reviewed and committed', (tester) async {
     Directory('${dir.path}/alpine/root/app').createSync(recursive: true);
+    File('${dir.path}/alpine/root/app/main.dart').writeAsStringSync('void main() {}');
     File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
     final now = DateTime.now().millisecondsSinceEpoch;
     File('${dir.path}/projects.json').writeAsStringSync(
@@ -371,9 +372,12 @@ void main() {
     expect(find.text('2 changes'), findsOneWidget); // on the card
     await tester.tap(find.text('Weather app'));
     await settleIo(tester);
-    expect(find.text('AGENT'), findsOneWidget);
+    // A project is a workspace with its own tabs; it opens on agent.
+    for (final t in ['agent', 'changes 2', 'files', 'preview']) {
+      expect(find.text(t), findsOneWidget);
+    }
     expect(find.text('Install Claude Code'), findsOneWidget); // no agent yet: one tap to get one
-    await tester.tap(find.text('2 changed files to review'));
+    await tester.tap(find.text('changes 2'));
     await settleIo(tester);
 
     expect(find.text('CHANGES · 2'), findsOneWidget);
@@ -392,27 +396,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Committed'), findsNothing);
 
-    // Back in the workspace, Terminal opens a tab in the project.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Terminal'));
-    await tester.tap(find.text('Terminal'));
+    // Files: the project's own folder, without leaving the project.
+    await tester.tap(find.text('files'));
     await settleIo(tester);
-    expect(services.navigation.tab.name, 'terminal');
-    expect(services.tabs.active.cwd, '/root/app');
+    expect(find.text('main.dart'), findsOneWidget);
+    expect(services.navigation.shownProject?.id, '1');
 
-    // The tab belongs to the project: its chip, and Android back, go there.
-    await tester.tap(find.byTooltip('Back to project'));
-    await settleIo(tester);
-    expect(services.navigation.tab.name, 'projects');
-    expect(find.text('AGENT'), findsOneWidget);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    services.navigation.open(AppTab.terminal);
-    await tester.pumpAndSettle();
+    // Back: a tab's own history, then the agent tab, then out to Projects.
     await tester.binding.handlePopRoute();
     await settleIo(tester);
-    expect(find.text('AGENT'), findsOneWidget);
+    expect(services.navigation.workspaceTab, WorkspaceTab.agent);
+    expect(find.text('Install Claude Code'), findsOneWidget);
+
+    // A terminal opened here belongs to the project, not the Terminal tab.
+    await tester.tap(find.text('Terminal'));
+    await settleIo(tester);
+    expect(services.navigation.tab.name, 'projects');
+    expect(services.tabs.activeIn('/root/app')?.cwd, '/root/app');
+    expect(find.text('app'), findsOneWidget); // its tab, in the workspace
+
+    await tester.binding.handlePopRoute();
+    await settleIo(tester);
+    expect(services.navigation.atTabs, isTrue); // back on the project list
+    await tester.tap(find.text('terminal'));
+    await settleIo(tester);
+    expect(find.text('shell'), findsOneWidget);
+    expect(find.text('app'), findsNothing);
+
+    // Coming back to the project finds its session where it was.
+    await tester.tap(find.text('projects'));
+    await settleIo(tester);
+    await tester.tap(find.text('Weather app'));
+    await settleIo(tester);
+    expect(find.text('app'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 

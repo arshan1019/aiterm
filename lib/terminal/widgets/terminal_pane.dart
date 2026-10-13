@@ -11,15 +11,17 @@ import '../../platform/android_env.dart';
 import '../../shared/settled_size.dart';
 import '../terminal_session.dart';
 import 'notice.dart';
-import '../../git/git_screen.dart';
 import 'terminal_selection.dart';
 
 /// Renders one [TerminalSession]: the terminal itself, link/selection
 /// handling, and notices floating over its top edge.
 class TerminalPane extends StatefulWidget {
-  const TerminalPane({super.key, required this.session, required this.visible});
+  const TerminalPane({super.key, required this.session, required this.visible, required this.onReview});
 
   final TerminalSession session;
+
+  /// Opens the changes a [ReviewHint] points at.
+  final void Function(ReviewHint hint) onReview;
 
   /// This tab is selected and the Terminal screen is showing.
   final bool visible;
@@ -230,7 +232,7 @@ class _TerminalPaneState extends State<TerminalPane> {
       action: 'Review',
       onAction: () {
         _session.review.value = null;
-        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => GitScreen(folder: hint.folder)));
+        widget.onReview(hint);
       },
       onDismiss: () => _session.review.value = null,
     );

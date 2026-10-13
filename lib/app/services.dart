@@ -72,16 +72,13 @@ class AppServices {
       // A command finished in a terminal: its repo may have changed.
       if (signal is CommandSignal) git.touched(cwd);
       // An agent finished (exited, or asked for attention): offer a review.
-      final agent = agents.installed.where((a) => session.title.startsWith(a.name)).firstOrNull;
+      final agent = agents.installed
+          .where((a) => session.agent == a.id || (session.agent == null && session.title.startsWith(a.name)))
+          .firstOrNull;
       if (agent != null) _offerReview(session, agent.name, cwd).ignore();
     };
-    // Back from an agent's tab: the project it works on.
-    navigation.setBackHandler(AppTab.terminal, () {
-      final project = projectOf(tabs.active);
-      if (project == null) return false;
-      navigation.showProject(project.id);
-      return true;
-    });
+    // A removed project's sessions move to the Terminal tab.
+    projects.addListener(_reconcileTabs);
     ssh.load().ignore();
     if (linux.installed) preview.start().ignore();
     _updatePresence();
@@ -92,7 +89,7 @@ class AppServices {
 
   void _updatePresence() {
     _presence.update(
-      visibleId: visibleSession(appVisible: _appVisible, tab: navigation.tab, activePtyId: tabs.active.ptyId),
+      visibleId: visibleSession(appVisible: _appVisible, shownPtyId: shownSession?.ptyId),
       titles: {for (final t in tabs.tabs) ?t.ptyId: t.title},
     );
   }
@@ -121,12 +118,43 @@ class AppServices {
     if (linux.installed) ssh.startAgent(rootfs: linux.rootfs).ignore();
   }
 
-  /// A notification for session [ptyId] was tapped.
-  void _openSession(int ptyId) {
-    for (final t in tabs.tabs) {
-      if (t.ptyId == ptyId) tabs.select(t);
+  /// The terminal on screen: the Terminal tab's selected tab, or the open
+  /// project's while its agent tab shows. Null when no terminal shows.
+  TerminalSession? get shownSession {
+    if (navigation.shownProject case final p?) {
+      return navigation.workspaceTab == WorkspaceTab.agent ? tabs.activeIn(p.path) : null;
     }
-    navigation.open(AppTab.terminal);
+    return navigation.atTabs && navigation.tab == AppTab.terminal ? tabs.activeIn(null) : null;
+  }
+
+  /// A notification for session [ptyId] was tapped: show it where it lives.
+  void _openSession(int ptyId) {
+    final session = tabs.tabs.where((t) => t.ptyId == ptyId).firstOrNull;
+    if (session != null) tabs.select(session);
+    showSession(session);
+  }
+
+  /// Shows [session] where it lives: its project's agent tab, or the
+  /// Terminal tab.
+  void showSession(TerminalSession? session) {
+    final project = session == null ? null : projectOf(session);
+    if (project != null) {
+      showProject(project, tab: WorkspaceTab.agent);
+    } else {
+      navigation.open(AppTab.terminal);
+    }
+  }
+
+  /// Opens [project]'s workspace (and remembers it as most recent).
+  void showProject(Project project, {WorkspaceTab? tab}) {
+    projects.opened(project).ignore();
+    navigation.showProject(ProjectRef(project.id, project.path), tab: tab);
+  }
+
+  void _reconcileTabs() {
+    for (final path in {for (final t in tabs.tabs) ?t.project}) {
+      if (projects.byPath(path) == null) tabs.detachProject(path);
+    }
   }
 
   // ignore: unused_field
@@ -165,18 +193,20 @@ class AppServices {
   /// folder, or starts one. The folder becomes a recent project.
   late final agents = AgentInstaller(
     run: linux.runScriptStreaming,
-    launch: (agent, title, commands, cwd) {
-      final existing = tabs.findAgent(agent.id, cwd);
+    launch: (agent, title, commands, cwd) async {
+      // The folder becomes (or is) a project, and the session lives there.
+      final project = cwd == null ? null : await projects.usedAgent(cwd, agent.id);
+      final scope = project?.path;
+      final existing = tabs.findAgent(agent.id, scope);
       if (existing == null) {
-        tabs.open(title: title, commands: commands, cwd: cwd, project: cwd, agent: agent.id);
+        tabs.open(title: project == null ? title : agent.name, commands: commands, cwd: cwd, project: scope, agent: agent.id);
       } else {
         tabs.select(existing);
         if (existing.state.value == SessionState.exited) {
           existing.restart(linux.sessionSpec, alpine: !linux.usesAndroidShell).ignore();
         }
       }
-      if (cwd != null) projects.usedAgent(cwd, agent.id).ignore();
-      navigation.open(AppTab.terminal);
+      showSession(tabs.active);
     },
   );
 
@@ -205,6 +235,7 @@ class AppServices {
     final services = AppServices._(paths, settings, linux, tabs);
     services.keepAlive.refresh().ignore();
     await services.projects.load();
+    services._reconcileTabs();
     return services;
   }
 

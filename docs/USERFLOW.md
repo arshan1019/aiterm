@@ -96,14 +96,13 @@ flowchart LR
     FR -->|no| H["Projects home"]
     OB --> NP["Create first project"]
     NP --> P
-    H -->|tap project| P["Project"]
-    P -->|primary button| AG["Agent session<br/>(resumed if running)"]
-    AG -->|agent finishes| RV["Review changes"]
-    RV --> PV["Preview"]
+    H -->|tap project| P["Project workspace"]
+    P -->|agent tab: primary button| AG["Agent session<br/>(resumed if running)"]
+    AG -->|agent finishes| RV["changes tab: review"]
+    RV --> PV["preview tab"]
     RV --> SH["Commit & push"]
-    SH --> P
-    PV --> P
-    AG <-->|project chip / back| P
+    SH --> AG
+    PV --> AG
 ```
 
 ### 5.2 First run: one screen, one wait
@@ -119,7 +118,7 @@ flowchart TD
     PR --> D{"Done"}
     D -->|failed step| RT["Retry this step · Details<br/>(earlier steps kept)"] --> PR
     D -->|ok| FP["Create your first project<br/>name field focused · template chips · Clone instead"]
-    FP -->|Create · 2–3 taps| P["Project page"]
+    FP -->|Create · 2–3 taps| P["Project workspace, agent tab"]
     P -->|Open Claude Code · 4th tap| AG["Agent session in the project folder"]
     AG --> SI["Agent's own sign-in (first time)<br/>link tap opens the browser"]
     W -.->|Advanced| AS["Use Android shell<br/>(power users, no agents)"]
@@ -133,20 +132,19 @@ Changes from today: F2, F3 and F4 go away, and F1 is handled before it can bite.
 flowchart TD
     H["Projects home<br/>cards: branch · N changes · agent running ●"] -->|tap| P
     H -->|New project| NP{"Empty · Template · Clone · Open folder"} --> P
-    P["Project<br/>[ ▶ Open Claude Code ]  ⌄ other agents<br/>Changes · Preview · Terminal · Files"] -->|primary| R{"Session for this project+agent?"}
-    R -->|running| RS["Switch to that tab"]
-    R -->|none| NS["New tab in project folder"]
+    P["Project workspace<br/>agent · changes 3 · files · preview ●"] -->|agent tab| R{"Session for this project+agent?"}
+    R -->|running| RS["Shown right away"]
+    R -->|none| NS["Open Claude Code → new session in the project folder"]
     RS --> T
-    NS --> T["Terminal tab<br/>chip: ‹ Weather app · 3 changes"]
-    T -->|chip| P
+    NS --> T["agent tab: the session<br/>+ another agent or a terminal"]
     T -->|agent finishes or asks for input| N["Notice: 3 files changed · Review"]
     N --> G
-    P -->|Changes| G["Git view"]
-    G -->|Preview| PV
-    P -->|Preview: live ● port| PV["Preview"]
+    P -->|changes tab| G["Git view"]
+    G -->|preview tab| PV
+    P -->|preview tab: live ●| PV["Preview"]
 ```
 
-Changes from today: F5, F6, F7, F8 and F11. The project page stays on the stack under the terminal tab (the chip's back target), and the primary button remembers the project's last agent.
+Changes from today: F5, F6, F7, F8 and F11. Nothing leaves the workspace: its sessions, changes, files and preview are its own tabs (section 6), and the primary button remembers the project's last agent.
 
 ### 5.4 Review and ship
 
@@ -191,7 +189,78 @@ flowchart TD
     E4["Git error"] --> N4["Inline card with its fix, then retry"]
 ```
 
-## 6. Screen by screen
+## 6. Navigation and the back stack
+
+### 6.1 The problem it fixes
+
+The first projects build had two hierarchies fighting each other: the top tabs (projects / terminal / files / settings) organise by *tool*, the project page organised by *project*. Opening an agent, a terminal or Files from a project jumped to a global tab and left the project behind, so back did something different every time:
+
+| From | Back went to | Expected |
+|---|---|---|
+| Agent tab (opened from a project) | the project (special case) | the project |
+| Files (opened from a project) | the Projects list | the project |
+| Changes → "Show in Files" | the Projects list | Changes |
+| A project opened from Files | Files | the project list |
+
+### 6.2 The model: one home for each thing
+
+```mermaid
+flowchart TB
+  subgraph Shell["App: top tabs (tabs are not history)"]
+    P["projects*"]
+    T["terminal: shells outside projects"]
+    F["files: Linux home + phone"]
+    S["settings"]
+  end
+  subgraph WS["Project workspace: a page over Projects, its own tabs"]
+    A["agent*: its agent and terminal sessions"]
+    C["changes: git"]
+    WF["files: the project folder + phone"]
+    PV["preview: its dev server"]
+  end
+  P -->|"tap a project"| A
+  C -->|"tap a file"| D["Diff page"]
+  WF -->|"tap a text file"| E["Editor page"]
+  P -->|"New project"| N["New project form"]
+  N -->|"Create: form replaced by"| A
+  P -->|"Agents"| AG["Agents page"]
+  F -->|"Open as project / Open in agent"| A
+  T -->|"Git changes here"| G["Git page (folder outside projects)"]
+```
+
+* = where that level opens. The workspace is the only place a project's sessions, changes, files and preview appear; the Terminal tab keeps shells that aren't in a project, Files the whole of Linux and the phone.
+
+### 6.3 Back rules
+
+Android back, in this order, everywhere:
+
+1. Close what's on top: keyboard, selection, sheet, dialog.
+2. Pop the top page: Diff → changes, Editor → files, Agents → Projects.
+3. The current tab's own history: folders in files (back, then up to the root), pages in preview.
+4. The first tab of that level: any workspace tab → agent; any app tab → projects.
+5. Leave the level: a workspace → the project list; the project list → close the app.
+
+The app bar's ← in a workspace is "up": it leaves the project directly. Switching tabs never adds a back step, at either level.
+
+### 6.4 What comes next
+
+| After | You land on | Back from there |
+|---|---|---|
+| Setup finishes | Projects (empty: "Create your first project") | closes the app |
+| Create, clone or open a project | its workspace, agent tab (the form is replaced) | Projects |
+| Open an agent (anywhere) | that project's agent tab, resuming its session if one is open | agent → Projects |
+| Open an agent in a folder that isn't a project | it becomes a project; its agent tab | Projects |
+| An agent finishes with changes → Review | the same workspace, changes tab | agent tab |
+| A dev server starts → Preview | the same workspace, preview tab | agent tab |
+| Show in Files (inside a project) | the workspace's files tab at that folder | agent tab |
+| Commit / push | stays on changes, result card in place | agent tab |
+| Notification tap | the session's home: its project's agent tab, or the Terminal tab | Projects |
+| Remove / delete a project | Projects (its sessions move to the Terminal tab / close) | closes the app |
+| Open as project (from Files) | the workspace, over Projects | Projects, not Files |
+
+The last row is deliberate: a project always opens over the project list, wherever it was opened from, so back from a project is always the same place.
+
+## 7. Screen by screen
 
 The single most important action per screen, and what is demoted.
 
@@ -199,17 +268,17 @@ The single most important action per screen, and what is demoted.
 |---|---|---|---|
 | **Onboarding** | Set up (agents preselected) | Pick agents; GitHub sign-in and keep-alive cards during the wait | "Use Android shell" → Advanced link |
 | **Projects home** | Tap a project card (shows ● agent running, N changes) | New project (FAB); Agents (top bar) | Agent prompt card once any agent is installed |
-| **Project** | **Open ⟨last agent⟩** (resumes) | Changes summary, Preview (● when live), Terminal, Files; ⌄ other agents | Equal-weight agent list |
-| **Terminal tab** | The agent session | Project chip ‹ back to the project; review notice; ✦ assistant | Nothing |
+| **Project workspace** | agent tab: **Open ⟨last agent⟩**, then the session itself | changes N, files, preview ● tabs; + for another agent or a terminal | The old project page and its links out to global tabs |
+| **Terminal tab** | Shells outside projects | ✦ assistant, review notice | Project sessions (they live in their workspace) |
 | **Git view** | Commit & push (with Suggest message) | File diffs, branch, sync | Error snackbars → inline cards |
 | **Files** | Browse / open | ⋮ actions, Linux/Phone, paste bar | Nothing |
 | **Settings** | GitHub, Keep alive | SSH keys, Appearance | Android shell, Backup → Advanced |
 
-## 7. Implementation plan
+## 8. Implementation plan
 
 In order of impact; each step ships with tests (unit for models, widget on CI).
 
-**Status (2026-10-14):** steps 1–6 are built (commit 2ecd4dd). Not done yet: a "View on GitHub" link after a push, and a live preview dot on each project card (preview shows on the Projects home instead, because ports aren't tied to a project).
+**Status (2026-10-14):** steps 1–6 are built (commit 2ecd4dd), and the navigation model in section 6 replaces the project page with the workspace. Not done yet: a "View on GitHub" link after a push, and a live preview dot on each project card (preview shows on the Projects home instead, because ports aren't tied to a project).
 
 1. **Keep-alive at the right time (F1).** A "Keep agents running" card set in onboarding; a tab notice when a session dies by signal 9 that deep-links to the step. *Files:* `keep_alive/`, `terminal_pane.dart`, new `onboarding/`.
 2. **Onboarding pipeline (F2, F3, F4).** `SetupPipeline` model: ordered steps (Linux → tools → agents), per-step status, resumable retry; agent picker; ends in "Create your first project". `SetupView` becomes the pipeline screen; Android shell moves to Settings → Advanced. *Tests:* pipeline order, retry keeps finished steps, failure isolation.
@@ -218,13 +287,13 @@ In order of impact; each step ships with tests (unit for models, widget on CI).
 5. **Preview always findable (F11).** Project page shows a live ● on Preview when a port is up; Projects card shows it too.
 6. **Inline git outcomes and suggested messages (F10, F12).** Commit-bar result card (identity, auth, pull first, publish, pushed + View on GitHub); "Suggest" generates a message from the staged diff. *Tests:* each error kind renders its card; suggestion uses staged paths and stats.
 
-## 8. How we measure it
+## 9. How we measure it
 
 | Measure | Today (build #29) | Target |
 |---|---|---|
 | Taps from first launch to an agent running in a project | ~9 taps + 3 separate waits (Linux, agent, git) | **4 taps, 1 wait** |
 | Waits the user must start by hand | 4 (Linux, each agent, git, GitHub) | 1 |
 | Taps from "agent finished" to "pushed" | 3 + typing a message | 2 with a suggested message |
-| Taps from an agent tab back to its project | 3 (projects tab, find card, tap) | 1 (chip) |
+| Taps from an agent session to the project's changes | 3 (projects tab, find card, Changes) | 1 (changes tab) |
 | Duplicate agent tabs per project | grows with every Open | 1 |
 | Agent runs lost to Android background kills | silent, common on Android 12+ | prevented in onboarding; explained with a fix when they happen |

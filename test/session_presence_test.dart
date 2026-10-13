@@ -1,13 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aiterm/app/navigation.dart';
 import 'package:aiterm/terminal/session_presence.dart';
 
 void main() {
-  test('only the active tab of a visible Terminal screen counts as seen', () {
-    expect(visibleSession(appVisible: true, tab: AppTab.terminal, activePtyId: 5), 5);
-    expect(visibleSession(appVisible: true, tab: AppTab.files, activePtyId: 5), isNull);
-    expect(visibleSession(appVisible: false, tab: AppTab.terminal, activePtyId: 5), isNull);
-    expect(visibleSession(appVisible: true, tab: AppTab.terminal, activePtyId: null), isNull);
+  test('the terminal on screen counts as seen while the app is visible', () {
+    expect(visibleSession(appVisible: true, shownPtyId: 5), 5);
+    expect(visibleSession(appVisible: false, shownPtyId: 5), isNull);
+    expect(visibleSession(appVisible: true, shownPtyId: null), isNull);
   });
 
   test('reports changes once, and titles per session', () {

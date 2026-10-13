@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../app/navigation.dart';
+import '../app/services.dart';
 import '../app/theme.dart';
 import '../platform/android_env.dart';
 import 'preview_controller.dart';
 
-/// An in-app browser for a dev server running in Linux.
+/// An in-app browser for a dev server running in Linux. A page, or a
+/// project's Preview tab ([embedded]: a slim bar instead of an app bar;
+/// back steps through the page's history via the workspace).
 class PreviewScreen extends StatefulWidget {
-  const PreviewScreen({super.key, required this.port});
+  const PreviewScreen({super.key, required this.port, this.embedded = false});
 
   final int port;
+  final bool embedded;
 
   @override
   State<PreviewScreen> createState() => _PreviewScreenState();
@@ -35,6 +40,24 @@ class _PreviewScreenState extends State<PreviewScreen> {
         },
       ))
       ..loadRequest(_url);
+    if (widget.embedded) _nav.workspaceBack[WorkspaceTab.preview] = _back;
+  }
+
+  late final _nav = context.services.navigation;
+
+  @override
+  void dispose() {
+    if (widget.embedded && _nav.workspaceBack[WorkspaceTab.preview] == _back) {
+      _nav.workspaceBack.remove(WorkspaceTab.preview);
+    }
+    super.dispose();
+  }
+
+  /// Back in the page's own history; false when there's none.
+  Future<bool> _back() async {
+    if (!await _web.canGoBack()) return false;
+    await _web.goBack();
+    return true;
   }
 
   Future<void> _openExternally() async {
@@ -48,6 +71,40 @@ class _PreviewScreenState extends State<PreviewScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    if (widget.embedded) {
+      return Column(
+        children: [
+          Container(
+            height: 40,
+            padding: const EdgeInsets.only(left: 12),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    [if (_title?.isNotEmpty == true) _title!, 'localhost:${widget.port}'].join('  ·  '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: c.textMuted, fontSize: 12),
+                  ),
+                ),
+                IconButton(tooltip: 'Reload', iconSize: 18, icon: const Icon(Icons.refresh_rounded), onPressed: _web.reload),
+                IconButton(
+                    tooltip: 'Open in browser',
+                    iconSize: 18,
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    onPressed: _openExternally),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 2,
+            child: _progress < 1 ? LinearProgressIndicator(value: _progress == 0 ? null : _progress, minHeight: 2) : null,
+          ),
+          Expanded(child: WebViewWidget(controller: _web)),
+        ],
+      );
+    }
     return PopScope(
       canPop: false,
       // Back steps through the page's own history first.

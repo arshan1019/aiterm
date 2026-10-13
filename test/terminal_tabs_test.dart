@@ -97,4 +97,59 @@ void main() {
     expect(seen, isNotEmpty);
     tabs.dispose();
   });
+
+  group('each project keeps its own sessions', () {
+    test('sessions are grouped by project; the global terminal keeps the rest', () async {
+      final tabs = TerminalTabs(dir.path);
+      await tabs.load();
+      final shell = tabs.active;
+      final agent = tabs.open(title: 'Claude Code · app', commands: ['claude'], cwd: '/root/app', project: '/root/app', agent: 'claude');
+      final appShell = tabs.open(cwd: '/root/app/src', project: '/root/app');
+      expect(tabs.inScope(null), [shell]);
+      expect(tabs.inScope('/root/app'), [agent, appShell]);
+      expect(tabs.activeIn('/root/app'), appShell); // the newest
+      expect(tabs.activeIn(null), shell);
+      tabs.select(agent);
+      expect(tabs.activeIn('/root/app'), agent);
+      expect(tabs.activeIn('/root/other'), isNull);
+      tabs.dispose();
+    });
+
+    test('closing a project session selects its neighbour in that project; the global terminal is never empty', () async {
+      final tabs = TerminalTabs(dir.path);
+      await tabs.load();
+      final a = tabs.open(cwd: '/root/app', project: '/root/app');
+      final b = tabs.open(cwd: '/root/app', project: '/root/app');
+      tabs.close(b);
+      expect(tabs.activeIn('/root/app'), a);
+      tabs.close(tabs.inScope(null).single);
+      expect(tabs.inScope(null), hasLength(1)); // a fresh shell
+      tabs.dispose();
+    });
+
+    test('a removed project hands its sessions to the global terminal', () async {
+      final tabs = TerminalTabs(dir.path);
+      await tabs.load();
+      final a = tabs.open(cwd: '/root/app', project: '/root/app');
+      tabs.detachProject('/root/app');
+      expect(a.project, isNull);
+      expect(tabs.inScope(null), contains(a));
+      tabs.dispose();
+    });
+
+    test('the selected session of each project comes back after a restart', () async {
+      final tabs = TerminalTabs(dir.path);
+      await tabs.load();
+      final a = tabs.open(cwd: '/root/app', project: '/root/app');
+      tabs.open(cwd: '/root/app', project: '/root/app');
+      tabs.select(a);
+      tabs.select(tabs.inScope(null).first);
+      await tabs.save();
+      tabs.dispose();
+      final again = TerminalTabs(dir.path);
+      await again.load();
+      expect(again.activeIn('/root/app')!.id, again.inScope('/root/app').first.id);
+      again.dispose();
+    });
+  });
 }

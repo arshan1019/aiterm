@@ -12,13 +12,15 @@ import 'git_parsers.dart';
 import 'git_repo.dart';
 
 /// A folder's git changes: branch, sync, staged and unstaged files, and
-/// commit. Opened from a project, Files or a terminal tab.
+/// commit. A project's Changes tab ([embedded]: no app bar of its own), or
+/// a page for folders outside projects (from Files or a terminal tab).
 class GitScreen extends StatefulWidget {
-  const GitScreen({super.key, required this.folder, this.title});
+  const GitScreen({super.key, required this.folder, this.title, this.embedded = false});
 
   /// Any folder inside the repository (a guest path).
   final String folder;
   final String? title;
+  final bool embedded;
 
   @override
   State<GitScreen> createState() => _GitScreenState();
@@ -73,6 +75,25 @@ class _GitScreenState extends State<GitScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final repo = _repo;
+    final body = switch (_load) {
+      _Load.loading => const SizedBox.expand(),
+      _Load.noTools => _Message(
+          icon: Icons.download_rounded,
+          title: 'Git isn\'t set up yet',
+          text: 'Install git and GitHub\'s CLI in Linux to track changes and sync. One tap, once.',
+          action: 'Install git',
+          onAction: _installTools,
+        ),
+      _Load.notRepo => _Message(
+          icon: Icons.history_rounded,
+          title: 'Not tracked by git',
+          text: 'Start tracking this folder to see changes, commit them and sync with GitHub.',
+          action: 'Start tracking',
+          onAction: _init,
+        ),
+      _Load.ready => _RepoView(repo: repo!),
+    };
+    if (widget.embedded) return body;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -85,24 +106,7 @@ class _GitScreenState extends State<GitScreen> {
         ),
         actions: [if (repo != null) _RepoMenu(repo: repo)],
       ),
-      body: switch (_load) {
-        _Load.loading => const SizedBox.expand(),
-        _Load.noTools => _Message(
-            icon: Icons.download_rounded,
-            title: 'Git isn\'t set up yet',
-            text: 'Install git and GitHub\'s CLI in Linux to track changes and sync. One tap, once.',
-            action: 'Install git',
-            onAction: _installTools,
-          ),
-        _Load.notRepo => _Message(
-            icon: Icons.history_rounded,
-            title: 'Not tracked by git',
-            text: 'Start tracking this folder to see changes, commit them and sync with GitHub.',
-            action: 'Start tracking',
-            onAction: _init,
-          ),
-        _Load.ready => _RepoView(repo: repo!),
-      },
+      body: body,
     );
   }
 }

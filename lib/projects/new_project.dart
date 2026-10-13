@@ -8,7 +8,6 @@ import '../shared/action_sheet.dart';
 import '../shared/folder_picker.dart';
 import '../shared/format.dart';
 import 'project.dart';
-import 'project_screen.dart';
 import 'project_service.dart';
 import 'project_store.dart';
 import 'templates.dart';
@@ -36,8 +35,7 @@ Future<void> openFolderAsProject(BuildContext context) async {
   final s = context.services;
   final path = await pickLinuxFolder(context, title: 'Open a folder', action: 'Open');
   if (path == null || !context.mounted) return;
-  final project = await s.projectService.openExisting(path);
-  if (context.mounted) await openProject(context, project);
+  s.showProject(await s.projectService.openExisting(path));
 }
 
 class NewProjectScreen extends StatefulWidget {
@@ -120,9 +118,8 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
         NewProjectKind.template => await svc.createFromTemplate(_template, name: _name.text.trim(), path: _path),
         NewProjectKind.clone => await svc.clone(_url.text.trim(), path: _path),
       };
-      if (!mounted) return;
-      Navigator.pop(context);
-      await openProject(context, p);
+      // The form gives way to the new project (back goes to Projects).
+      _s.showProject(p);
     } on GitError catch (e) {
       if (e.kind == GitErrorKind.auth && mounted && await signInToGitHub(context) && mounted) {
         setState(() => _busy = false);

@@ -84,7 +84,7 @@ class FilesBrowser extends ChangeNotifier {
     if (phone != null && (_current == phone.root || _current.startsWith('${phone.root}/'))) {
       (base, label) = (phone.root, phone.label);
     } else if (_current == _root || _current.startsWith('$_root/')) {
-      (base, label) = (_root, '~');
+      (base, label) = (_root, _locations.firstWhere((l) => l.kind == LocationKind.linux, orElse: () => FilesLocation.linux(_root)).label);
     } else if (rootfs case final r? when _current.startsWith(r)) {
       (base, label) = (r, '/');
     } else {

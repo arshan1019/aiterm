@@ -1,9 +1,7 @@
-import '../app/navigation.dart';
-
-/// The session the user is looking at: the active tab, while the Terminal
-/// screen shows and the app is on screen. Native notifications skip it.
-int? visibleSession({required bool appVisible, required AppTab tab, required int? activePtyId}) =>
-    appVisible && tab == AppTab.terminal ? activePtyId : null;
+/// The session the user is looking at ([shownPtyId]: the terminal on
+/// screen, in the Terminal tab or a project's agent tab), while the app is
+/// on screen. Native notifications skip it.
+int? visibleSession({required bool appVisible, required int? shownPtyId}) => appVisible ? shownPtyId : null;
 
 /// Tells the native side (which decides notifications even when this UI is
 /// gone) what's on screen and what each session's tab is called. Sends

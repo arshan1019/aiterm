@@ -8,7 +8,6 @@ import '../app/theme.dart';
 import '../agents/agent_installer.dart';
 import '../platform/android_env.dart';
 import '../git/git_screen.dart';
-import '../projects/project_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/name_dialog.dart';
 import 'file_clipboard.dart';
@@ -16,10 +15,15 @@ import 'file_system_service.dart';
 import 'files_browser.dart';
 import 'text_editor_screen.dart';
 
-/// The Files tab: browse the shell's home folder, open text files, and
-/// create, rename or delete entries.
+/// Browse files, open text files, and create, rename, copy or delete
+/// entries. The Files tab (Linux home and the phone's storage), or a
+/// project's Files tab ([project]: rooted at its folder, plus the phone's
+/// storage to bring assets in).
 class FilesScreen extends StatefulWidget {
-  const FilesScreen({super.key});
+  const FilesScreen({super.key, this.project, this.projectName});
+
+  final ProjectRef? project;
+  final String? projectName;
 
   @override
   State<FilesScreen> createState() => _FilesScreenState();
@@ -29,10 +33,19 @@ class _FilesScreenState extends State<FilesScreen> {
   late final _services = context.services;
   static const _phoneRoot = '/storage/emulated/0';
   late final FilesBrowser _browser = FilesBrowser(
-    root: _services.linux.home,
+    root: _root,
     rootfs: _services.linux.rootfs,
-    locations: [FilesLocation.linux(_services.linux.home), const FilesLocation.phone(_phoneRoot)],
+    locations: [
+      FilesLocation(LocationKind.linux, _root, widget.projectName ?? '~'),
+      const FilesLocation.phone(_phoneRoot),
+    ],
   );
+
+  ProjectRef? get _project => widget.project;
+  String get _root => switch (_project) {
+        final p? => _services.linux.hostPath(p.path),
+        null => _services.linux.home,
+      };
   final _clipboard = FileClipboard();
   bool _phoneAccess = false;
   late final _lifecycle = AppLifecycleListener(onResume: _checkPhoneAccess);
@@ -40,19 +53,31 @@ class _FilesScreenState extends State<FilesScreen> {
   @override
   void initState() {
     super.initState();
-    _browser.load();
+    if (_project == null) _browser.load();
     _lifecycle; // re-check phone access when back from system settings
     _checkPhoneAccess();
-    _services.linux.addListener(_onLinuxChanged);
     _services.navigation.addListener(_openPending);
-    _services.navigation.setBackHandler(AppTab.files, _browser.handleBack);
+    if (_project == null) {
+      _services.linux.addListener(_onLinuxChanged);
+      _services.navigation.setBackHandler(AppTab.files, _browser.handleBack);
+    } else {
+      _services.navigation.workspaceBack[WorkspaceTab.files] = _back;
+      // A folder asked for before this tab existed (Show in Files).
+      _browser.load().then((_) => _openPending());
+    }
   }
+
+  Future<bool> _back() async => _browser.handleBack();
 
   @override
   void dispose() {
-    _services.linux.removeListener(_onLinuxChanged);
     _services.navigation.removeListener(_openPending);
-    _services.navigation.setBackHandler(AppTab.files, null);
+    if (_project == null) {
+      _services.linux.removeListener(_onLinuxChanged);
+      _services.navigation.setBackHandler(AppTab.files, null);
+    } else if (_services.navigation.workspaceBack[WorkspaceTab.files] == _back) {
+      _services.navigation.workspaceBack.remove(WorkspaceTab.files);
+    }
     _browser.dispose();
     _clipboard.dispose();
     _lifecycle.dispose();
@@ -90,12 +115,18 @@ class _FilesScreenState extends State<FilesScreen> {
     if (home != _browser.root) _browser.reset(home);
   }
 
-  /// A folder the assistant asked to show ("show src in files").
+  /// A folder asked for elsewhere ("show src in files", Show in Files).
   Future<void> _openPending() async {
     final nav = _services.navigation;
-    final requested = nav.pendingFolder;
+    final String? requested;
+    if (_project == null) {
+      requested = nav.pendingFolder;
+      nav.pendingFolder = null;
+    } else {
+      requested = nav.pendingProjectFolder;
+      nav.pendingProjectFolder = null;
+    }
     if (requested == null) return;
-    nav.pendingFolder = null;
     final target = _services.linux.hostPath(requested).replaceAll(RegExp(r'/+$'), '');
     if (await _browser.fs.isDirectory(target)) {
       await _browser.open(target);
@@ -131,7 +162,14 @@ class _FilesScreenState extends State<FilesScreen> {
   /// default), shown right away.
   void _openTerminalHere([String? folder]) {
     final linux = _services.linux;
-    _services.tabs.open(cwd: linux.guestPath(folder ?? _browser.current));
+    final cwd = linux.guestPath(folder ?? _browser.current);
+    if (_project case final p?) {
+      // Stays in the project: a session in its agent tab.
+      _services.tabs.open(cwd: cwd, project: p.path);
+      _services.navigation.openWorkspaceTab(WorkspaceTab.agent);
+      return;
+    }
+    _services.tabs.open(cwd: cwd);
     _services.navigation.open(AppTab.terminal);
   }
 
@@ -149,7 +187,7 @@ class _FilesScreenState extends State<FilesScreen> {
   /// Adds [folder] (a host path) to Projects and opens it.
   Future<void> _openAsProject([String? folder]) async {
     final project = await _services.projectService.openExisting(_services.linux.guestPath(folder ?? _browser.current));
-    if (mounted) await openProject(context, project);
+    _services.showProject(project);
   }
 
   /// Files changed: repos showing this folder refresh.
@@ -183,14 +221,15 @@ class _FilesScreenState extends State<FilesScreen> {
       actions: [
         if (folder) ...[
           SheetAction(Icons.terminal_rounded, 'Open terminal here', () => _openTerminalHere(e.path)),
-          for (final agent in _services.agents.installed)
+          if (_project == null)
+            for (final agent in _services.agents.installed)
             SheetAction(
               Icons.auto_awesome_rounded,
               'Open in ${agent.name}',
               () => _openInAgent(agent.id, e.path),
               accent: true,
             ),
-          if (_inLinux) ...[
+          if (_inLinux && _project == null) ...[
             SheetAction(Icons.folder_special_outlined, 'Open as project', () => _openAsProject(e.path)),
             SheetAction(Icons.call_split_rounded, 'Git changes', () => _openGit(e.path)),
           ],
@@ -224,9 +263,10 @@ class _FilesScreenState extends State<FilesScreen> {
               browser: _browser,
               agents: _services.agents,
               onOpenTerminal: _openTerminalHere,
-              onOpenAgent: _openInAgent,
-              onGit: _inLinux ? _openGit : null,
-              onProject: _inLinux ? _openAsProject : null,
+              onOpenAgent: _project == null ? _openInAgent : null,
+              onGit: _inLinux && _project == null ? _openGit : null,
+              onProject: _inLinux && _project == null ? _openAsProject : null,
+              homeLabel: _project == null ? 'Go home' : 'Project folder',
             ),
             Expanded(
               child: _browser.location.kind == LocationKind.phone && !_phoneAccess
@@ -285,17 +325,20 @@ class _Header extends StatefulWidget {
     required this.browser,
     required this.agents,
     required this.onOpenTerminal,
-    required this.onOpenAgent,
+    this.onOpenAgent,
     this.onGit,
     this.onProject,
+    required this.homeLabel,
   });
+
+  final String homeLabel;
 
   /// Only in Linux storage (git doesn't work on the phone's storage).
   final VoidCallback? onGit, onProject;
 
   final FilesBrowser browser;
   final VoidCallback onOpenTerminal;
-  final void Function(String agentId) onOpenAgent;
+  final void Function(String agentId)? onOpenAgent;
   final AgentInstaller agents;
 
   @override
@@ -373,7 +416,7 @@ class _HeaderState extends State<_Header> {
             icon: Icon(Icons.more_vert_rounded, color: c.textMuted, size: 20),
             onSelected: (v) => switch (v) {
               'terminal' => widget.onOpenTerminal(),
-              final v when v.startsWith('agent:') => widget.onOpenAgent(v.substring(6)),
+              final v when v.startsWith('agent:') => widget.onOpenAgent?.call(v.substring(6)),
               'git' => widget.onGit?.call(),
               'project' => widget.onProject?.call(),
               'home' => b.open(b.root),
@@ -382,12 +425,13 @@ class _HeaderState extends State<_Header> {
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
-              for (final agent in widget.agents.installed)
-                PopupMenuItem(value: 'agent:${agent.id}', child: Text('Open in ${agent.name}')),
+              if (widget.onOpenAgent != null)
+                for (final agent in widget.agents.installed)
+                  PopupMenuItem(value: 'agent:${agent.id}', child: Text('Open in ${agent.name}')),
               if (widget.onProject != null) const PopupMenuItem(value: 'project', child: Text('Open as project')),
               if (widget.onGit != null) const PopupMenuItem(value: 'git', child: Text('Git changes')),
               const PopupMenuDivider(),
-              const PopupMenuItem(value: 'home', child: Text('Go home')),
+              PopupMenuItem(value: 'home', child: Text(widget.homeLabel)),
               CheckedPopupMenuItem(value: 'hidden', checked: b.showHidden, child: const Text('Show hidden')),
               const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
             ],

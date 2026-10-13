@@ -6,13 +6,14 @@ import '../terminal_tabs.dart';
 /// The row of terminal tabs. Tap to switch; tap the active tab or
 /// long-press any tab for pin / rename / close.
 class TabStrip extends StatefulWidget {
-  const TabStrip({super.key, required this.tabs, required this.onMenu, this.leading});
+  const TabStrip({super.key, required this.tabs, this.scope, required this.onMenu, required this.onNew});
 
   final TerminalTabs tabs;
-  final ValueChanged<TerminalSession> onMenu;
 
-  /// Shown before the tabs (the active tab's project, linking back to it).
-  final Widget? leading;
+  /// Whose tabs: a project's (its folder), or the Terminal tab's (null).
+  final String? scope;
+  final ValueChanged<TerminalSession> onMenu;
+  final VoidCallback onNew;
 
   static const height = 38.0;
 
@@ -27,7 +28,7 @@ class _TabStripState extends State<TabStrip> {
   @override
   void initState() {
     super.initState();
-    _count = widget.tabs.tabs.length;
+    _count = widget.tabs.inScope(widget.scope).length;
     widget.tabs.addListener(_onTabs);
   }
 
@@ -39,7 +40,7 @@ class _TabStripState extends State<TabStrip> {
   }
 
   void _onTabs() {
-    final count = widget.tabs.tabs.length;
+    final count = widget.tabs.inScope(widget.scope).length;
     if (count > _count) {
       // A tab was opened at the end: bring it into view.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -59,12 +60,12 @@ class _TabStripState extends State<TabStrip> {
       decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
       child: Row(
         children: [
-          AnimatedSize(duration: Motion.standard, curve: Motion.move, child: widget.leading ?? const SizedBox.shrink()),
           Expanded(
             child: ListenableBuilder(
               listenable: widget.tabs,
               builder: (context, _) {
-                final tabs = widget.tabs.tabs;
+                final tabs = widget.tabs.inScope(widget.scope);
+                final activeId = widget.tabs.activeIn(widget.scope)?.id;
                 return ListView.builder(
                   controller: _scroll,
                   scrollDirection: Axis.horizontal,
@@ -73,8 +74,8 @@ class _TabStripState extends State<TabStrip> {
                   itemBuilder: (context, i) => _Tab(
                     key: ValueKey(tabs[i].id),
                     session: tabs[i],
-                    active: tabs[i].id == widget.tabs.activeId,
-                    onTap: () => tabs[i].id == widget.tabs.activeId
+                    active: tabs[i].id == activeId,
+                    onTap: () => tabs[i].id == activeId
                         ? widget.onMenu(tabs[i])
                         : widget.tabs.select(tabs[i]),
                     onLongPress: () => widget.onMenu(tabs[i]),
@@ -89,7 +90,7 @@ class _TabStripState extends State<TabStrip> {
             child: IconButton(
               tooltip: 'New tab',
               iconSize: 20,
-              onPressed: widget.tabs.open,
+              onPressed: widget.onNew,
               icon: Icon(Icons.add_rounded, color: c.textMuted),
             ),
           ),
