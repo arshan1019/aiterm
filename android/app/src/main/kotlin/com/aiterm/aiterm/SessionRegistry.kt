@@ -27,8 +27,14 @@ object SessionRegistry {
     private var sink: EventChannel.EventSink? = null
     private var appContext: Context? = null
 
+    /** The session the user is looking at, or null when the app is hidden. */
+    @Volatile private var visibleId: Int? = null
+
     private class Entry(val session: ShellSession) {
         val ring = OutputRing(RING_BYTES)
+        val signals = TerminalSignals()
+        val policy = NotifyPolicy()
+        @Volatile var title = "Terminal"
         val pending = ByteArrayOutputStream()
         var scheduled = false
         var exitCode: Int? = null
@@ -46,7 +52,10 @@ object SessionRegistry {
         lateinit var entry: Entry
         val session = ShellSession(
             argv, env, cwd, rows, cols,
-            onData = { bytes -> enqueue(id, entry) { it.ring.append(bytes); it.pending.write(bytes) } },
+            onData = { bytes ->
+                notifyFor(id, entry, bytes)
+                enqueue(id, entry) { it.ring.append(bytes); it.pending.write(bytes) }
+            },
             onExit = { code -> enqueue(id, entry) { it.exitCode = code } },
         )
         entry = Entry(session)
@@ -57,7 +66,9 @@ object SessionRegistry {
     }
 
     fun write(id: Int, data: String) {
-        val s = sessions[id]?.session ?: return
+        val e = sessions[id] ?: return
+        val s = e.session
+        if ('\r' in data) synchronized(e.policy) { e.policy.onEnter() }
         io.execute { s.write(data) }
     }
 
@@ -73,6 +84,28 @@ object SessionRegistry {
     /** Hangs up every shell; each then exits through the normal path. */
     fun stopAll() {
         sessions.values.forEach { it.session.stop() }
+    }
+
+    fun setVisible(id: Int?) {
+        visibleId = id
+        val ctx = appContext
+        if (id != null && ctx != null) SessionNotifier.cancel(ctx, id)
+    }
+
+    fun setTitle(id: Int, title: String) {
+        sessions[id]?.title = title
+    }
+
+    /** Reader thread: notifications are decided natively, UI or not. */
+    private fun notifyFor(id: Int, e: Entry, bytes: ByteArray) {
+        val ctx = appContext ?: return
+        val signals = e.signals.feed(bytes)
+        if (signals.isEmpty()) return
+        val visibility = Visibility(visibleId == id)
+        for (signal in signals) {
+            val spec = synchronized(e.policy) { e.policy.onSignal(signal, visibility, e.signals.lastLine(), e.title) }
+            if (spec != null) SessionNotifier.show(ctx, id, spec)
+        }
     }
 
     fun live(): List<Int> = sessions.filterValues { it.exitCode == null }.keys.toList()

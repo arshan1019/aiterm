@@ -66,6 +66,21 @@ class PtyHost implements PtyBackend {
 
   void _listen() => _sub ??= _events.receiveBroadcastStream().listen(_onEvent);
 
+  /// A session notification was tapped: show that session's tab.
+  set onOpenRequest(void Function(int id)? handler) {
+    _method.setMethodCallHandler(handler == null
+        ? null
+        : (call) async {
+            if (call.method == 'open') handler((call.arguments as Map)['id'] as int);
+          });
+  }
+
+  /// The session on screen (null when none): no notifications for it.
+  void setVisible(int? id) => _method.invokeMethod('setVisible', {'id': id}).ignore();
+
+  /// The tab title native notifications use for [id].
+  void setTitle(int id, String title) => _method.invokeMethod('setTitle', {'id': id, 'title': title}).ignore();
+
   @override
   Future<List<int>> liveSessions() async {
     _listen();

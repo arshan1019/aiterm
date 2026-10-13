@@ -75,6 +75,7 @@ class TerminalTabs extends ChangeNotifier {
       notifyListeners();
     };
     s.onPersistable = _scheduleSave;
+    s.state.addListener(notifyListeners); // e.g. a shell started or exited
     _tabs.add(s);
     return s;
   }

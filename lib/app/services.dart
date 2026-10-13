@@ -6,6 +6,8 @@ import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
 import '../platform/android_env.dart';
 import '../settings/settings.dart';
+import '../platform/pty.dart';
+import '../terminal/session_presence.dart';
 import '../terminal/terminal_tabs.dart';
 import 'navigation.dart';
 
@@ -25,10 +27,40 @@ class AppServices {
     // Android may kill a backgrounded app without warning: save tabs as
     // soon as the app leaves the screen.
     _lifecycle = AppLifecycleListener(
-      onHide: () => tabs.save().ignore(),
+      onHide: () {
+        _appVisible = false;
+        _updatePresence();
+        tabs.save().ignore();
+      },
+      onShow: () {
+        _appVisible = true;
+        _updatePresence();
+      },
       // Back from battery or notification settings: show the new state.
       onResume: () => keepAlive.refresh().ignore(),
     );
+    navigation.addListener(_updatePresence);
+    tabs.addListener(_updatePresence);
+    PtyHost.instance.onOpenRequest = _openSession;
+    _updatePresence();
+  }
+
+  final _presence = SessionPresence(setVisible: PtyHost.instance.setVisible, setTitle: PtyHost.instance.setTitle);
+  bool _appVisible = true;
+
+  void _updatePresence() {
+    _presence.update(
+      visibleId: visibleSession(appVisible: _appVisible, tab: navigation.tab, activePtyId: tabs.active.ptyId),
+      titles: {for (final t in tabs.tabs) ?t.ptyId: t.title},
+    );
+  }
+
+  /// A notification for session [ptyId] was tapped.
+  void _openSession(int ptyId) {
+    for (final t in tabs.tabs) {
+      if (t.ptyId == ptyId) tabs.select(t);
+    }
+    navigation.open(AppTab.terminal);
   }
 
   // ignore: unused_field

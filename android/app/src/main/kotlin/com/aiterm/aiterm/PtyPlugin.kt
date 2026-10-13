@@ -42,6 +42,14 @@ class PtyPlugin : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
                 result.success(null)
             }
             "list" -> result.success(SessionRegistry.live())
+            "setVisible" -> {
+                SessionRegistry.setVisible(call.argument<Int>("id"))
+                result.success(null)
+            }
+            "setTitle" -> {
+                SessionRegistry.setTitle(call.argument<Int>("id") ?: 0, call.argument<String>("title") ?: "Terminal")
+                result.success(null)
+            }
             "attach" -> result.success(SessionRegistry.attach(call.argument<Int>("id") ?: 0))
             else -> result.notImplemented()
         }

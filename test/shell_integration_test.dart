@@ -75,7 +75,8 @@ void main() {
   });
 
   group('shell profile (needs busybox ash)', () {
-    final ash = ['/bin/ash', '/bin/busybox'].firstWhere((p) => File(p).existsSync(), orElse: () => '');
+    // Alpine's shell is busybox ash; other "ash"es (e.g. Debian's dash) differ.
+    final ash = ['/bin/busybox', '/usr/bin/busybox'].firstWhere((p) => File(p).existsSync(), orElse: () => '');
 
     test('script output parses into the expected events', () async {
       final dir = Directory.systemTemp.createTempSync('aiterm_profile');
@@ -84,7 +85,7 @@ void main() {
       final work = Directory('${dir.path}/my dir')..createSync();
       final p = await Process.start(
         ash,
-        [if (ash.endsWith('busybox')) 'ash', '-i'],
+        ['ash', '-i'],
         environment: {'ENV': profile.path, 'PS1': r'\w\$ ', 'HOME': dir.path},
       );
       p.stdin.write('cd "${work.path}"\nfalse\nexit\n');

@@ -15,15 +15,15 @@ class MainActivity : FlutterActivity() {
     private val ptyPlugin = PtyPlugin()
     private var micResult: MethodChannel.Result? = null
     private var keepAlive: KeepAlivePlugin? = null
+    private var ptyChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         SessionRegistry.init(this)
 
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            "aiterm/pty",
-        ).setMethodCallHandler(ptyPlugin)
+        ptyChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/pty").apply {
+            setMethodCallHandler(ptyPlugin)
+        }
 
         EventChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -70,6 +70,24 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /** A tapped session notification: show that tab. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openSessionFrom(intent)
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        openSessionFrom(intent)
+    }
+
+    private fun openSessionFrom(intent: Intent?) {
+        val id = intent?.getIntExtra(SessionNotifier.EXTRA_SESSION, -1) ?: -1
+        if (id < 0) return
+        intent?.removeExtra(SessionNotifier.EXTRA_SESSION)
+        ptyChannel?.invokeMethod("open", mapOf("id" to id))
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

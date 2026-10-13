@@ -61,6 +61,7 @@ void main() {
     expect(find.text('files'), findsOneWidget);
     expect(find.text('settings'), findsOneWidget);
     expect(find.text('Install Alpine'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
   testWidgets('walks through every screen without framework errors', (tester) async {
@@ -96,6 +97,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.close_rounded).first);
     await tester.pumpAndSettle();
     expect(find.text('shell 2'), findsNothing);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
   testWidgets('installed Linux: links, selection toolbar, sheets, files', (tester) async {
@@ -168,6 +170,7 @@ void main() {
     await tester.pumpAndSettle();
     services.settings.dark = true;
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
   testWidgets('name dialogs, rename tab, selection handles', (tester) async {
@@ -222,5 +225,6 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Create'));
     await settleIo(tester);
     expect(find.text('made'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 }
