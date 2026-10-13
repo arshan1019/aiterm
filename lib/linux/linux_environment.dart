@@ -8,6 +8,7 @@ import '../shared/fs_atomic.dart';
 import 'proc_stubs.dart';
 import 'session_spec.dart';
 import 'shell_profile.dart';
+import 'system_gitconfig.dart';
 
 enum LinuxStatus { missing, installing, ready }
 
@@ -126,6 +127,7 @@ class LinuxEnvironment extends ChangeNotifier {
 
     // Shell integration: folder and command boundaries (see shell_profile).
     await writeFileAtomic('$rootfs/etc/profile.d/aiterm.sh', shellProfile);
+    await _ensureGitDefaults();
     final start = cwd != null && cwd.startsWith('/') && Directory('$rootfs$cwd').existsSync() ? cwd : '/root';
 
     final shell = await _loginShell();
@@ -214,6 +216,15 @@ class LinuxEnvironment extends ChangeNotifier {
     pipe(p.stdout);
     pipe(p.stderr);
     return p.exitCode;
+  }
+
+  /// git's settings for proot (see system_gitconfig.dart), keeping any
+  /// the user added.
+  Future<void> _ensureGitDefaults() async {
+    final f = File('$rootfs/etc/gitconfig');
+    final existing = await f.exists() ? await f.readAsString() : '';
+    final updated = withProotGitDefaults(existing);
+    if (updated != existing) await writeFileAtomic(f.path, updated);
   }
 
   /// root's shell from /etc/passwd, so `chsh -s /bin/bash` sticks.

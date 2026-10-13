@@ -58,12 +58,14 @@ if [ ! -f "$PROOT_CACHE/proot" ] || [ ! -f "$PROOT_CACHE/loader" ]; then
   mkdir -p "$WORK/sysroot/include" "$WORK/sysroot/lib"
   cp -r "$WORK/libtalloc/$P/include/." "$WORK/libandroid-shmem/$P/include/." "$WORK/sysroot/include/"
   cp -L "$WORK/libtalloc/$P/lib/libtalloc.so" "$WORK/libandroid-shmem/$P/lib/libandroid-shmem.so" "$WORK/sysroot/lib/"
+  # Flags go in the environment (as Termux's build does) so the makefile's
+  # own `CPPFLAGS += -I.` etc. still apply; make arguments would replace them.
+  CPPFLAGS="-I$WORK/sysroot/include -DARG_MAX=131072 -DVERSION=\\\"5.1.107.96-g${PROOT_COMMIT:0:8}\\\"" \
+  LDFLAGS="-L$WORK/sysroot/lib" \
   make -C "$SRC/src" -j"$(nproc)" proot \
     CC="$BIN/aarch64-linux-android24-clang" STRIP="$BIN/llvm-strip" \
     OBJCOPY="$BIN/llvm-objcopy" OBJDUMP="$BIN/llvm-objdump" \
-    PROOT_WITH_LIBANDROID_SHMEM=true PROOT_UNBUNDLE_LOADER=/unused HAS_LOADER_32BIT= \
-    CPPFLAGS="-I$WORK/sysroot/include -DARG_MAX=131072 -DVERSION=\\\"5.1.107.96-g${PROOT_COMMIT:0:8}\\\"" \
-    LDFLAGS="-L$WORK/sysroot/lib"
+    PROOT_WITH_LIBANDROID_SHMEM=true PROOT_UNBUNDLE_LOADER=/unused HAS_LOADER_32BIT=
   mkdir -p "$PROOT_CACHE"
   "$BIN/llvm-strip" -o "$PROOT_CACHE/proot" "$SRC/src/proot"
   cp "$SRC/src/loader/loader" "$PROOT_CACHE/loader"
