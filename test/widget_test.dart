@@ -45,8 +45,13 @@ void main() {
   }
 
   // Lets real file IO (listing folders, starting sessions) finish.
+  // Real IO resumes in the test's fake zone only on a pump, and listing a
+  // folder takes several IO round trips, so alternate a few times.
   Future<void> settleIo(WidgetTester tester) async {
-    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    for (var i = 0; i < 12; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
   }
 
