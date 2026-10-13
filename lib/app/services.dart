@@ -191,7 +191,7 @@ class AppServices {
 
   /// One-tap AI agents; "Open" goes back to the agent's tab for that
   /// folder, or starts one. The folder becomes a recent project.
-  late final agents = AgentInstaller(
+  late AgentInstaller agents = AgentInstaller(
     run: linux.runScriptStreaming,
     launch: (agent, title, commands, cwd) async {
       // The folder becomes (or is) a project, and the session lives there.
@@ -211,7 +211,7 @@ class AppServices {
   );
 
   /// First run: Linux, git tools and the chosen agents in one go.
-  late final setup = SetupPipeline(
+  late SetupPipeline setup = SetupPipeline(
     installLinux: linux.install,
     linuxReady: () => linux.installed,
     installTools: () async => await gitTools.ensure() ? null : gitTools.error ?? 'Couldn\'t install git.',
