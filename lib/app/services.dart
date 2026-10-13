@@ -6,6 +6,7 @@ import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
 import '../platform/android_env.dart';
 import '../settings/settings.dart';
+import '../ssh/ssh_keys.dart';
 import '../platform/pty.dart';
 import '../preview/preview_controller.dart';
 import '../terminal/session_presence.dart';
@@ -46,6 +47,9 @@ class AppServices {
     tabs.addListener(_updatePresence);
     PtyHost.instance.onOpenRequest = _openSession;
     tabs.onPortsMentioned = preview.portsMentioned;
+    linux.addListener(_startAgent);
+    _startAgent();
+    ssh.load().ignore();
     if (linux.installed) preview.start().ignore();
     _updatePresence();
   }
@@ -58,6 +62,10 @@ class AppServices {
       visibleId: visibleSession(appVisible: _appVisible, tab: navigation.tab, activePtyId: tabs.active.ptyId),
       titles: {for (final t in tabs.tabs) ?t.ptyId: t.title},
     );
+  }
+
+  void _startAgent() {
+    if (linux.installed) ssh.startAgent(rootfs: linux.rootfs).ignore();
   }
 
   /// A notification for session [ptyId] was tapped.
@@ -78,6 +86,7 @@ class AppServices {
   final TerminalTabs tabs;
   final Assistant assistant;
   final preview = PreviewController();
+  final ssh = SshKeys(SshChannel());
   late final KeepAliveController keepAlive;
 
   /// Loads everything the first frame depends on.

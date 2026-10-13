@@ -20,6 +20,8 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         SessionRegistry.init(this)
+        SshAgent.activity = java.lang.ref.WeakReference(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/ssh").setMethodCallHandler(SshPlugin())
 
         ptyChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/pty").apply {
             setMethodCallHandler(ptyPlugin)

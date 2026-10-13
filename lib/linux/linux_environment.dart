@@ -171,6 +171,8 @@ class LinuxEnvironment extends ChangeNotifier {
       'COLORTERM=truecolor',
       'LANG=C.UTF-8',
       'TMPDIR=/tmp',
+      // The app's keystore-backed ssh-agent (lib/ssh).
+      'SSH_AUTH_SOCK=/tmp/aiterm-agent.sock',
       'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
       ...(command ?? [shell, '-l']),
     ];
