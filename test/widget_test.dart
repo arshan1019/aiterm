@@ -10,6 +10,7 @@ import 'package:aiterm/git/git_registry.dart';
 import 'package:aiterm/git/git_runner.dart';
 import 'package:aiterm/git/git_screen.dart';
 import 'package:aiterm/git/git_tools.dart';
+import 'package:aiterm/shared/form.dart';
 import 'package:aiterm/terminal/terminal_session.dart';
 import 'package:xterm/xterm.dart';
 
@@ -205,7 +206,7 @@ void main() {
     await tester.tap(find.text('Rename'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'build');
-    await tester.tap(find.widgetWithText(TextButton, 'Rename'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
     await tester.pumpAndSettle();
     expect(find.text('build'), findsOneWidget);
 
@@ -239,7 +240,7 @@ void main() {
     await tester.tap(find.text('New folder'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'made');
-    await tester.tap(find.widgetWithText(TextButton, 'Create'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
     await settleIo(tester);
     expect(find.text('made'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
@@ -492,7 +493,7 @@ void main() {
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     expect(find.textContaining('can\'t be undone'), findsOneWidget);
-    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Cancel')));
+    await tester.tap(find.descendant(of: find.byType(AppDialog), matching: find.text('Cancel')));
     await tester.pumpAndSettle();
     expect(File('${dir.path}/alpine/root/proj/notes.txt').existsSync(), isTrue);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
