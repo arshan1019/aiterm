@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../assistant/ask_sheet.dart';
 import '../preview/preview_controller.dart';
 import '../preview/preview_screen.dart';
+import '../shared/action_sheet.dart';
 import '../shared/fade_indexed_stack.dart';
 import '../shared/name_dialog.dart';
 import 'terminal_session.dart';
@@ -74,43 +76,27 @@ class _WorkspaceState extends State<_Workspace> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => AskSheet(
-        alpine: !_services.linux.usesAndroidShell,
-        onInsert: session.insert,
-        onAppAction: _services.perform,
-      ),
+      builder: (_) =>
+          AskSheet(alpine: !_services.linux.usesAndroidShell, onInsert: session.insert, onAppAction: _services.perform),
     );
   }
 
   void _tabMenu(TerminalSession session) {
     final tabs = _services.tabs;
     final hasOthers = tabs.tabs.any((t) => t != session && !t.pinned);
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheet) {
-        final c = sheet.colors;
-        Widget item(IconData icon, String label, VoidCallback onTap, {Color? color}) => ListTile(
-              leading: Icon(icon, size: 20, color: color ?? c.textMuted),
-              title: Text(label, style: TextStyle(color: color ?? c.text, fontSize: 14)),
-              onTap: () {
-                Navigator.pop(sheet);
-                onTap();
-              },
-            );
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              item(session.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, session.pinned ? 'Unpin' : 'Pin',
-                  () => tabs.togglePin(session)),
-              item(Icons.drive_file_rename_outline_rounded, 'Rename', () => _rename(session)),
-              if (hasOthers) item(Icons.tab_unselected_rounded, 'Close other tabs', () => tabs.closeOthers(session)),
-              if (!session.pinned) item(Icons.close_rounded, 'Close', () => tabs.close(session), color: c.danger),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+    showActionSheet(
+      context,
+      title: session.title,
+      actions: [
+        SheetAction(
+          session.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+          session.pinned ? 'Unpin' : 'Pin',
+          () => tabs.togglePin(session),
+        ),
+        SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () => _rename(session)),
+        if (hasOthers) SheetAction(Icons.tab_unselected_rounded, 'Close other tabs', () => tabs.closeOthers(session)),
+        if (!session.pinned) SheetAction(Icons.close_rounded, 'Close', () => tabs.close(session), danger: true),
+      ],
     );
   }
 
@@ -190,7 +176,10 @@ class _PortAnnouncement extends StatelessWidget {
                   color: c.surface,
                   elevation: 6,
                   shadowColor: Colors.black38,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: c.border)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: c.border),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
                     child: Row(
@@ -203,9 +192,8 @@ class _PortAnnouncement extends StatelessWidget {
                         TextButton(
                           onPressed: () {
                             preview.dismiss();
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(builder: (_) => PreviewScreen(port: port)),
-                            );
+                            Navigator.of(context)
+                                .push(MaterialPageRoute<void>(builder: (_) => PreviewScreen(port: port)));
                           },
                           child: const Text('Preview'),
                         ),

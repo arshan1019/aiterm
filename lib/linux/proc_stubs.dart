@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../shared/fs_atomic.dart';
 
 const kernelRelease = '6.17.0-aiterm';
 const kernelVersion = '#1 SMP PREEMPT_DYNAMIC Fri, 10 Oct 2025 00:00:00 +0000';
@@ -34,9 +35,9 @@ Future<List<String>> procStubBinds(Directory dir, {required DateTime bootTime}) 
   };
   for (final MapEntry(key: real, value: content) in stubs.entries) {
     if (_readable(real)) continue; // this device allows the real one
-    final stub = File('${dir.path}/${real.substring(1).replaceAll('/', '_')}');
-    await stub.writeAsString(content);
-    binds.add('--bind=${stub.path}:$real');
+    final stub = '${dir.path}/${real.substring(1).replaceAll('/', '_')}';
+    await writeFileAtomic(stub, content); // several tabs may start at once
+    binds.add('--bind=$stub:$real');
   }
   return binds;
 }

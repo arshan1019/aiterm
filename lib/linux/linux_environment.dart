@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../platform/android_env.dart';
 import '../shared/download.dart';
+import '../shared/fs_atomic.dart';
 import 'proc_stubs.dart';
 import 'session_spec.dart';
 import 'shell_profile.dart';
@@ -112,9 +113,8 @@ class LinuxEnvironment extends ChangeNotifier {
     // nativeLibDir moves on every app update, so rebuild the link each time.
     final libDir = Directory('${paths.filesDir}/lib');
     await libDir.create(recursive: true);
-    final talloc = Link('${libDir.path}/libtalloc.so.2');
-    if (await talloc.exists()) await talloc.delete();
-    await talloc.create('$lib/libtalloc.so');
+    // Atomic: several tabs may start at once.
+    await ensureLink('${libDir.path}/libtalloc.so.2', '$lib/libtalloc.so');
     final prootTmp = Directory('${paths.cacheDir}/proot-tmp');
     await prootTmp.create(recursive: true);
 
@@ -125,7 +125,7 @@ class LinuxEnvironment extends ChangeNotifier {
     await Process.run('/system/bin/chmod', ['1777', shm.path, '$rootfs/tmp']);
 
     // Shell integration: folder and command boundaries (see shell_profile).
-    await File('$rootfs/etc/profile.d/aiterm.sh').writeAsString(shellProfile);
+    await writeFileAtomic('$rootfs/etc/profile.d/aiterm.sh', shellProfile);
     final start = cwd != null && cwd.startsWith('/') && Directory('$rootfs$cwd').existsSync() ? cwd : '/root';
 
     final shell = await _loginShell();

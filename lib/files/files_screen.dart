@@ -7,6 +7,7 @@ import '../app/services.dart';
 import '../app/theme.dart';
 import '../agents/agent_installer.dart';
 import '../platform/android_env.dart';
+import '../shared/action_sheet.dart';
 import '../shared/name_dialog.dart';
 import 'file_clipboard.dart';
 import 'file_system_service.dart';
@@ -154,72 +155,32 @@ class _FilesScreenState extends State<FilesScreen> {
       false;
 
   void _entryActions(FsEntry e) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheet) {
-        final c = sheet.colors;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (e.kind == EntryKind.directory)
-                ListTile(
-                  leading: Icon(Icons.terminal_rounded, color: c.textMuted),
-                  title: const Text('Open terminal here', style: TextStyle(fontSize: 14)),
-                  onTap: () {
-                    Navigator.pop(sheet);
-                    _openTerminalHere(e.path);
-                  },
-                ),
-              if (e.kind == EntryKind.directory)
-                for (final agent in _services.agents.installed)
-                  ListTile(
-                    leading: Icon(Icons.auto_awesome_rounded, color: c.accent),
-                    title: Text('Open in ${agent.name}', style: const TextStyle(fontSize: 14)),
-                    onTap: () {
-                      Navigator.pop(sheet);
-                      _openInAgent(agent.id, e.path);
-                    },
-                  ),
-              if (e.kind == EntryKind.directory) const Divider(height: 8),
-              ListTile(
-                leading: Icon(Icons.copy_rounded, color: c.textMuted),
-                title: const Text('Copy', style: TextStyle(fontSize: 14)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  _clipboard.copy([e]);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.content_cut_rounded, color: c.textMuted),
-                title: const Text('Move', style: TextStyle(fontSize: 14)),
-                onTap: () {
-                  Navigator.pop(sheet);
-                  _clipboard.cut([e]);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.drive_file_rename_outline_rounded, color: c.textMuted),
-                title: const Text('Rename', style: TextStyle(fontSize: 14)),
-                onTap: () async {
-                  Navigator.pop(sheet);
-                  final name = await _askName('Rename', 'Rename', initial: e.name);
-                  if (name != null) await _browser.rename(e, name);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_outline_rounded, color: c.danger),
-                title: Text('Delete', style: TextStyle(color: c.danger, fontSize: 14)),
-                onTap: () async {
-                  Navigator.pop(sheet);
-                  if (await _confirmDelete(e)) await _browser.delete(e);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+    final folder = e.kind == EntryKind.directory;
+    showActionSheet(
+      context,
+      title: e.name,
+      actions: [
+        if (folder) ...[
+          SheetAction(Icons.terminal_rounded, 'Open terminal here', () => _openTerminalHere(e.path)),
+          for (final agent in _services.agents.installed)
+            SheetAction(
+              Icons.auto_awesome_rounded,
+              'Open in ${agent.name}',
+              () => _openInAgent(agent.id, e.path),
+              accent: true,
+            ),
+          null,
+        ],
+        SheetAction(Icons.copy_rounded, 'Copy', () => _clipboard.copy([e])),
+        SheetAction(Icons.content_cut_rounded, 'Move', () => _clipboard.cut([e])),
+        SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () async {
+          final name = await _askName('Rename', 'Rename', initial: e.name);
+          if (name != null) await _browser.rename(e, name);
+        }),
+        SheetAction(Icons.delete_outline_rounded, 'Delete', () async {
+          if (await _confirmDelete(e)) await _browser.delete(e);
+        }, danger: true),
+      ],
     );
   }
 

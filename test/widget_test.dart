@@ -347,7 +347,7 @@ void main() {
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
     expect(find.textContaining('can\'t be undone'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
+    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Cancel')));
     await tester.pumpAndSettle();
     expect(File('${dir.path}/alpine/root/proj/notes.txt').existsSync(), isTrue);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
