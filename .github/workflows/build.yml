@@ -41,9 +41,22 @@ jobs:
 
       - run: flutter pub get
 
+      # One signing key for every build (repo secret), and an increasing
+      # version code, so each new APK installs as an update over the last.
+      - name: Signing key
+        env:
+          KEYSTORE: ${{ secrets.DEBUG_KEYSTORE }}
+        run: mkdir -p ~/.android && echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+
       # arm64 covers virtually every phone in use; building one ABI instead
       # of all of them is what keeps this fast.
-      - run: flutter build apk --debug --target-platform android-arm64
+      - run: flutter build apk --debug --target-platform android-arm64 --build-number=${{ github.run_number }}
+
+      - name: Check the APK is signed with the shared key
+        run: |
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -1)
+          $APKSIGNER verify --print-certs build/app/outputs/flutter-apk/app-debug.apk | grep -i "SHA-256" | tee /dev/stderr \
+            | grep -qi "59f76149bd4f8f9498de0d11b383d22ad9706d5829a5d715c02af67c827bf9ef"
 
       - name: Publish debug release
         env:
