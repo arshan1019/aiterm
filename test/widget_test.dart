@@ -8,6 +8,7 @@ import 'package:aiterm/app/services.dart';
 // Widget tests overflow the stack inside the Acode sandbox this project is
 // developed in; they run on CI (.github/workflows/test.yml).
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory dir;
   final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
