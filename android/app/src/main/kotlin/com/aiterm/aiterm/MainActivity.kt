@@ -16,12 +16,16 @@ class MainActivity : FlutterActivity() {
     private var micResult: MethodChannel.Result? = null
     private var keepAlive: KeepAlivePlugin? = null
     private var ptyChannel: MethodChannel? = null
+    private var backup: BackupPlugin? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         SessionRegistry.init(this)
         SshAgent.activity = java.lang.ref.WeakReference(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/ssh").setMethodCallHandler(SshPlugin())
+        backup = BackupPlugin(this).also {
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/backup").setMethodCallHandler(it)
+        }
 
         ptyChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/pty").apply {
             setMethodCallHandler(ptyPlugin)
@@ -72,6 +76,13 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    @Deprecated("Needed for the document picker results")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        backup?.onActivityResult(requestCode, resultCode, data)
     }
 
     /** A tapped session notification: show that tab. */

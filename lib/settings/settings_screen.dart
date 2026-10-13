@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../backup/backup_controller.dart';
 import '../keep_alive/keep_alive.dart';
 import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
@@ -78,6 +79,8 @@ class SettingsScreen extends StatelessWidget {
           _KeepAliveSection(controller: s.keepAlive),
           const SizedBox(height: 20),
           _SshSection(keys: s.ssh),
+          const SizedBox(height: 20),
+          _BackupSection(backup: s.backup, linuxInstalled: s.linux.installed),
           const SizedBox(height: 20),
           _Section(
             title: 'About',
@@ -292,6 +295,83 @@ class _SshSection extends StatelessWidget {
                 label: const Text('New key'),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackupSection extends StatelessWidget {
+  const _BackupSection({required this.backup, required this.linuxInstalled});
+
+  final BackupController backup;
+  final bool linuxInstalled;
+
+  Future<void> _restore(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('Restore a backup?', style: TextStyle(fontSize: 16)),
+        content: const Text(
+          'This replaces Linux, your files in it, and aiterm\'s settings and tabs. '
+          'Running sessions end and the app restarts.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Choose backup')),
+        ],
+      ),
+    );
+    if (ok == true) await backup.restore();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: backup,
+      builder: (context, _) => _Section(
+        title: 'Backup',
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Text(
+              'Everything in Linux (installed tools, your files) plus settings and tabs, '
+              'in one file. Save it to your phone or Google Drive; restore it on any phone.',
+              style: TextStyle(color: c.textMuted, fontSize: 12, height: 1.4),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: backup.busy || !linuxInstalled ? null : backup.backup,
+                  icon: const Icon(Icons.save_alt_rounded, size: 18),
+                  label: const Text('Back up'),
+                ),
+                TextButton.icon(
+                  onPressed: backup.busy ? null : () => _restore(context),
+                  icon: const Icon(Icons.settings_backup_restore_rounded, size: 18),
+                  label: const Text('Restore'),
+                ),
+                if (backup.busy) ...[
+                  const SizedBox(width: 8),
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ],
+            ),
+          ),
+          AnimatedSize(
+            duration: Motion.standard,
+            alignment: Alignment.topCenter,
+            child: backup.message == null
+                ? const SizedBox(width: double.infinity)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Text(backup.message!, style: TextStyle(color: c.text, fontSize: 12)),
+                  ),
           ),
         ],
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../assistant/assistant.dart';
 import '../assistant/needle.dart';
 import '../assistant/tool_call.dart';
+import '../backup/backup_controller.dart';
 import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
 import '../platform/android_env.dart';
@@ -87,6 +88,7 @@ class AppServices {
   final Assistant assistant;
   final preview = PreviewController();
   final ssh = SshKeys(SshChannel());
+  late final backup = BackupController(BackupChannel(), filesDir: paths.filesDir, appVersion: '1.0.0');
   late final KeepAliveController keepAlive;
 
   /// Loads everything the first frame depends on.
