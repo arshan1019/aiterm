@@ -148,7 +148,7 @@ class LinuxEnvironment extends ChangeNotifier {
       if (!_exists('/dev/fd')) '--bind=/proc/self/fd:/dev/fd',
       for (final (i, name) in [(0, 'stdin'), (1, 'stdout'), (2, 'stderr')])
         if (!_exists('/dev/$name')) '--bind=/proc/self/fd/$i:/dev/$name',
-      ...await procStubBinds(Directory('${paths.filesDir}/sysdata'), uptimeMs: paths.uptimeMs),
+      ...await procStubBinds(Directory('${paths.filesDir}/sysdata'), bootTime: paths.bootTime),
       // Android's own tree, for device tools like getprop.
       for (final p in const [
         '/apex', '/odm', '/product', '/system', '/system_ext', '/vendor',

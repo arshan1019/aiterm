@@ -14,7 +14,7 @@ void main() {
 
     test('Claude Code gets what its native musl build and tools need', () {
       final c = byId('claude');
-      expect(c.packages, containsAll(['bash', 'curl', 'git', 'libgcc', 'libstdc++', 'ripgrep', 'ca-certificates']));
+      expect(c.allPackages, containsAll(['bash', 'curl', 'git', 'libgcc', 'libstdc++', 'ripgrep', 'ca-certificates']));
       expect(c.steps.last.script, contains('claude.ai/install.sh'));
       expect(c.command, 'claude');
     });
@@ -25,6 +25,13 @@ void main() {
       }
       expect(byId('gemini').steps.last.script, contains('@google/gemini-cli'));
       expect(byId('codex').steps.last.script, contains('@openai/codex'));
+    });
+
+    test('every agent gets a standard Linux userland (procps ps, GNU tools, ssh)', () {
+      for (final a in agentCatalog) {
+        expect(a.allPackages, containsAll(['procps-ng', 'coreutils', 'findutils', 'grep', 'sed', 'openssh-client']),
+            reason: a.id);
+      }
     });
 
     test('every step stops at the first error and dependencies come first', () {
@@ -105,11 +112,26 @@ void main() {
       expect(scripts.where((s) => s.contains('@openai/codex')), isEmpty);
     });
 
-    test('open starts the agent in its own tab; login happens there', () {
+    test('open starts the agent in its own tab; login happens there', () async {
       final i = make();
-      i.open('claude');
+      await i.open('claude');
       expect(launched.single.$1, 'Claude Code');
       expect(launched.single.$2, ['claude']);
+    });
+
+    test('open first adds dependencies a newer recipe needs', () async {
+      respond = (s) => s.contains('apk info -e') ? ('', 1) : ('', 0); // something missing
+      final i = make();
+      await i.open('codex');
+      expect(scripts.any((s) => s.contains('apk add') && s.contains('procps-ng')), isTrue);
+      expect(launched.single.$2, ['codex']);
+    });
+
+    test('open skips the install when everything is present', () async {
+      final i = make();
+      await i.open('codex');
+      expect(scripts.where((s) => s.contains('apk add')), isEmpty);
+      expect(launched, hasLength(1));
     });
   });
 

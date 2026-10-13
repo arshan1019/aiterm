@@ -40,11 +40,25 @@ class AgentRecipe {
   /// The program to run; it handles sign-in on first start.
   final String command;
 
+  /// Everything to install: the base userland plus the agent's own needs.
+  List<String> get allPackages => {...baseUserland, ...packages}.toList();
+
+  AgentStep get dependencies =>
+      AgentStep('Installing dependencies', 'set -e\napk update -q\napk add -q --no-cache ${allPackages.join(' ')}');
+
   List<AgentStep> get steps => [
-        AgentStep('Installing dependencies', 'set -e\napk update -q\napk add -q --no-cache ${packages.join(' ')}'),
+        dependencies,
         AgentStep('Installing $name', 'set -e\n$install'),
       ];
 }
+
+/// What agents expect of a Linux dev machine. Alpine's defaults are
+/// BusyBox's cut-down tools; agents (and the commands they run) assume the
+/// standard ones: procps `ps` (Codex reads `ps -p … -o lstart=`), GNU
+/// coreutils/findutils/grep/sed/diff, less, and ssh for git remotes.
+const baseUserland = [
+  'procps-ng', 'coreutils', 'findutils', 'grep', 'sed', 'diffutils', 'less', 'openssh-client', 'ca-certificates',
+];
 
 const agentCatalog = [
   AgentRecipe(

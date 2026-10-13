@@ -8,7 +8,7 @@ const kernelVersion = '#1 SMP PREEMPT_DYNAMIC Fri, 10 Oct 2025 00:00:00 +0000';
 /// Termux's proot-distro, bind believable stand-ins over the ones this
 /// device blocks. They're written to [dir], outside the rootfs, so the
 /// guest can't swap them for links to host files.
-Future<List<String>> procStubBinds(Directory dir, {required int uptimeMs}) async {
+Future<List<String>> procStubBinds(Directory dir, {required DateTime bootTime}) async {
   await dir.create(recursive: true);
   final empty = Directory('${dir.path}/empty');
   await empty.create();
@@ -16,29 +16,10 @@ Future<List<String>> procStubBinds(Directory dir, {required int uptimeMs}) async
   final binds = ['--bind=${empty.path}:/sys/fs/selinux'];
 
   final cpus = _cpuIds();
-  final uptime = uptimeMs / 1000;
-  final idle = uptime * cpus.length * 0.9;
-  final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  String jiffies(double share) => '${(uptime * 100 * share).round()}';
-
-  final stat = StringBuffer()
-    ..writeln('cpu  ${jiffies(0.05 * cpus.length)} 0 ${jiffies(0.03 * cpus.length)} '
-        '${(idle * 100).round()} 0 0 0 0 0 0');
-  for (final id in cpus) {
-    stat.writeln('cpu$id ${jiffies(0.05)} 0 ${jiffies(0.03)} ${jiffies(0.9)} 0 0 0 0 0 0');
-  }
-  stat
-    ..writeln('intr 0')
-    ..writeln('ctxt 0')
-    ..writeln('btime ${now - uptime.round()}')
-    ..writeln('processes 1')
-    ..writeln('procs_running 1')
-    ..writeln('procs_blocked 0')
-    ..writeln('softirq 0');
-
+  final now = DateTime.now();
   final stubs = {
-    '/proc/stat': stat.toString(),
-    '/proc/uptime': '${uptime.toStringAsFixed(2)} ${idle.toStringAsFixed(2)}\n',
+    '/proc/stat': procStatContent(cpus: cpus, bootTime: bootTime, now: now),
+    '/proc/uptime': procUptimeContent(cpus: cpus.length, bootTime: bootTime, now: now),
     '/proc/loadavg': '0.12 0.07 0.02 1/100 100\n',
     '/proc/version': 'Linux version $kernelRelease (aiterm@localhost) (clang version 18) $kernelVersion\n',
     '/proc/vmstat': '${const [
@@ -58,6 +39,34 @@ Future<List<String>> procStubBinds(Directory dir, {required int uptimeMs}) async
     binds.add('--bind=${stub.path}:$real');
   }
   return binds;
+}
+
+/// /proc/stat with one line per cpu. `btime` is the fixed boot moment, so
+/// every session reports the same process start times (procps computes
+/// them from it; Codex compares them across runs).
+String procStatContent({required List<int> cpus, required DateTime bootTime, required DateTime now}) {
+  final uptime = now.difference(bootTime).inMilliseconds / 1000;
+  String jiffies(double share) => '${(uptime * 100 * share).round()}';
+  final idle = uptime * cpus.length * 0.9;
+  final stat = StringBuffer()
+    ..writeln('cpu  ${jiffies(0.05 * cpus.length)} 0 ${jiffies(0.03 * cpus.length)} ${(idle * 100).round()} 0 0 0 0 0 0');
+  for (final id in cpus) {
+    stat.writeln('cpu$id ${jiffies(0.05)} 0 ${jiffies(0.03)} ${jiffies(0.9)} 0 0 0 0 0 0');
+  }
+  stat
+    ..writeln('intr 0')
+    ..writeln('ctxt 0')
+    ..writeln('btime ${bootTime.millisecondsSinceEpoch ~/ 1000}')
+    ..writeln('processes 1')
+    ..writeln('procs_running 1')
+    ..writeln('procs_blocked 0')
+    ..writeln('softirq 0');
+  return stat.toString();
+}
+
+String procUptimeContent({required int cpus, required DateTime bootTime, required DateTime now}) {
+  final uptime = now.difference(bootTime).inMilliseconds / 1000;
+  return '${uptime.toStringAsFixed(2)} ${(uptime * cpus * 0.9).toStringAsFixed(2)}\n';
 }
 
 List<int> _cpuIds() {

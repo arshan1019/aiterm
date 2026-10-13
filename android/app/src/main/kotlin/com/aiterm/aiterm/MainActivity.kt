@@ -56,6 +56,8 @@ class MainActivity : FlutterActivity() {
                         "cacheDir" to cacheDir.absolutePath,
                         // /proc/uptime is unreadable for apps; the guest gets a stand-in.
                         "uptimeMs" to SystemClock.elapsedRealtime().toString(),
+                        // Wall-clock boot moment, the same for every session (Linux's btime).
+                        "bootTimeMs" to (System.currentTimeMillis() - SystemClock.elapsedRealtime()).toString(),
                     ),
                 )
                 "openUrl" -> try {

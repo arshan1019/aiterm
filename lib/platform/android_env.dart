@@ -11,12 +11,16 @@ class AppPaths {
   /// Milliseconds since boot when the app started.
   final int uptimeMs;
 
-  const AppPaths({
+  /// When the phone booted (fixed; Linux's btime).
+  final DateTime bootTime;
+
+  AppPaths({
     required this.nativeLibDir,
     required this.filesDir,
     required this.cacheDir,
     required this.uptimeMs,
-  });
+    DateTime? bootTime,
+  }) : bootTime = bootTime ?? DateTime.now().subtract(Duration(milliseconds: uptimeMs));
 }
 
 /// The small "aiterm/env" channel (MainActivity.kt).
@@ -30,6 +34,10 @@ class AndroidEnv {
       filesDir: p['filesDir']!,
       cacheDir: p['cacheDir']!,
       uptimeMs: int.tryParse(p['uptimeMs'] ?? '') ?? 0,
+      bootTime: switch (int.tryParse(p['bootTimeMs'] ?? '')) {
+        final ms? => DateTime.fromMillisecondsSinceEpoch(ms),
+        null => null,
+      },
     );
   }
 

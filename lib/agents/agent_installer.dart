@@ -89,8 +89,29 @@ class AgentInstaller extends ChangeNotifier {
   }
 
   /// Starts the agent in its own tab; first start walks through sign-in.
-  void open(String id) {
+  /// Dependencies a newer recipe added (e.g. procps for Codex) are
+  /// installed first, so existing installs keep working.
+  Future<void> open(String id) async {
     final agent = recipe(id);
+    if (!busy) {
+      final present = await _run('apk info -e ${agent.allPackages.join(' ')} >/dev/null', (_) {});
+      if (present != 0) {
+        _installing = id;
+        _states[id] = AgentState(AgentStatus.installing, step: agent.dependencies.label);
+        notifyListeners();
+        final log = StringBuffer();
+        try {
+          final code = await _run(agent.dependencies.script, (line) => log.writeln(line));
+          _states[id] = code == 0
+              ? const AgentState(AgentStatus.installed)
+              : AgentState(AgentStatus.failed, message: _reason(log.toString(), code), log: log.toString());
+          if (code != 0) return;
+        } finally {
+          _installing = null;
+          notifyListeners();
+        }
+      }
+    }
     _launch(agent.name, [agent.command]);
   }
 
