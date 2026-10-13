@@ -277,7 +277,11 @@ void main() {
 
   testWidgets('switching tabs or screens does not pop the keyboard up', (tester) async {
     await boot(tester);
-    await tester.tap(find.text('Use Android shell instead'));
+    await tester.tap(find.text('settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('terminal'));
     await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isFalse, reason: 'not on first show');
 
