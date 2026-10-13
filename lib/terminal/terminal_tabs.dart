@@ -95,8 +95,10 @@ class TerminalTabs extends ChangeNotifier {
     }
   }
 
-  TerminalSession open() {
-    final s = _add(_freshTitle());
+  /// A new tab, starting in [cwd] (a guest path) if given and named after it.
+  TerminalSession open({String? cwd}) {
+    final name = cwd?.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => '/');
+    final s = _add(name ?? _freshTitle(), cwd: cwd);
     _activeId = s.id;
     _scheduleSave();
     notifyListeners();

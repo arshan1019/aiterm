@@ -216,6 +216,16 @@ class LinuxEnvironment extends ChangeNotifier {
     return '$home/${guestPath.replaceFirst(RegExp(r'^~/'), '')}';
   }
 
+  /// The inverse of [hostPath]: where the shell sees host folder [host].
+  String guestPath(String host) {
+    if (!_androidShell && installed) {
+      if (host == rootfs) return '/';
+      if (host.startsWith('$rootfs/')) return host.substring(rootfs.length);
+      if (host.startsWith('/storage/emulated/0')) return '/sdcard${host.substring('/storage/emulated/0'.length)}';
+    }
+    return host;
+  }
+
   static bool _exists(String path) =>
       FileSystemEntity.typeSync(path, followLinks: false) != FileSystemEntityType.notFound;
 

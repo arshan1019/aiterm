@@ -79,6 +79,21 @@ class _TerminalPaneState extends State<TerminalPane> {
     }
   }
 
+  /// Keeps content where xterm's resize will leave it while the keyboard
+  /// slides (see [keyboardOffset]).
+  double _keyboardOffset(double settledHeight, double availableHeight) {
+    final render = _viewKey.currentState?.renderTerminal;
+    if (render == null) return 0;
+    final buffer = _session.terminal.buffer;
+    return keyboardOffset(
+      settledHeight: settledHeight,
+      availableHeight: availableHeight,
+      lineHeight: render.lineHeight,
+      cursorRow: buffer.cursorY,
+      scrollbackLines: buffer.scrollBack,
+    );
+  }
+
   TerminalTheme _themeFor(AppColors c) {
     if (_theme == null || _themeColors != c) {
       _themeColors = c;
@@ -105,6 +120,7 @@ class _TerminalPaneState extends State<TerminalPane> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
             child: SettledSize(
+              offsetFor: _keyboardOffset,
               child: TerminalSelection(
                 terminal: _session.terminal,
                 controller: _session.selection,

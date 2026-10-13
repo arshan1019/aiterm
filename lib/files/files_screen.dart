@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
@@ -61,7 +62,11 @@ class _FilesScreenState extends State<FilesScreen> {
     if (e.kind == EntryKind.directory) {
       _browser.open(e.path);
     } else if (_browser.fs.looksLikeText(e.name)) {
-      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => TextEditorScreen(entry: e, fs: _browser.fs)));
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => TextEditorScreen(entry: e, fs: _browser.fs),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No viewer for this file type yet')));
     }
@@ -75,6 +80,35 @@ class _FilesScreenState extends State<FilesScreen> {
     if (name != null) await _browser.create(name, folder: folder);
   }
 
+  /// A new terminal tab in [folder] (a host path; the current folder by
+  /// default), shown right away.
+  void _openTerminalHere([String? folder]) {
+    final linux = _services.linux;
+    _services.tabs.open(cwd: linux.guestPath(folder ?? _browser.current));
+    _services.navigation.open(AppTab.terminal);
+  }
+
+  Future<void> _backgroundMenu(Offset at) async {
+    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(at & const Size(1, 1), Offset.zero & overlay.size),
+      items: const [
+        PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
+        PopupMenuItem(value: 'file', child: Text('New file')),
+        PopupMenuItem(value: 'folder', child: Text('New folder')),
+      ],
+    );
+    switch (choice) {
+      case 'terminal':
+        _openTerminalHere();
+      case 'file':
+        await _create(false);
+      case 'folder':
+        await _create(true);
+    }
+  }
+
   void _entryActions(FsEntry e) {
     showModalBottomSheet<void>(
       context: context,
@@ -84,6 +118,15 @@ class _FilesScreenState extends State<FilesScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (e.kind == EntryKind.directory)
+                ListTile(
+                  leading: Icon(Icons.terminal_rounded, color: c.textMuted),
+                  title: const Text('Open terminal here', style: TextStyle(fontSize: 14)),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _openTerminalHere(e.path);
+                  },
+                ),
               ListTile(
                 leading: Icon(Icons.drive_file_rename_outline_rounded, color: c.textMuted),
                 title: const Text('Rename', style: TextStyle(fontSize: 14)),
@@ -117,7 +160,7 @@ class _FilesScreenState extends State<FilesScreen> {
         listenable: _browser,
         builder: (context, _) => Column(
           children: [
-            _Header(browser: _browser),
+            _Header(browser: _browser, onOpenTerminal: _openTerminalHere),
             Expanded(
               child: !_browser.loaded
                   ? const SizedBox.expand()
@@ -143,6 +186,7 @@ class _FilesScreenState extends State<FilesScreen> {
                         browser: _browser,
                         onOpen: _open,
                         onActions: _entryActions,
+                        onBackgroundMenu: _backgroundMenu,
                       ),
                     ),
             ),
@@ -168,9 +212,10 @@ class _FilesScreenState extends State<FilesScreen> {
 }
 
 class _Header extends StatefulWidget {
-  const _Header({required this.browser});
+  const _Header({required this.browser, required this.onOpenTerminal});
 
   final FilesBrowser browser;
+  final VoidCallback onOpenTerminal;
 
   @override
   State<_Header> createState() => _HeaderState();
@@ -203,7 +248,9 @@ class _HeaderState extends State<_Header> {
     final crumbs = b.crumbs;
     return Container(
       height: 42,
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.border, width: 0.5)),
+      ),
       child: Row(
         children: [
           _NavButton(icon: Icons.arrow_back_rounded, onTap: b.canGoBack ? b.back : null),
@@ -243,11 +290,13 @@ class _HeaderState extends State<_Header> {
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert_rounded, color: c.textMuted, size: 20),
             onSelected: (v) => switch (v) {
+              'terminal' => widget.onOpenTerminal(),
               'home' => b.open(b.root),
               'hidden' => b.toggleHidden(),
               _ => b.refresh(),
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
               const PopupMenuItem(value: 'home', child: Text('Go home')),
               CheckedPopupMenuItem(value: 'hidden', checked: b.showHidden, child: const Text('Show hidden')),
               const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
@@ -286,11 +335,20 @@ class _NavButton extends StatelessWidget {
 /// One folder's entries. Each folder gets its own list (and scroll
 /// position), so the old and new listings can animate side by side.
 class _Listing extends StatefulWidget {
-  const _Listing({super.key, required this.browser, required this.onOpen, required this.onActions});
+  const _Listing({
+    super.key,
+    required this.browser,
+    required this.onOpen,
+    required this.onActions,
+    required this.onBackgroundMenu,
+  });
 
   final FilesBrowser browser;
   final ValueChanged<FsEntry> onOpen;
   final ValueChanged<FsEntry> onActions;
+
+  /// Long-press on empty space, at this global position.
+  final ValueChanged<Offset> onBackgroundMenu;
 
   @override
   State<_Listing> createState() => _ListingState();
@@ -311,42 +369,53 @@ class _ListingState extends State<_Listing> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final entries = widget.browser.entries;
-    return RefreshIndicator(
-      onRefresh: widget.browser.refresh,
-      color: c.accent,
-      backgroundColor: c.surface,
-      child: entries.isEmpty
-          ? ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                const SizedBox(height: 140),
-                Center(child: Text('Empty folder', style: TextStyle(color: c.textMuted))),
-              ],
-            )
-          : ListView.builder(
-              controller: _scroll,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(top: 4, bottom: 96),
-              itemCount: entries.length,
-              itemExtent: 52,
-              itemBuilder: (context, i) {
-                final e = entries[i];
-                final dir = e.kind == EntryKind.directory;
-                return ListTile(
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  leading: Icon(
-                    dir ? Icons.folder_rounded : Icons.description_outlined,
-                    color: dir ? c.accent : c.textMuted,
+    // Entries take their own long-press; one on empty space reaches here.
+    return GestureDetector(
+      onLongPressStart: (d) => widget.onBackgroundMenu(d.globalPosition),
+      child: RefreshIndicator(
+        onRefresh: widget.browser.refresh,
+        color: c.accent,
+        backgroundColor: c.surface,
+        child: entries.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 140),
+                  Center(
+                    child: Text('Empty folder', style: TextStyle(color: c.textMuted)),
                   ),
-                  title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
-                  subtitle: dir ? null : Text(_size(e.size), style: TextStyle(color: c.textMuted, fontSize: 11)),
-                  trailing: dir ? Icon(Icons.chevron_right_rounded, size: 18, color: c.border) : null,
-                  onTap: () => widget.onOpen(e),
-                  onLongPress: () => widget.onActions(e),
-                );
-              },
-            ),
+                ],
+              )
+            : ListView.builder(
+                controller: _scroll,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(top: 4, bottom: 96),
+                itemCount: entries.length,
+                itemExtent: 52,
+                itemBuilder: (context, i) {
+                  final e = entries[i];
+                  final dir = e.kind == EntryKind.directory;
+                  return ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    leading: Icon(
+                      dir ? Icons.folder_rounded : Icons.description_outlined,
+                      color: dir ? c.accent : c.textMuted,
+                    ),
+                    title: Text(
+                      e.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: dir ? null : Text(_size(e.size), style: TextStyle(color: c.textMuted, fontSize: 11)),
+                    trailing: dir ? Icon(Icons.chevron_right_rounded, size: 18, color: c.border) : null,
+                    onTap: () => widget.onOpen(e),
+                    onLongPress: () => widget.onActions(e),
+                  );
+                },
+              ),
+      ),
     );
   }
 
