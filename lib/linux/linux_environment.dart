@@ -103,6 +103,9 @@ class LinuxEnvironment extends ChangeNotifier {
   Future<SessionSpec> sessionSpec([String? cwd]) =>
       _androidShell || !installed ? Future.value(_androidSpec(cwd)) : _prootSpec(cwd);
 
+  /// What to exec to run [command] inside Linux (no login shell).
+  Future<SessionSpec> commandSpec(List<String> command) => _prootSpec(null, command: command);
+
   SessionSpec _androidSpec(String? cwd) => SessionSpec(
         const ['/system/bin/sh', '-l'],
         {'HOME': androidHome, 'TERM': 'xterm-256color', 'COLORTERM': 'truecolor', 'PATH': '/system/bin:/system/xbin'},

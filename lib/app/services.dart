@@ -9,7 +9,15 @@ import '../linux/linux_environment.dart';
 import '../platform/android_env.dart';
 import '../settings/settings.dart';
 import '../ssh/ssh_keys.dart';
+import '../git/git_registry.dart';
+import '../git/git_runner.dart';
+import '../git/git_tools.dart';
+import '../git/github_auth.dart';
+import '../git/pty_process.dart';
 import '../platform/pty.dart';
+import '../projects/project_service.dart';
+import '../projects/project_store.dart';
+import '../terminal/terminal_session.dart';
 import '../preview/preview_controller.dart';
 import '../terminal/session_presence.dart';
 import '../terminal/terminal_tabs.dart';
@@ -53,6 +61,12 @@ class AppServices {
     _startAgent();
     linux.addListener(_refreshAgents);
     _refreshAgents();
+    linux.addListener(_refreshGit);
+    _refreshGit();
+    tabs.onSignal = (session, signal) {
+      // A command finished in a terminal: its repo may have changed.
+      if (signal is CommandSignal && session.cwd != null) git.touched(session.cwd!);
+    };
     ssh.load().ignore();
     if (linux.installed) preview.start().ignore();
     _updatePresence();
@@ -66,6 +80,13 @@ class AppServices {
       visibleId: visibleSession(appVisible: _appVisible, tab: navigation.tab, activePtyId: tabs.active.ptyId),
       titles: {for (final t in tabs.tabs) ?t.ptyId: t.title},
     );
+  }
+
+  void _refreshGit() {
+    if (!linux.installed) return;
+    gitTools.refresh().then((_) {
+      if (gitTools.ready) github.refresh();
+    }).ignore();
   }
 
   void _refreshAgents() {
@@ -98,6 +119,18 @@ class AppServices {
   late final backup = BackupController(BackupChannel(), filesDir: paths.filesDir, appVersion: '1.0.0');
   late final KeepAliveController keepAlive;
 
+  // Projects and git (real git and GitHub's gh inside Linux).
+  late final git = GitRegistry(LinuxGitRunner(linux.runCommandLine));
+  late final gitTools = GitTools(run: linux.runScriptStreaming);
+  late final github = GitHubAuth(
+    startLogin: () => PtyProcess.start(linux, 'BROWSER=true exec gh auth login -h github.com -p https --web'),
+    run: (args, {stdin}) =>
+        linux.runCommandLine('exec gh ${args.map(shellQuote).join(' ')}', env: gitEnvironment, stdin: stdin),
+  );
+  late final projects = ProjectStore('${paths.filesDir}/projects.json');
+  late final projectService =
+      ProjectService(store: projects, git: git.runner, hostPath: linux.hostPath);
+
   /// One-tap AI agents; "Open" starts one in its own terminal tab.
   late final agents = AgentInstaller(
     run: linux.runScriptStreaming,
@@ -118,6 +151,7 @@ class AppServices {
     await tabs.reattach();
     final services = AppServices._(paths, settings, linux, tabs);
     services.keepAlive.refresh().ignore();
+    await services.projects.load();
     return services;
   }
 

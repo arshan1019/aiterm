@@ -23,6 +23,9 @@ class TerminalTabs extends ChangeNotifier {
   /// Ports any tab's output mentioned (for the preview watcher).
   void Function(Set<int> ports)? onPortsMentioned;
 
+  /// Finished commands, notifications and bells from any tab.
+  void Function(TerminalSession session, SessionSignal signal)? onSignal;
+
   List<TerminalSession> get tabs => List.unmodifiable(_tabs);
   int get activeId => _activeId;
   TerminalSession get active => _tabs.firstWhere((t) => t.id == _activeId, orElse: () => _tabs.first);
@@ -85,6 +88,7 @@ class TerminalTabs extends ChangeNotifier {
     };
     s.onPersistable = _scheduleSave;
     s.onPortsMentioned = (ports) => onPortsMentioned?.call(ports);
+    s.onSignal = (signal) => onSignal?.call(s, signal);
     s.state.addListener(notifyListeners); // e.g. a shell started or exited
     _tabs.add(s);
     return s;
