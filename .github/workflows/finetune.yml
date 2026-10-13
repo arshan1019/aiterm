@@ -1,21 +1,38 @@
 name: Fine-tune Needle
 
+# Incremental: each run trains for up to ~5 hours (GitHub's job limit is 6),
+# uploads its state, and starts the next run from it until training is done.
+# Nothing is lost if a run stops: state is saved every 15 minutes and
+# uploaded even when the job is cancelled. The final run evaluates base vs
+# tuned and uploads the models.
 on:
   workflow_dispatch:
     inputs:
       epochs:
         description: Training epochs
-        default: "3"
+        default: "2"
       per_tool:
         description: Generated examples per action
-        default: "120"
+        default: "100"
+      resume_run:
+        description: Run id to continue from (set automatically)
+        default: ""
+      chunk:
+        description: Chunk number (set automatically)
+        default: "1"
+
+permissions:
+  actions: write  # to download the previous state and start the next chunk
+  contents: read
 
 jobs:
   train:
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 345
     env:
       HF_REV: 93e88ede867e4311c39151285e74df513e4b835b
+      GH_TOKEN: ${{ github.token }}
+      JAX_CACHE_DIR: ${{ github.workspace }}/.jax-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -30,19 +47,54 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-needle3-${{ env.HF_REV }}
 
+      # Compiled XLA programs carry over between chunks.
+      - uses: actions/cache@v4
+        with:
+          path: .jax-cache
+          key: jax-${{ github.run_id }}
+          restore-keys: jax-
+
       - run: pip install "cactus-needle[train]==3.0.2"
 
-      - run: python training/generate.py --out train.jsonl --per-tool ${{ inputs.per_tool }}
+      - name: Restore or create training state
+        run: |
+          if [ -n "${{ inputs.resume_run }}" ]; then
+            gh run download "${{ inputs.resume_run }}" -n needle-state -D state
+            cat state/progress.json
+          else
+            mkdir -p state
+            python training/generate.py --out state/train.jsonl --per-tool ${{ inputs.per_tool }}
+          fi
 
-      - name: Train LoRA adapter
-        run: needle finetune train.jsonl --epochs ${{ inputs.epochs }} --max-len 640 --out adapter.safetensors
+      - name: Train (chunk ${{ inputs.chunk }})
+        run: |
+          python training/train_incremental.py --data state/train.jsonl --state state \
+            --epochs ${{ inputs.epochs }} --out state/adapter.safetensors --budget-minutes 290
+          python -c "import json; p=json.load(open('state/progress.json')); print('DONE=' + str(p['done']).lower())" >> "$GITHUB_ENV"
+
+      - name: Save state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: needle-state
+          path: state/
+          retention-days: 7
+
+      - name: Start the next chunk
+        if: env.DONE == 'false' && inputs.chunk < 8
+        run: |
+          gh workflow run finetune.yml --ref "${{ github.ref_name }}" \
+            -f epochs=${{ inputs.epochs }} -f per_tool=${{ inputs.per_tool }} \
+            -f resume_run=${{ github.run_id }} -f chunk=$(( ${{ inputs.chunk }} + 1 ))
 
       - name: Export models
+        if: env.DONE == 'true'
         run: |
-          needle build --lora adapter.safetensors --out tuned.cact
-          needle build --lora adapter.safetensors --layers 12 --out tuned-12.cact
+          needle build --lora state/adapter.safetensors --out tuned.cact
+          needle build --lora state/adapter.safetensors --layers 12 --out tuned-12.cact
 
       - name: Evaluate base vs tuned
+        if: env.DONE == 'true'
         run: |
           HF=https://huggingface.co/Cactus-Compute/needle3/resolve/$HF_REV
           curl -fsSL $HF/linux-x86_64/needle -o needle && chmod +x needle
@@ -55,11 +107,11 @@ jobs:
           ls -la *.cact | tee -a report.txt
 
       - uses: actions/upload-artifact@v4
+        if: env.DONE == 'true'
         with:
           name: needle-tuned
           path: |
             tuned.cact
             tuned-12.cact
-            adapter.safetensors
+            state/adapter.safetensors
             report.txt
-            train.jsonl
