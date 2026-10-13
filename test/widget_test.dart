@@ -112,7 +112,12 @@ void main() {
       return render.localToGlobal(render.getOffset(CellOffset(x, y)) + render.cellSize.center(Offset.zero));
     }
     final url = cell(10, 6);
+    final r = tester.state<TerminalViewState>(find.byType(TerminalView).first).renderTerminal;
+    debugPrint('DIAG row6="${session.terminal.buffer.lines[6].getText()}" lines=${session.terminal.buffer.lines.length} '
+        'size=${session.terminal.viewWidth}x${session.terminal.viewHeight} tap=$url cellAtTap=${r.getCellOffset(r.globalToLocal(url))}');
     await tester.tapAt(url);
+    await tester.pump();
+    debugPrint('DIAG selection=${session.selection.selection}');
     await tester.pumpAndSettle();
     expect(find.text('Open'), findsOneWidget);
 
