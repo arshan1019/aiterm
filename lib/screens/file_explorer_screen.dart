@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../app_theme.dart';
+import '../core/distro_manager.dart';
 import '../core/file_system_service.dart';
 
 class FileExplorerScreen extends StatefulWidget {
@@ -18,15 +20,31 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
   List<FsEntry> _entries = [];
   bool _loading = true;
 
+  final _distro = DistroManager.instance;
+
   @override
   void initState() {
     super.initState();
+    _distro.addListener(_init);
     _init();
   }
 
+  @override
+  void dispose() {
+    _distro.removeListener(_init);
+    super.dispose();
+  }
+
   Future<void> _init() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final home = '${dir.path}/home';
+    String home;
+    if (_distro.installed) {
+      home = _distro.home;
+    } else {
+      final dir = await getApplicationDocumentsDirectory();
+      home = '${dir.path}/home';
+      await Directory(home).create(recursive: true);
+    }
+    if (!mounted) return;
     _root = home;
     _current = home;
     await _refresh();
@@ -239,7 +257,6 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
         ],
       ),
       floatingActionButton: PopupMenuButton<bool>(
-        icon: Icon(Icons.add, color: c.bg),
         color: c.surface,
         onSelected: _newEntry,
         itemBuilder: (context) => [

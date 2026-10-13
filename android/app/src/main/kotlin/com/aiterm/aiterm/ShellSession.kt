@@ -1,76 +1,74 @@
 package com.aiterm.aiterm
 
-import java.io.File
+import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
 
-/**
- * Runs one interactive child process.
- *
- * This is NOT a real pseudo-terminal: ProcessBuilder gives us plain pipes,
- * so there's no job control, no window-size ioctl, and curses-style full
- * screen programs will misbehave. It's enough to run Android's own shell
- * interactively. A true PTY needs a native (JNI) forkpty()/openpty()
- * implementation — see README.md "Roadmap" before building the proot/Alpine
- * backend, which will need exactly that.
- */
+/** One child process attached to a real pseudo-terminal (see cpp/pty_native.c). */
 class ShellSession(
     private val argv: List<String>,
     private val env: Map<String, String>,
     private val cwd: String,
+    private val rows: Int,
+    private val cols: Int,
     private val onData: (ByteArray) -> Unit,
     private val onExit: (Int) -> Unit,
 ) {
-    private var process: Process? = null
-    private var readerThread: Thread? = null
+    private var master: ParcelFileDescriptor? = null
+    private var output: FileOutputStream? = null
+    private var pid = -1
 
     @Throws(IOException::class)
     fun start() {
-        val builder = ProcessBuilder(argv)
-        builder.directory(File(cwd))
-        builder.environment().putAll(env)
-        builder.redirectErrorStream(true)
-        val p = builder.start()
-        process = p
+        val envp = env.map { "${it.key}=${it.value}" }.toTypedArray()
+        val (fd, childPid) = NativePty.createSubprocess(cwd, argv.toTypedArray(), envp, rows, cols)
+        pid = childPid
+        val pfd = ParcelFileDescriptor.adoptFd(fd)
+        master = pfd
+        // Plain streams over the shared fd: they don't own it, so only pfd.close() closes it.
+        val input = FileInputStream(pfd.fileDescriptor)
+        output = FileOutputStream(pfd.fileDescriptor)
 
-        readerThread = Thread {
-            val buf = ByteArray(4096)
+        Thread {
+            val buf = ByteArray(8192)
             try {
-                val input = p.inputStream
                 while (true) {
                     val n = input.read(buf)
                     if (n < 0) break
                     onData(buf.copyOf(n))
                 }
             } catch (_: IOException) {
-                // stream closed under us when the process is killed; fine.
+                // EIO on the master once the child exits; expected.
             }
-            val code = try {
-                p.waitFor()
-            } catch (_: InterruptedException) {
-                -1
-            }
-            onExit(code)
-        }
-        readerThread?.isDaemon = true
-        readerThread?.start()
+            onExit(NativePty.waitFor(childPid))
+        }.apply { isDaemon = true }.start()
     }
 
     fun write(data: String) {
         try {
-            process?.outputStream?.let {
-                it.write(data.toByteArray(Charsets.UTF_8))
-                it.flush()
-            }
+            output?.write(data.toByteArray(Charsets.UTF_8))
         } catch (_: IOException) {
-            // process already gone; caller will see onExit.
         }
     }
 
-    /** No-op until a real PTY backend exists; kept so the Dart contract is stable. */
-    fun resize(rows: Int, cols: Int) {}
+    fun resize(rows: Int, cols: Int) {
+        master?.let { NativePty.setWindowSize(it.fd, rows, cols) }
+    }
 
     fun stop() {
-        process?.destroy()
-        process = null
+        if (pid > 0) {
+            try {
+                Os.kill(pid, OsConstants.SIGHUP)
+            } catch (_: Exception) {
+            }
+        }
+        try {
+            master?.close()
+        } catch (_: IOException) {
+        }
+        master = null
     }
 }

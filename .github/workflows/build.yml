@@ -31,6 +31,8 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle.kts', 'android/app/build.gradle.kts') }}
 
+      - run: bash scripts/fetch_proot.sh
+
       - run: flutter pub get
 
       # arm64 covers virtually every phone in use; building one ABI instead

@@ -6,9 +6,7 @@ plugins {
 
 android {
     namespace = "com.aiterm.aiterm"
-    // permission_handler_android requires compiling against SDK 37;
-    // flutter.compileSdkVersion is pinned lower on this Flutter version.
-    compileSdk = 37
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -29,6 +27,24 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
+    // proot is shipped as lib*.so and exec'd from nativeLibraryDir; that only
+    // works if the installer extracts native libs to disk.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     buildTypes {

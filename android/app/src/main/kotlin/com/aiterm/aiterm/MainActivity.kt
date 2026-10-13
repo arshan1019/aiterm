@@ -20,5 +20,21 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "aiterm/pty/output",
         ).setStreamHandler(ptyPlugin)
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "aiterm/env",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "paths" -> result.success(
+                    mapOf(
+                        "nativeLibDir" to applicationInfo.nativeLibraryDir,
+                        "filesDir" to filesDir.absolutePath,
+                        "cacheDir" to cacheDir.absolutePath,
+                    ),
+                )
+                else -> result.notImplemented()
+            }
+        }
     }
 }

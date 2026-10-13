@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app_theme.dart';
+import '../core/distro_manager.dart';
 
 class SettingsScreen extends StatelessWidget {
   final AppColors colors;
@@ -29,22 +30,17 @@ class SettingsScreen extends StatelessWidget {
         ]),
         const SizedBox(height: 24),
         _Section(colors: c, title: 'Environment', children: [
-          ListTile(
-            title: Text('Shell backend', style: TextStyle(color: c.text)),
-            subtitle: Text(
-              'Android system shell (/system/bin/sh). No root, no package '
-              'manager — this is the v1 backend.',
-              style: TextStyle(color: c.textMuted),
+          ListenableBuilder(
+            listenable: DistroManager.instance,
+            builder: (context, _) => ListTile(
+              title: Text('Linux distro', style: TextStyle(color: c.text)),
+              subtitle: Text(
+                DistroManager.instance.installed
+                    ? 'Alpine Linux via proot. Install packages with apk.'
+                    : 'Not installed. Set it up from the Terminal tab.',
+                style: TextStyle(color: c.textMuted),
+              ),
             ),
-          ),
-          ListTile(
-            title: Text('Linux distro (Alpine / Arch)', style: TextStyle(color: c.text)),
-            subtitle: Text(
-              'Not wired up yet. Needs a proot binary built for this device\'s '
-              'ABI — see README.md "Roadmap" for how to add it.',
-              style: TextStyle(color: c.textMuted),
-            ),
-            trailing: Icon(Icons.schedule, color: c.textMuted, size: 18),
           ),
         ]),
         const SizedBox(height: 24),

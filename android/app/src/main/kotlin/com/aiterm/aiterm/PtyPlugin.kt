@@ -27,12 +27,16 @@ class PtyPlugin : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
                 @Suppress("UNCHECKED_CAST")
                 val env = (call.argument<Map<String, String>>("env")) ?: emptyMap()
                 val cwd = call.argument<String>("cwd") ?: "/"
+                val rows = call.argument<Int>("rows") ?: 24
+                val cols = call.argument<Int>("cols") ?: 80
                 val id = nextId.getAndIncrement()
 
                 val session = ShellSession(
                     argv = argv,
                     env = env,
                     cwd = cwd,
+                    rows = rows,
+                    cols = cols,
                     onData = { bytes ->
                         mainHandler.post { sinks[id]?.success(bytes) }
                     },
