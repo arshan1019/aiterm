@@ -49,7 +49,7 @@ def main():
     from flax import serialization
     from needle.model.architecture import SimpleAttentionNetwork
     from needle.model.checkpoints import write_adapter
-    from needle.model.finetune import DEFAULT_BASE, init_lora, lora_target_paths, read_examples, render_example
+    from needle.model.finetune import DEFAULT_BASE, init_lora, lora_target_paths, render_example
     from needle.model.quantize import WEIGHT_BITS, configure_deploy, cq_ste_params
     from needle.model.run import load_checkpoint
     from needle.model.tokenizer import BOS_ID, EOS_ID, PAD_ID, get_tokenizer
@@ -71,8 +71,16 @@ def main():
     tokenizer = get_tokenizer(config.vocab_size)
 
     # ── Data: token ids with a loss mask on the answer only ────────────
+    def examples(path):
+        # Same reading as needle 3.0.2's load_jsonl: query/answers lines.
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and "query" in (ex := json.loads(line)):
+                    yield ex
+
     seqs, masks = [], []
-    for ex in read_examples(args.data):
+    for ex in examples(args.data):
         prompt, target = render_example(ex)
         pi, ti = tokenizer.encode(prompt), tokenizer.encode(target)
         ids = ([BOS_ID] + pi + ti + [EOS_ID])[: args.max_len]
