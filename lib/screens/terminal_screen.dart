@@ -16,6 +16,7 @@ import '../core/shell_env.dart';
 import '../core/tool_call.dart';
 import '../widgets/ask_sheet.dart';
 import '../widgets/extra_keys_bar.dart';
+import '../widgets/terminal_selection.dart';
 
 enum _Phase { loading, setup, ready }
 
@@ -442,6 +443,9 @@ class _TerminalPaneState extends State<TerminalPane> {
   final _distro = DistroManager.instance;
   final _app = AppController.instance;
   final _terminal = _Terminal();
+  final _controller = TerminalController();
+  final _viewKey = GlobalKey<TerminalViewState>();
+  static const _env = MethodChannel('aiterm/env');
   PtySession? _session;
   StreamSubscription<String>? _outputSub;
 
@@ -457,6 +461,8 @@ class _TerminalPaneState extends State<TerminalPane> {
 
   // Volume Down held = Ctrl, as in Termux.
   bool _volumeCtrl = false;
+
+  bool _wasVisible = true;
 
   // The keyboard animates the view height frame by frame. Telling the shell
   // about every intermediate size makes it redraw its prompt dozens of times
@@ -561,8 +567,20 @@ class _TerminalPaneState extends State<TerminalPane> {
     }
   }
 
+  Future<void> _openUrl(String url) async {
+    try {
+      await _env.invokeMethod('openUrl', {'url': url});
+    } on PlatformException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'Could not open link')));
+      }
+    }
+  }
+
   void _onAppChanged() {
-    if (mounted && _app.fontSize != _styleSize) setState(() {});
+    final visible = _app.tab == AppController.tabTerminal;
+    if (mounted && (_app.fontSize != _styleSize || visible != _wasVisible)) setState(() {});
+    _wasVisible = visible;
   }
 
   Future<void> _start() async {
@@ -661,6 +679,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     _outputSub?.cancel();
     _app.removeListener(_onAppChanged);
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
+    _controller.dispose();
     _session?.dispose();
     _focus.dispose();
     super.dispose();
@@ -701,18 +720,29 @@ class _TerminalPaneState extends State<TerminalPane> {
                 Positioned.fill(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-                    child: TerminalView(
-                      _terminal,
-                      focusNode: _focus,
-                      autofocus: widget.active,
-                      backgroundOpacity: 0,
-                      theme: _themeFor(c),
-                      textStyle: _styleFor(_app.fontSize),
-                      // No suggestions or autocorrect: predictive keyboards
-                      // rewrite composed text and move the cursor.
-                      keyboardType: TextInputType.visiblePassword,
-                      deleteDetection: true,
-                      cursorType: TerminalCursorType.block,
+                    child: TerminalSelection(
+                      terminal: _terminal,
+                      controller: _controller,
+                      viewKey: _viewKey,
+                      onPaste: _terminal.paste,
+                      onOpenUrl: _openUrl,
+                      visible: widget.active && _app.tab == AppController.tabTerminal,
+                      builder: (onTapUp) => TerminalView(
+                        _terminal,
+                        key: _viewKey,
+                        controller: _controller,
+                        onTapUp: onTapUp,
+                        focusNode: _focus,
+                        autofocus: widget.active,
+                        backgroundOpacity: 0,
+                        theme: _themeFor(c),
+                        textStyle: _styleFor(_app.fontSize),
+                        // No suggestions or autocorrect: predictive keyboards
+                        // rewrite composed text and move the cursor.
+                        keyboardType: TextInputType.visiblePassword,
+                        deleteDetection: true,
+                        cursorType: TerminalCursorType.block,
+                      ),
                     ),
                   ),
                 ),

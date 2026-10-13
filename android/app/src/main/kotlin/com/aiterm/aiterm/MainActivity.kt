@@ -1,6 +1,9 @@
 package com.aiterm.aiterm
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import io.flutter.embedding.android.FlutterActivity
@@ -44,6 +47,12 @@ class MainActivity : FlutterActivity() {
                         "uptimeMs" to SystemClock.elapsedRealtime().toString(),
                     ),
                 )
+                "openUrl" -> try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(call.argument<String>("url"))))
+                    result.success(null)
+                } catch (e: ActivityNotFoundException) {
+                    result.error("no_app", "No app can open this link", null)
+                }
                 "requestMic" -> {
                     if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                         result.success(true)
