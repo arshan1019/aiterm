@@ -113,7 +113,7 @@ class TerminalSession {
     _alpine = alpine;
     error = null;
     fix.value = null;
-    state.value = SessionState.starting;
+    _setState(SessionState.starting);
     try {
       final s = await spec();
       final pty = await PtyHost.instance.start(
@@ -138,18 +138,23 @@ class TerminalSession {
         if (_disposed || _pty != pty) return;
         terminal.write('\r\n[process exited: $code]\r\n');
         _pty = null;
-        state.value = SessionState.exited;
+        _setState(SessionState.exited);
       });
-      state.value = SessionState.running;
+      _setState(SessionState.running);
     } catch (e) {
       error = '$e';
-      state.value = SessionState.exited;
+      _setState(SessionState.exited);
     }
+  }
+
+  /// The tab may be closed while a start is still in flight.
+  void _setState(SessionState s) {
+    if (!_disposed) state.value = s;
   }
 
   Future<void> restart(Future<SessionSpec> Function() spec, {required bool alpine}) async {
     _stopShell();
-    state.value = SessionState.idle;
+    _setState(SessionState.idle);
     await start(spec, alpine: alpine);
   }
 
