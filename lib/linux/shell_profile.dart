@@ -9,6 +9,10 @@
 /// bash/zsh-only syntax is kept inside `eval` so busybox ash, which parses
 /// the whole file, never sees it.
 const shellProfile = r'''# aiterm shell integration (OSC 7 / OSC 133). Managed by the app.
+# Per-user programs (native installers put them here), as Debian's
+# default ~/.profile does. Set for every shell, interactive or not.
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) PATH="$HOME/.local/bin:$PATH"; export PATH ;; esac
+
 case $- in *i*) ;; *) return 0 ;; esac
 [ -n "$AITERM_SHELL_INTEGRATION" ] && return 0
 AITERM_SHELL_INTEGRATION=1

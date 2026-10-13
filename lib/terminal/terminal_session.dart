@@ -85,8 +85,10 @@ class TerminalSession {
     this._pinned = false,
     this.restoredScrollback,
     this.savedPtyId,
+    List<String> startupCommands = const [],
     PtyBackend? backend,
-  }) : _backend = backend ?? PtyHost.instance {
+  })  : _backend = backend ?? PtyHost.instance,
+        _startup = startupCommands {
     terminal.onOutput = _onInput;
     terminal.onResize = (cols, rows, _, _) => _onResize(rows, cols);
     terminal.onTitleChange = _onShellTitle;
@@ -150,6 +152,9 @@ class TerminalSession {
   }
 
   final PtyBackend _backend;
+
+  /// Typed into the shell once, when it first starts (e.g. an agent).
+  List<String> _startup;
   PtySession? _pty;
 
   /// The PTY this tab had when it was saved; reattached if still running.
@@ -194,6 +199,10 @@ class TerminalSession {
         return;
       }
       _connect(pty);
+      for (final command in _startup) {
+        pty.write('$command\r');
+      }
+      _startup = const [];
       _setState(SessionState.running);
     } catch (e) {
       error = '$e';

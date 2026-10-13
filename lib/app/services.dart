@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../assistant/assistant.dart';
 import '../assistant/needle.dart';
 import '../assistant/tool_call.dart';
+import '../agents/agent_installer.dart';
 import '../backup/backup_controller.dart';
 import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
@@ -50,6 +51,8 @@ class AppServices {
     tabs.onPortsMentioned = preview.portsMentioned;
     linux.addListener(_startAgent);
     _startAgent();
+    linux.addListener(_refreshAgents);
+    _refreshAgents();
     ssh.load().ignore();
     if (linux.installed) preview.start().ignore();
     _updatePresence();
@@ -63,6 +66,10 @@ class AppServices {
       visibleId: visibleSession(appVisible: _appVisible, tab: navigation.tab, activePtyId: tabs.active.ptyId),
       titles: {for (final t in tabs.tabs) ?t.ptyId: t.title},
     );
+  }
+
+  void _refreshAgents() {
+    if (linux.installed) agents.refresh().ignore();
   }
 
   void _startAgent() {
@@ -90,6 +97,15 @@ class AppServices {
   final ssh = SshKeys(SshChannel());
   late final backup = BackupController(BackupChannel(), filesDir: paths.filesDir, appVersion: '1.0.0');
   late final KeepAliveController keepAlive;
+
+  /// One-tap AI agents; "Open" starts one in its own terminal tab.
+  late final agents = AgentInstaller(
+    run: linux.runScriptStreaming,
+    launch: (title, commands) {
+      tabs.open(title: title, commands: commands);
+      navigation.open(AppTab.terminal);
+    },
+  );
 
   /// Loads everything the first frame depends on.
   static Future<AppServices> load() async {

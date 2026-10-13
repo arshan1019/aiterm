@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -195,6 +196,24 @@ class LinuxEnvironment extends ChangeNotifier {
     final r = await Process.run(spec.argv.first, spec.argv.sublist(1),
         environment: spec.env, workingDirectory: spec.cwd);
     return ('${r.stdout}${r.stderr}', r.exitCode);
+  }
+
+  /// Like [runScript], streaming output lines as they come (installs).
+  Future<int> runScriptStreaming(String script, void Function(String line) onOutput) async {
+    if (!installed) {
+      onOutput('Linux is not installed');
+      return 1;
+    }
+    final spec = await _prootSpec(null, command: ['/bin/sh', '-c', script]);
+    final p = await Process.start(spec.argv.first, spec.argv.sublist(1),
+        environment: spec.env, workingDirectory: spec.cwd);
+    void pipe(Stream<List<int>> s) => s
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .transform(const LineSplitter())
+        .listen(onOutput);
+    pipe(p.stdout);
+    pipe(p.stderr);
+    return p.exitCode;
   }
 
   /// root's shell from /etc/passwd, so `chsh -s /bin/bash` sticks.

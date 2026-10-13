@@ -111,4 +111,18 @@ void main() {
     tabs.dispose(); // the UI going away must leave shells to the service
     expect(backend.started[1].stopped, isFalse);
   });
+
+  test('a tab opened with commands runs them once its shell starts', () async {
+    final backend = FakeBackend();
+    final tabs = TerminalTabs(dir.path, backend: backend);
+    await tabs.load();
+    final t = tabs.open(title: 'Claude Code', commands: ['claude']);
+    expect(t.title, 'Claude Code');
+    expect(tabs.active, t);
+    await t.start(spec, alpine: true);
+    expect(backend.started.single.written, ['claude\r']);
+    await t.restart(spec, alpine: true); // not again on restart
+    expect(backend.started.last.written, isEmpty);
+    tabs.dispose();
+  });
 }

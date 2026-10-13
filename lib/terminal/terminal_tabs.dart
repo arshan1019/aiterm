@@ -63,7 +63,12 @@ class TerminalTabs extends ChangeNotifier {
   }
 
   TerminalSession _add(String title,
-      {bool customTitle = false, bool pinned = false, String? cwd, String? scrollback, int? ptyId}) {
+      {bool customTitle = false,
+      bool pinned = false,
+      String? cwd,
+      String? scrollback,
+      int? ptyId,
+      List<String> commands = const []}) {
     final s = TerminalSession(
       id: _nextId++,
       title: title,
@@ -71,6 +76,7 @@ class TerminalTabs extends ChangeNotifier {
       pinned: pinned,
       restoredScrollback: scrollback == null || scrollback.isEmpty ? null : scrollback,
       savedPtyId: ptyId,
+      startupCommands: commands,
       backend: _backend,
     )..cwd = cwd;
     s.onMetaChanged = () {
@@ -96,9 +102,10 @@ class TerminalTabs extends ChangeNotifier {
   }
 
   /// A new tab, starting in [cwd] (a guest path) if given and named after it.
-  TerminalSession open({String? cwd}) {
-    final name = cwd?.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => '/');
-    final s = _add(name ?? _freshTitle(), cwd: cwd);
+  /// [title] names the tab; [commands] run once its shell starts.
+  TerminalSession open({String? cwd, String? title, List<String> commands = const []}) {
+    final name = title ?? cwd?.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => '/');
+    final s = _add(name ?? _freshTitle(), cwd: cwd, customTitle: title != null, commands: commands);
     _activeId = s.id;
     _scheduleSave();
     notifyListeners();

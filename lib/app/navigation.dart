@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
 
-enum AppTab { terminal, files, settings }
+/// [agents] is home: aiterm is for running AI coding agents.
+enum AppTab { agents, terminal, files, settings }
 
 /// Which top-level tab is showing, plus cross-tab requests ("show src in
 /// Files"). Screens that keep their own back stack register a back handler.
 class AppNavigation extends ChangeNotifier {
-  AppTab _tab = AppTab.terminal;
+  AppTab _tab = AppTab.agents;
   AppTab get tab => _tab;
 
   /// A folder the Files tab should open next; it clears this once handled.
@@ -34,12 +35,12 @@ class AppNavigation extends ChangeNotifier {
     }
   }
 
-  /// Android back: the current tab's own history first, then back to the
-  /// terminal. False means nothing is left and the app should close.
+  /// Android back: the current tab's own history first, then home
+  /// (agents). False means nothing is left and the app should close.
   bool handleBack() {
     if (_backHandlers[_tab]?.call() ?? false) return true;
-    if (_tab != AppTab.terminal) {
-      open(AppTab.terminal);
+    if (_tab != AppTab.agents) {
+      open(AppTab.agents);
       return true;
     }
     return false;

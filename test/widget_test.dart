@@ -37,10 +37,16 @@ void main() {
 
   tearDown(() => dir.deleteSync(recursive: true));
 
-  Future<AppServices> boot(WidgetTester tester) async {
+  /// Starts the app; [home] false switches to the terminal tab, which most
+  /// tests drive (agents is the home tab).
+  Future<AppServices> boot(WidgetTester tester, {bool home = false}) async {
     final services = (await tester.runAsync(AppServices.load))!;
     await tester.pumpWidget(AiTermApp(services: services));
     await tester.pumpAndSettle();
+    if (!home) {
+      await tester.tap(find.text('terminal'));
+      await tester.pumpAndSettle();
+    }
     return services;
   }
 
@@ -281,6 +287,24 @@ void main() {
     await tester.tap(find.byWidgetPredicate((w) => w.runtimeType.toString() == 'TerminalView').first);
     await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isTrue);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
+  testWidgets('home is AI agents: Linux setup first, then one-tap installs', (tester) async {
+    await boot(tester, home: true);
+    expect(find.text('agents'), findsOneWidget);
+    expect(find.text('Install Alpine'), findsOneWidget); // first launch sets up Linux here
+
+    File('${dir.path}/alpine/.aiterm-installed')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('x');
+    final services = await boot(tester, home: true);
+    expect(services.navigation.tab.name, 'agents');
+    for (final name in ['Claude Code', 'Gemini CLI', 'Codex CLI']) {
+      expect(find.text(name), findsOneWidget);
+    }
+    expect(find.text('Install'), findsNWidgets(3));
+    expect(find.textContaining('Sign in the first time'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 }
