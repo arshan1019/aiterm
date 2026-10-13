@@ -309,4 +309,47 @@ void main() {
     expect(find.textContaining('Sign in the first time'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
+
+  testWidgets('Files: Linux/Phone switcher, copy & paste, delete asks first', (tester) async {
+    Directory('${dir.path}/alpine/root/proj').createSync(recursive: true);
+    File('${dir.path}/alpine/root/notes.txt').writeAsStringSync('hi');
+    File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+    await boot(tester);
+    await settleIo(tester);
+    await tester.tap(find.text('files'));
+    await settleIo(tester);
+
+    // Phone without permission: a clear prompt, not an empty or broken list.
+    await tester.tap(find.text('Phone'));
+    await settleIo(tester);
+    expect(find.text('Allow access'), findsOneWidget);
+    await tester.tap(find.text('Linux'));
+    await settleIo(tester);
+    expect(find.text('notes.txt'), findsOneWidget);
+
+    // Copy → paste bar → paste into proj.
+    final notesRow = find.ancestor(of: find.text('notes.txt'), matching: find.byType(ListTile));
+    await tester.tap(find.descendant(of: notesRow, matching: find.byTooltip('Actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+    expect(find.text('Paste here'), findsOneWidget);
+    await tester.tap(find.text('proj'));
+    await settleIo(tester);
+    await tester.tap(find.text('Paste here'));
+    await settleIo(tester);
+    expect(File('${dir.path}/alpine/root/proj/notes.txt').existsSync(), isTrue);
+
+    // Delete confirms before acting.
+    await tester.tap(find.byTooltip('Actions').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('can\'t be undone'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(File('${dir.path}/alpine/root/proj/notes.txt').existsSync(), isTrue);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
 }

@@ -45,6 +45,12 @@ class AndroidEnv {
   /// can handle it.
   static Future<void> openUrl(String url) => _channel.invokeMethod('openUrl', {'url': url});
 
+  /// Whether the app may read and write phone storage (All files access).
+  static Future<bool> storageAccess() async => await _channel.invokeMethod<bool>('storageAccess') ?? false;
+
+  /// Opens the system screen to grant All files access (Android 11+).
+  static Future<void> requestStorageAccess() => _channel.invokeMethod('requestStorageAccess');
+
   /// Asks for the microphone; true once granted.
   static Future<bool> requestMic() async => await _channel.invokeMethod<bool>('requestMic') ?? false;
 }

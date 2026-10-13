@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../agents/agent_installer.dart';
+import '../platform/android_env.dart';
 import '../shared/name_dialog.dart';
+import 'file_clipboard.dart';
 import 'file_system_service.dart';
 import 'files_browser.dart';
 import 'text_editor_screen.dart';
@@ -20,12 +24,22 @@ class FilesScreen extends StatefulWidget {
 
 class _FilesScreenState extends State<FilesScreen> {
   late final _services = context.services;
-  late final FilesBrowser _browser = FilesBrowser(root: _services.linux.home, rootfs: _services.linux.rootfs);
+  static const _phoneRoot = '/storage/emulated/0';
+  late final FilesBrowser _browser = FilesBrowser(
+    root: _services.linux.home,
+    rootfs: _services.linux.rootfs,
+    locations: [FilesLocation.linux(_services.linux.home), const FilesLocation.phone(_phoneRoot)],
+  );
+  final _clipboard = FileClipboard();
+  bool _phoneAccess = false;
+  late final _lifecycle = AppLifecycleListener(onResume: _checkPhoneAccess);
 
   @override
   void initState() {
     super.initState();
     _browser.load();
+    _lifecycle; // re-check phone access when back from system settings
+    _checkPhoneAccess();
     _services.linux.addListener(_onLinuxChanged);
     _services.navigation.addListener(_openPending);
     _services.navigation.setBackHandler(AppTab.files, _browser.handleBack);
@@ -37,7 +51,34 @@ class _FilesScreenState extends State<FilesScreen> {
     _services.navigation.removeListener(_openPending);
     _services.navigation.setBackHandler(AppTab.files, null);
     _browser.dispose();
+    _clipboard.dispose();
+    _lifecycle.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkPhoneAccess() async {
+    bool access;
+    try {
+      access = await AndroidEnv.storageAccess();
+    } catch (_) {
+      access = false;
+    }
+    if (!mounted || access == _phoneAccess) return;
+    setState(() => _phoneAccess = access);
+    if (access && _browser.location.kind == LocationKind.phone) await _browser.refresh();
+  }
+
+  Future<void> _paste() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final done = await _clipboard.paste(_browser.current);
+      await _browser.refresh();
+      messenger.showSnackBar(
+        SnackBar(content: Text(done.length == 1 ? 'Pasted 1 item' : 'Pasted ${done.length} items')),
+      );
+    } on FileSystemException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   void _onLinuxChanged() {
@@ -94,6 +135,24 @@ class _FilesScreenState extends State<FilesScreen> {
   void _openInAgent(String id, [String? folder]) =>
       _services.agents.open(id, cwd: _services.linux.guestPath(folder ?? _browser.current));
 
+  Future<bool> _confirmDelete(FsEntry e) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+          title: Text('Delete “${e.name}”?', style: const TextStyle(fontSize: 16)),
+          content: Text(
+            e.kind == EntryKind.directory
+                ? 'The folder and everything in it will be deleted. This can\'t be undone.'
+                : 'This can\'t be undone.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Delete')),
+          ],
+        ),
+      ) ??
+      false;
+
   void _entryActions(FsEntry e) {
     showModalBottomSheet<void>(
       context: context,
@@ -122,6 +181,23 @@ class _FilesScreenState extends State<FilesScreen> {
                       _openInAgent(agent.id, e.path);
                     },
                   ),
+              if (e.kind == EntryKind.directory) const Divider(height: 8),
+              ListTile(
+                leading: Icon(Icons.copy_rounded, color: c.textMuted),
+                title: const Text('Copy', style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _clipboard.copy([e]);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.content_cut_rounded, color: c.textMuted),
+                title: const Text('Move', style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  _clipboard.cut([e]);
+                },
+              ),
               ListTile(
                 leading: Icon(Icons.drive_file_rename_outline_rounded, color: c.textMuted),
                 title: const Text('Rename', style: TextStyle(fontSize: 14)),
@@ -134,9 +210,9 @@ class _FilesScreenState extends State<FilesScreen> {
               ListTile(
                 leading: Icon(Icons.delete_outline_rounded, color: c.danger),
                 title: Text('Delete', style: TextStyle(color: c.danger, fontSize: 14)),
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(sheet);
-                  _browser.delete(e);
+                  if (await _confirmDelete(e)) await _browser.delete(e);
                 },
               ),
               const SizedBox(height: 8),
@@ -155,6 +231,7 @@ class _FilesScreenState extends State<FilesScreen> {
         listenable: _browser,
         builder: (context, _) => Column(
           children: [
+            _LocationSwitcher(browser: _browser),
             _Header(
               browser: _browser,
               agents: _services.agents,
@@ -162,7 +239,9 @@ class _FilesScreenState extends State<FilesScreen> {
               onOpenAgent: _openInAgent,
             ),
             Expanded(
-              child: !_browser.loaded
+              child: _browser.location.kind == LocationKind.phone && !_phoneAccess
+                  ? _PhoneAccessPrompt(onAllow: AndroidEnv.requestStorageAccess)
+                  : !_browser.loaded
                   ? const SizedBox.expand()
                   : AnimatedSwitcher(
                       duration: Motion.standard,
@@ -189,6 +268,7 @@ class _FilesScreenState extends State<FilesScreen> {
                       ),
                     ),
             ),
+            _PasteBar(clipboard: _clipboard, onPaste: _paste),
           ],
         ),
       ),
@@ -422,5 +502,132 @@ class _ListingState extends State<_Listing> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+/// Linux | Phone: which storage Files shows.
+class _LocationSwitcher extends StatelessWidget {
+  const _LocationSwitcher({required this.browser});
+
+  final FilesBrowser browser;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<LocationKind>(
+          showSelectedIcon: false,
+          style: const ButtonStyle(visualDensity: VisualDensity.compact),
+          segments: const [
+            ButtonSegment(
+              value: LocationKind.linux,
+              icon: Icon(Icons.terminal_rounded, size: 16),
+              label: Text('Linux'),
+            ),
+            ButtonSegment(
+              value: LocationKind.phone,
+              icon: Icon(Icons.smartphone_rounded, size: 16),
+              label: Text('Phone'),
+            ),
+          ],
+          selected: {browser.location.kind},
+          onSelectionChanged: (s) => browser.switchTo(s.first),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhoneAccessPrompt extends StatelessWidget {
+  const _PhoneAccessPrompt({required this.onAllow});
+
+  final VoidCallback onAllow;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.folder_shared_rounded, size: 40, color: c.accent),
+            const SizedBox(height: 12),
+            Text(
+              'Phone storage',
+              style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Allow access to move files between Linux and your phone: '
+              'downloads, photos, project assets. Linux also sees it at /sdcard.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onAllow, child: const Text('Allow access')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown while something is copied or cut; stays across folders and
+/// locations so it can be pasted anywhere.
+class _PasteBar extends StatelessWidget {
+  const _PasteBar({required this.clipboard, required this.onPaste});
+
+  final FileClipboard clipboard;
+  final VoidCallback onPaste;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: clipboard,
+      builder: (context, _) => AnimatedSize(
+        duration: Motion.standard,
+        curve: Motion.move,
+        child: !clipboard.hasItems
+            ? const SizedBox(width: double.infinity)
+            : Material(
+                color: c.surface,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+                    child: Row(
+                      children: [
+                        Icon(
+                          clipboard.mode == ClipMode.cut ? Icons.content_cut_rounded : Icons.copy_rounded,
+                          size: 16,
+                          color: c.accent,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${clipboard.mode == ClipMode.cut ? 'Move' : 'Copy'} '
+                            '${clipboard.items.length == 1 ? clipboard.items.first.name : '${clipboard.items.length} items'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: c.text, fontSize: 13),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: clipboard.clear,
+                          child: Text('Cancel', style: TextStyle(color: c.textMuted)),
+                        ),
+                        FilledButton(onPressed: onPaste, child: const Text('Paste here')),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
   }
 }
