@@ -14,7 +14,14 @@ import 'navigation.dart';
 class AppServices {
   AppServices._(this.paths, this.settings, this.linux, this.tabs)
       : navigation = AppNavigation(),
-        assistant = Assistant(Needle(paths));
+        assistant = Assistant(Needle(paths)) {
+    // Android may kill a backgrounded app without warning: save tabs as
+    // soon as the app leaves the screen.
+    _lifecycle = AppLifecycleListener(onHide: () => tabs.save().ignore());
+  }
+
+  // ignore: unused_field
+  late final AppLifecycleListener _lifecycle;
 
   final AppPaths paths;
   final Settings settings;

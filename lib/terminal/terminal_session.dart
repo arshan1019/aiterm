@@ -6,8 +6,34 @@ import '../assistant/error_fixes.dart';
 import '../linux/session_spec.dart';
 import '../platform/pty.dart';
 import 'key_mapping.dart';
+import 'shell_integration.dart';
 
 enum SessionState { idle, starting, running, exited }
+
+/// Builds what to run for a tab, starting in [cwd] (a guest path) if given.
+typedef SpecFor = Future<SessionSpec> Function(String? cwd);
+
+/// Something in a session worth telling the user about.
+sealed class SessionSignal {
+  const SessionSignal();
+}
+
+/// A command finished (from shell integration prompt marks).
+class CommandSignal extends SessionSignal {
+  const CommandSignal(this.command);
+  final CommandDone command;
+}
+
+/// The program asked for a notification (OSC 9 / OSC 777).
+class NotifySignal extends SessionSignal {
+  const NotifySignal(this.notification);
+  final ShellNotification notification;
+}
+
+/// The terminal bell (many programs ring it when they need attention).
+class BellSignal extends SessionSignal {
+  const BellSignal();
+}
 
 /// Sticky CTRL/ALT from the key bar (next key only) and Volume Down held as
 /// Ctrl, as in Termux.
@@ -51,10 +77,18 @@ class Modifiers extends ChangeNotifier {
 /// its output. Lives outside the widget tree, so tabs keep running while
 /// hidden and widgets only render.
 class TerminalSession {
-  TerminalSession({required this.id, required this._title, this._customTitle = false, this._pinned = false}) {
+  TerminalSession({
+    required this.id,
+    required this._title,
+    this._customTitle = false,
+    this._pinned = false,
+    this.restoredScrollback,
+  }) {
     terminal.onOutput = _onInput;
     terminal.onResize = (cols, rows, _, _) => _onResize(rows, cols);
     terminal.onTitleChange = _onShellTitle;
+    terminal.onPrivateOSC = _onOsc;
+    terminal.onBell = () => onSignal?.call(const BellSignal());
   }
 
   final int id;
@@ -72,6 +106,24 @@ class TerminalSession {
 
   /// Called when the tab's title or pin changes (the tab strip listens).
   VoidCallback? onMetaChanged;
+
+  /// Receives finished commands, notifications and bells.
+  void Function(SessionSignal signal)? onSignal;
+
+  /// The shell's current folder (guest path), from shell integration.
+  String? cwd;
+
+  /// Output from before the app restarted, shown above the new shell.
+  final String? restoredScrollback;
+  bool _restoredShown = false;
+
+  /// Something worth saving changed (folder, output).
+  VoidCallback? onPersistable;
+
+  final _commands = CommandTracker();
+
+  /// A command is running (shell integration saw Enter but no prompt yet).
+  bool get busy => _commands.busy;
 
   String _title;
   bool _customTitle;
@@ -108,14 +160,15 @@ class TerminalSession {
 
   /// Starts the shell at the terminal's current size. Call after the view
   /// has laid out, so the first prompt is drawn at the right width.
-  Future<void> start(Future<SessionSpec> Function() spec, {required bool alpine}) async {
+  Future<void> start(SpecFor spec, {required bool alpine}) async {
     if (state.value == SessionState.starting || state.value == SessionState.running) return;
     _alpine = alpine;
     error = null;
     fix.value = null;
     _setState(SessionState.starting);
+    showRestoredScrollback();
     try {
-      final s = await spec();
+      final s = await spec(cwd);
       final pty = await PtyHost.instance.start(
         argv: s.argv,
         env: s.env,
@@ -152,7 +205,7 @@ class TerminalSession {
     if (!_disposed) state.value = s;
   }
 
-  Future<void> restart(Future<SessionSpec> Function() spec, {required bool alpine}) async {
+  Future<void> restart(SpecFor spec, {required bool alpine}) async {
     _stopShell();
     _setState(SessionState.idle);
     await start(spec, alpine: alpine);
@@ -169,6 +222,7 @@ class TerminalSession {
     }
     _pty?.write(data);
     if (data.contains('\r')) {
+      _commands.onEnter();
       // A new command started: earlier errors no longer apply.
       _recent.clear();
       fix.value = null;
@@ -197,6 +251,59 @@ class TerminalSession {
   void _onResize(int rows, int cols) {
     _resizeTimer?.cancel();
     _resizeTimer = Timer(const Duration(milliseconds: 80), () => _pty?.resize(rows, cols));
+  }
+
+  void _onOsc(String code, List<String> args) {
+    switch (parseOsc(code, args)) {
+      case CwdChanged(:final path):
+        if (path != cwd) {
+          cwd = path;
+          onPersistable?.call();
+        }
+      case ShellNotification n:
+        onSignal?.call(NotifySignal(n));
+      case final ShellEvent e:
+        if (_commands.onEvent(e) case final done?) onSignal?.call(CommandSignal(done));
+      case null:
+    }
+  }
+
+  /// The main screen's text, oldest first, at most [maxLines] lines. A
+  /// full-screen app on the alternate screen (vim, a TUI) isn't included.
+  String scrollbackText({int maxLines = 2000}) {
+    final lines = terminal.mainBuffer.lines;
+    final out = <String>[];
+    for (var y = 0; y < lines.length; y++) {
+      final line = lines[y];
+      final text = line.getText().trimRight();
+      if (line.isWrapped && out.isNotEmpty) {
+        out[out.length - 1] += text;
+      } else {
+        out.add(text);
+      }
+    }
+    while (out.isNotEmpty && out.last.isEmpty) {
+      out.removeLast();
+    }
+    return out.skip(out.length > maxLines ? out.length - maxLines : 0).join('\n');
+  }
+
+  /// Writes [restoredScrollback] into the terminal, once, with a marker.
+  void showRestoredScrollback() {
+    final text = restoredScrollback;
+    if (text == null || _restoredShown) return;
+    _restoredShown = true;
+    terminal.write('${text.split('\n').join('\r\n')}\r\n\x1b[2m── restored from your last session ──\x1b[0m\r\n');
+  }
+
+  /// The last non-blank line of output, as plain text.
+  String? lastOutputLine() {
+    final lines = terminal.buffer.lines;
+    for (var y = lines.length - 1; y >= 0; y--) {
+      final text = lines[y].getText().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return null;
   }
 
   void _onShellTitle(String raw) {

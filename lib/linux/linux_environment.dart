@@ -5,6 +5,7 @@ import '../platform/android_env.dart';
 import '../shared/download.dart';
 import 'proc_stubs.dart';
 import 'session_spec.dart';
+import 'shell_profile.dart';
 
 enum LinuxStatus { missing, installing, ready }
 
@@ -93,16 +94,18 @@ class LinuxEnvironment extends ChangeNotifier {
     }
   }
 
-  /// What a new terminal tab should run.
-  Future<SessionSpec> sessionSpec() => _androidShell || !installed ? Future.value(_androidSpec()) : _prootSpec();
+  /// What a terminal tab should run, starting in [cwd] (as the shell sees
+  /// it) when that folder still exists.
+  Future<SessionSpec> sessionSpec([String? cwd]) =>
+      _androidShell || !installed ? Future.value(_androidSpec(cwd)) : _prootSpec(cwd);
 
-  SessionSpec _androidSpec() => SessionSpec(
+  SessionSpec _androidSpec(String? cwd) => SessionSpec(
         const ['/system/bin/sh', '-l'],
         {'HOME': androidHome, 'TERM': 'xterm-256color', 'PATH': '/system/bin:/system/xbin'},
-        androidHome,
+        cwd != null && Directory(cwd).existsSync() ? cwd : androidHome,
       );
 
-  Future<SessionSpec> _prootSpec() async {
+  Future<SessionSpec> _prootSpec(String? cwd) async {
     final lib = paths.nativeLibDir;
     // proot links against libtalloc.so.2, but jniLibs must be named lib*.so.
     // nativeLibDir moves on every app update, so rebuild the link each time.
@@ -120,6 +123,10 @@ class LinuxEnvironment extends ChangeNotifier {
     await Directory('$rootfs/tmp').create(recursive: true);
     await Process.run('/system/bin/chmod', ['1777', shm.path, '$rootfs/tmp']);
 
+    // Shell integration: folder and command boundaries (see shell_profile).
+    await File('$rootfs/etc/profile.d/aiterm.sh').writeAsString(shellProfile);
+    final start = cwd != null && cwd.startsWith('/') && Directory('$rootfs$cwd').existsSync() ? cwd : '/root';
+
     final shell = await _loginShell();
     final argv = <String>[
       '$lib/libproot.so',
@@ -131,7 +138,7 @@ class LinuxEnvironment extends ChangeNotifier {
       '-L',
       '--change-id=0:0',
       '--rootfs=$rootfs',
-      '--cwd=/root',
+      '--cwd=$start',
       '--bind=/dev',
       '--bind=/proc',
       '--bind=/sys',
