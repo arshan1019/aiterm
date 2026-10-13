@@ -105,7 +105,7 @@ class LinuxEnvironment extends ChangeNotifier {
         cwd != null && Directory(cwd).existsSync() ? cwd : androidHome,
       );
 
-  Future<SessionSpec> _prootSpec(String? cwd) async {
+  Future<SessionSpec> _prootSpec(String? cwd, {List<String>? command}) async {
     final lib = paths.nativeLibDir;
     // proot links against libtalloc.so.2, but jniLibs must be named lib*.so.
     // nativeLibDir moves on every app update, so rebuild the link each time.
@@ -172,7 +172,7 @@ class LinuxEnvironment extends ChangeNotifier {
       'LANG=C.UTF-8',
       'TMPDIR=/tmp',
       'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      shell, '-l',
+      ...(command ?? [shell, '-l']),
     ];
     return SessionSpec(
       argv,
@@ -183,6 +183,16 @@ class LinuxEnvironment extends ChangeNotifier {
       },
       paths.filesDir,
     );
+  }
+
+  /// Runs [script] with /bin/sh inside Linux, without a terminal; returns
+  /// the combined output and exit status.
+  Future<(String, int)> runScript(String script) async {
+    if (!installed) return ('Linux is not installed', 1);
+    final spec = await _prootSpec(null, command: ['/bin/sh', '-c', script]);
+    final r = await Process.run(spec.argv.first, spec.argv.sublist(1),
+        environment: spec.env, workingDirectory: spec.cwd);
+    return ('${r.stdout}${r.stderr}', r.exitCode);
   }
 
   /// root's shell from /etc/passwd, so `chsh -s /bin/bash` sticks.

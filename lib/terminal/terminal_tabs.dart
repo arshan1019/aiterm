@@ -2,15 +2,19 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../platform/pty.dart';
 import 'terminal_session.dart';
 
 /// The open terminal tabs. Every tab comes back after the app restarts,
 /// with its title, folder and scrollback (and a fresh shell). Pinned tabs
 /// sit first and can't be closed by accident.
 class TerminalTabs extends ChangeNotifier {
-  TerminalTabs(String filesDir) : _file = File('$filesDir/terminal_tabs.json');
+  TerminalTabs(String filesDir, {PtyBackend? backend})
+      : _file = File('$filesDir/terminal_tabs.json'),
+        _backend = backend ?? PtyHost.instance;
 
   final File _file;
+  final PtyBackend _backend;
   final _tabs = <TerminalSession>[];
   int _nextId = 1;
   int _activeId = 0;
@@ -38,6 +42,7 @@ class TerminalTabs extends ChangeNotifier {
             pinned: t['pinned'] == true,
             cwd: t['cwd'] as String?,
             scrollback: t['scrollback'] as String?,
+            ptyId: t['pty'] as int?,
           );
         }
         active = saved['active'] as int? ?? 0;
@@ -55,13 +60,15 @@ class TerminalTabs extends ChangeNotifier {
   }
 
   TerminalSession _add(String title,
-      {bool customTitle = false, bool pinned = false, String? cwd, String? scrollback}) {
+      {bool customTitle = false, bool pinned = false, String? cwd, String? scrollback, int? ptyId}) {
     final s = TerminalSession(
       id: _nextId++,
       title: title,
       customTitle: customTitle,
       pinned: pinned,
       restoredScrollback: scrollback == null || scrollback.isEmpty ? null : scrollback,
+      savedPtyId: ptyId,
+      backend: _backend,
     )..cwd = cwd;
     s.onMetaChanged = () {
       _scheduleSave();
@@ -70,6 +77,17 @@ class TerminalTabs extends ChangeNotifier {
     s.onPersistable = _scheduleSave;
     _tabs.add(s);
     return s;
+  }
+
+  /// Reconnects tabs to shells that kept running in the background service
+  /// while the UI was gone (e.g. the app was swiped away).
+  Future<void> reattach() async {
+    final live = (await _backend.liveSessions()).toSet();
+    for (final t in _tabs) {
+      final id = t.savedPtyId;
+      if (id == null || !live.contains(id)) continue;
+      if (await _backend.attach(id) case final a?) t.attach(a);
+    }
   }
 
   TerminalSession open() {
@@ -91,7 +109,7 @@ class TerminalTabs extends ChangeNotifier {
     final i = _tabs.indexOf(s);
     if (i < 0) return;
     _tabs.removeAt(i);
-    s.dispose();
+    s.dispose(); // closing a tab ends its shell
     if (_tabs.isEmpty) _add(_freshTitle());
     if (s.id == _activeId) _activeId = _tabs[i.clamp(0, _tabs.length - 1)].id;
     _scheduleSave();
@@ -144,6 +162,7 @@ class TerminalTabs extends ChangeNotifier {
             'pinned': t.pinned,
             'cwd': t.cwd,
             'scrollback': t.scrollbackText(),
+            'pty': t.ptyId,
           },
       ],
     };
@@ -156,7 +175,8 @@ class TerminalTabs extends ChangeNotifier {
   void dispose() {
     _saveTimer?.cancel();
     for (final t in _tabs) {
-      t.dispose();
+      // The UI is going away, not the user closing tabs: shells live on.
+      t.dispose(stopShell: false);
     }
     super.dispose();
   }

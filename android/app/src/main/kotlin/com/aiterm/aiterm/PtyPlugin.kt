@@ -1,126 +1,53 @@
 package com.aiterm.aiterm
 
-import android.os.Handler
-import android.os.Looper
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import java.io.ByteArrayOutputStream
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Bridges lib/platform/pty.dart to [ShellSession].
- *
- * "aiterm/pty" is the control channel. "aiterm/pty/output" is a single
- * stream shared by every session: an EventChannel supports one listener,
- * so events carry the session id — `[id, bytes]` for output and
- * `[id, exitCode]` when the process ends.
- *
- * Output is batched: the reader thread appends to the session's outbox and
- * schedules at most one flush per main-loop turn, so a burst (a build log,
- * `cat` of a big file) becomes a few large messages instead of thousands
- * of small ones. Writes go through a background thread so a full PTY
- * buffer can never stall the UI thread.
+ * Bridges lib/platform/pty.dart to [SessionRegistry]. "aiterm/pty" is the
+ * control channel, "aiterm/pty/output" the single shared output stream.
+ * Sessions belong to the registry, so this plugin (and its engine) can come
+ * and go without ending them.
  */
 class PtyPlugin : MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
-    private val main = Handler(Looper.getMainLooper())
-    private val io = Executors.newSingleThreadExecutor()
-    private val sessions = mutableMapOf<Int, ShellSession>()
-    private val outboxes = mutableMapOf<Int, Outbox>()
-    private val nextId = AtomicInteger(1)
-    private var sink: EventChannel.EventSink? = null
-
-    private class Outbox {
-        val bytes = ByteArrayOutputStream()
-        var scheduled = false
-        var exitCode: Int? = null
-    }
-
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "start" -> start(call, result)
+            "start" -> try {
+                val id = SessionRegistry.start(
+                    argv = call.argument<List<String>>("argv") ?: emptyList(),
+                    env = call.argument<Map<String, String>>("env") ?: emptyMap(),
+                    cwd = call.argument<String>("cwd") ?: "/",
+                    rows = call.argument<Int>("rows") ?: 24,
+                    cols = call.argument<Int>("cols") ?: 80,
+                )
+                result.success(mapOf("id" to id))
+            } catch (e: Exception) {
+                result.error("start_failed", e.message, null)
+            }
             "write" -> {
-                val session = sessions[call.argument<Int>("id")]
-                val data = call.argument<String>("data") ?: ""
-                if (session != null) io.execute { session.write(data) }
+                SessionRegistry.write(call.argument<Int>("id") ?: 0, call.argument<String>("data") ?: "")
                 result.success(null)
             }
             "resize" -> {
-                sessions[call.argument<Int>("id")]?.resize(
+                SessionRegistry.resize(
+                    call.argument<Int>("id") ?: 0,
                     call.argument<Int>("rows") ?: 24,
                     call.argument<Int>("cols") ?: 80,
                 )
                 result.success(null)
             }
             "stop" -> {
-                val id = call.argument<Int>("id")
-                sessions.remove(id)?.stop()
-                outboxes.remove(id)
+                SessionRegistry.stop(call.argument<Int>("id") ?: 0)
                 result.success(null)
             }
+            "list" -> result.success(SessionRegistry.live())
+            "attach" -> result.success(SessionRegistry.attach(call.argument<Int>("id") ?: 0))
             else -> result.notImplemented()
         }
     }
 
-    private fun start(call: MethodCall, result: MethodChannel.Result) {
-        val id = nextId.getAndIncrement()
-        val outbox = Outbox()
-        outboxes[id] = outbox
-        val session = ShellSession(
-            argv = call.argument<List<String>>("argv") ?: emptyList(),
-            env = call.argument<Map<String, String>>("env") ?: emptyMap(),
-            cwd = call.argument<String>("cwd") ?: "/",
-            rows = call.argument<Int>("rows") ?: 24,
-            cols = call.argument<Int>("cols") ?: 80,
-            onData = { bytes -> enqueue(id, outbox) { it.bytes.write(bytes) } },
-            onExit = { code -> enqueue(id, outbox) { it.exitCode = code } },
-        )
-        try {
-            session.start()
-            sessions[id] = session
-            result.success(mapOf("id" to id))
-        } catch (e: Exception) {
-            outboxes.remove(id)
-            result.error("start_failed", e.message, null)
-        }
-    }
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink) = SessionRegistry.setSink(events)
 
-    /** Called on the reader thread. */
-    private fun enqueue(id: Int, outbox: Outbox, change: (Outbox) -> Unit) {
-        synchronized(outbox) {
-            change(outbox)
-            if (outbox.scheduled) return
-            outbox.scheduled = true
-        }
-        main.post { flush(id, outbox) }
-    }
-
-    private fun flush(id: Int, outbox: Outbox) {
-        if (outboxes[id] !== outbox) return // session was stopped
-        val events = sink ?: return // kept until Dart listens; see onListen
-        val data: ByteArray
-        val exit: Int?
-        synchronized(outbox) {
-            data = outbox.bytes.toByteArray()
-            outbox.bytes.reset()
-            exit = outbox.exitCode
-            outbox.scheduled = false
-        }
-        if (data.isNotEmpty()) events.success(listOf(id, data))
-        if (exit != null) {
-            events.success(listOf(id, exit))
-            sessions.remove(id)
-            outboxes.remove(id)
-        }
-    }
-
-    override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
-        sink = events
-        outboxes.toList().forEach { (id, outbox) -> flush(id, outbox) }
-    }
-
-    override fun onCancel(arguments: Any?) {
-        sink = null
-    }
+    override fun onCancel(arguments: Any?) = SessionRegistry.setSink(null)
 }

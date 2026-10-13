@@ -14,9 +14,11 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val ptyPlugin = PtyPlugin()
     private var micResult: MethodChannel.Result? = null
+    private var keepAlive: KeepAlivePlugin? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        SessionRegistry.init(this)
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -32,6 +34,9 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "aiterm/needle",
         ).setMethodCallHandler(NeedlePlugin())
+
+        val keepAliveChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/keepalive")
+        keepAlive = KeepAlivePlugin(this, keepAliveChannel).also { keepAliveChannel.setMethodCallHandler(it) }
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -69,9 +74,13 @@ class MainActivity : FlutterActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == MIC_REQUEST) {
-            micResult?.success(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
-            micResult = null
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        when (requestCode) {
+            MIC_REQUEST -> {
+                micResult?.success(granted)
+                micResult = null
+            }
+            KeepAlivePlugin.NOTIFICATION_REQUEST -> keepAlive?.onNotificationPermission(granted)
         }
     }
 

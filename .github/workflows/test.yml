@@ -1,7 +1,7 @@
 name: test
 
-# Manual only: widget tests can't run in the phone sandbox this project is
-# developed in, so they run here on demand.
+# Manual only: widget and JVM tests can't run in the phone sandbox this
+# project is developed in, so they run here on demand.
 on: workflow_dispatch
 
 jobs:
@@ -9,8 +9,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.7
+          flutter-version: "3.47.7"
           cache: true
       - run: flutter test --reporter expanded
+      - name: Kotlin unit tests
+        run: |
+          bash scripts/fetch_deps.sh
+          flutter build apk --config-only
+          cd android && ./gradlew --no-daemon :app:testDebugUnitTest

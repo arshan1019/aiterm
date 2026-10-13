@@ -16,7 +16,7 @@ class CwdChanged extends ShellEvent {
   const CwdChanged(this.path);
   final String path;
   @override
-  bool operator ==(Object o) => o is CwdChanged && o.path == path;
+  bool operator ==(Object other) => other is CwdChanged && other.path == path;
   @override
   int get hashCode => path.hashCode;
   @override
@@ -26,7 +26,7 @@ class CwdChanged extends ShellEvent {
 class PromptShown extends ShellEvent {
   const PromptShown();
   @override
-  bool operator ==(Object o) => o is PromptShown;
+  bool operator ==(Object other) => other is PromptShown;
   @override
   int get hashCode => 1;
   @override
@@ -36,7 +36,7 @@ class PromptShown extends ShellEvent {
 class CommandStarted extends ShellEvent {
   const CommandStarted();
   @override
-  bool operator ==(Object o) => o is CommandStarted;
+  bool operator ==(Object other) => other is CommandStarted;
   @override
   int get hashCode => 2;
   @override
@@ -47,7 +47,7 @@ class CommandFinished extends ShellEvent {
   const CommandFinished(this.exitCode);
   final int? exitCode;
   @override
-  bool operator ==(Object o) => o is CommandFinished && o.exitCode == exitCode;
+  bool operator ==(Object other) => other is CommandFinished && other.exitCode == exitCode;
   @override
   int get hashCode => Object.hash(3, exitCode);
   @override
@@ -59,7 +59,7 @@ class ShellNotification extends ShellEvent {
   final String? title;
   final String body;
   @override
-  bool operator ==(Object o) => o is ShellNotification && o.title == title && o.body == body;
+  bool operator ==(Object other) => other is ShellNotification && other.title == title && other.body == body;
   @override
   int get hashCode => Object.hash(title, body);
   @override

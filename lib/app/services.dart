@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import '../assistant/assistant.dart';
 import '../assistant/needle.dart';
 import '../assistant/tool_call.dart';
+import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
 import '../platform/android_env.dart';
 import '../settings/settings.dart';
@@ -15,9 +16,19 @@ class AppServices {
   AppServices._(this.paths, this.settings, this.linux, this.tabs)
       : navigation = AppNavigation(),
         assistant = Assistant(Needle(paths)) {
+    keepAlive = KeepAliveController(
+      platform: KeepAliveChannel(),
+      runInLinux: linux.runScript,
+      isFixed: () => settings.childLimitFixed,
+      markFixed: settings.markChildLimitFixed,
+    );
     // Android may kill a backgrounded app without warning: save tabs as
     // soon as the app leaves the screen.
-    _lifecycle = AppLifecycleListener(onHide: () => tabs.save().ignore());
+    _lifecycle = AppLifecycleListener(
+      onHide: () => tabs.save().ignore(),
+      // Back from battery or notification settings: show the new state.
+      onResume: () => keepAlive.refresh().ignore(),
+    );
   }
 
   // ignore: unused_field
@@ -29,6 +40,7 @@ class AppServices {
   final LinuxEnvironment linux;
   final TerminalTabs tabs;
   final Assistant assistant;
+  late final KeepAliveController keepAlive;
 
   /// Loads everything the first frame depends on.
   static Future<AppServices> load() async {
@@ -36,7 +48,12 @@ class AppServices {
     final linux = LinuxEnvironment(paths);
     final tabs = TerminalTabs(paths.filesDir);
     final (settings, _, _) = await (Settings.load(paths.filesDir), linux.load(), tabs.load()).wait;
-    return AppServices._(paths, settings, linux, tabs);
+    // Shells that kept running while the UI was gone (the app was swiped
+    // away) are picked up again before the first frame.
+    await tabs.reattach();
+    final services = AppServices._(paths, settings, linux, tabs);
+    services.keepAlive.refresh().ignore();
+    return services;
   }
 
   /// Runs an app action the assistant picked ("dark mode", "bigger text",

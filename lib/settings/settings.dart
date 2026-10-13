@@ -12,8 +12,12 @@ class Settings extends ChangeNotifier {
   final File _file;
   bool _dark = true;
   double _fontSize = 14;
+  bool _childLimitFixed = false;
 
   bool get dark => _dark;
+
+  /// The Wireless debugging fix for the child-process limit succeeded.
+  bool get childLimitFixed => _childLimitFixed;
   double get fontSize => _fontSize;
 
   static Future<Settings> load(String filesDir) async {
@@ -22,6 +26,7 @@ class Settings extends ChangeNotifier {
       final j = jsonDecode(await s._file.readAsString()) as Map<String, dynamic>;
       s._dark = j['dark'] as bool? ?? true;
       s._fontSize = ((j['fontSize'] as num?)?.toDouble() ?? 14).clamp(minFontSize, maxFontSize);
+      s._childLimitFixed = j['childLimitFixed'] as bool? ?? false;
     } catch (_) {
       // First launch or unreadable: defaults.
     }
@@ -31,6 +36,11 @@ class Settings extends ChangeNotifier {
   set dark(bool v) {
     if (v == _dark) return;
     _dark = v;
+    _changed();
+  }
+
+  void markChildLimitFixed() {
+    _childLimitFixed = true;
     _changed();
   }
 
@@ -44,6 +54,6 @@ class Settings extends ChangeNotifier {
 
   void _changed() {
     notifyListeners();
-    _file.writeAsString(jsonEncode({'dark': _dark, 'fontSize': _fontSize})).ignore();
+    _file.writeAsString(jsonEncode({'dark': _dark, 'fontSize': _fontSize, 'childLimitFixed': _childLimitFixed})).ignore();
   }
 }

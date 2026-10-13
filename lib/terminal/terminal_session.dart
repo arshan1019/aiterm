@@ -83,7 +83,9 @@ class TerminalSession {
     this._customTitle = false,
     this._pinned = false,
     this.restoredScrollback,
-  }) {
+    this.savedPtyId,
+    PtyBackend? backend,
+  }) : _backend = backend ?? PtyHost.instance {
     terminal.onOutput = _onInput;
     terminal.onResize = (cols, rows, _, _) => _onResize(rows, cols);
     terminal.onTitleChange = _onShellTitle;
@@ -143,7 +145,14 @@ class TerminalSession {
     onMetaChanged?.call();
   }
 
+  final PtyBackend _backend;
   PtySession? _pty;
+
+  /// The PTY this tab had when it was saved; reattached if still running.
+  final int? savedPtyId;
+
+  /// The running shell's PTY id, saved so a restarted UI can reattach.
+  int? get ptyId => _pty?.id;
   StreamSubscription<String>? _output;
   bool _alpine = true;
   bool _applyingModifier = false;
@@ -169,7 +178,7 @@ class TerminalSession {
     showRestoredScrollback();
     try {
       final s = await spec(cwd);
-      final pty = await PtyHost.instance.start(
+      final pty = await _backend.start(
         argv: s.argv,
         env: s.env,
         cwd: s.cwd,
@@ -180,19 +189,7 @@ class TerminalSession {
         pty.stop();
         return;
       }
-      _pty = pty;
-      // Streaming decode: a character split across two reads must not
-      // become replacement glyphs.
-      _output = pty.output.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((text) {
-        terminal.write(text);
-        _watchForErrors(text);
-      });
-      pty.exitCode.then((code) {
-        if (_disposed || _pty != pty) return;
-        terminal.write('\r\n[process exited: $code]\r\n');
-        _pty = null;
-        _setState(SessionState.exited);
-      });
+      _connect(pty);
       _setState(SessionState.running);
     } catch (e) {
       error = '$e';
@@ -203,6 +200,32 @@ class TerminalSession {
   /// The tab may be closed while a start is still in flight.
   void _setState(SessionState s) {
     if (!_disposed) state.value = s;
+  }
+
+  void _connect(PtySession pty) {
+    _pty = pty;
+    // Streaming decode: a character split across two reads must not
+    // become replacement glyphs.
+    _output = pty.output.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((text) {
+      terminal.write(text);
+      _watchForErrors(text);
+    });
+    pty.exitCode.then((code) {
+      if (_disposed || _pty != pty) return;
+      terminal.write('\r\n[process exited: $code]\r\n');
+      _pty = null;
+      _setState(SessionState.exited);
+    });
+  }
+
+  /// Reconnects to a shell that kept running while the UI was gone,
+  /// redrawing the terminal from its recent output.
+  void attach(PtyAttachment a) {
+    if (_disposed) return;
+    terminal.write(utf8.decode(a.replay, allowMalformed: true));
+    _connect(a.session);
+    a.session.resize(terminal.viewHeight, terminal.viewWidth);
+    _setState(SessionState.running);
   }
 
   Future<void> restart(SpecFor spec, {required bool alpine}) async {
@@ -336,11 +359,17 @@ class TerminalSession {
     _pty = null;
   }
 
-  void dispose() {
+  /// [stopShell] is false when only the UI is going away: the shell keeps
+  /// running in the background service for the next UI to reattach.
+  void dispose({bool stopShell = true}) {
     _disposed = true;
     _resizeTimer?.cancel();
     _fixTimer?.cancel();
-    _stopShell();
+    if (stopShell) {
+      _stopShell();
+    } else {
+      _output?.cancel();
+    }
     selection.dispose();
     modifiers.dispose();
     state.dispose();
