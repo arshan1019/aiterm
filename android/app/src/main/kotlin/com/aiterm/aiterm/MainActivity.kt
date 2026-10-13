@@ -2,6 +2,7 @@ package com.aiterm.aiterm
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -39,6 +40,8 @@ class MainActivity : FlutterActivity() {
                         "nativeLibDir" to applicationInfo.nativeLibraryDir,
                         "filesDir" to filesDir.absolutePath,
                         "cacheDir" to cacheDir.absolutePath,
+                        // /proc/uptime is unreadable for apps; the guest gets a stand-in.
+                        "uptimeMs" to SystemClock.elapsedRealtime().toString(),
                     ),
                 )
                 "requestMic" -> {

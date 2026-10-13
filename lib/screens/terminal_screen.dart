@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
 
 import '../app_theme.dart';
 import '../core/app_controller.dart';
 import '../core/distro_manager.dart';
 import '../core/error_fixes.dart';
+import '../core/key_mapping.dart';
 import '../core/pty_channel.dart';
 import '../core/shell_env.dart';
 import '../core/tool_call.dart';
@@ -439,7 +441,7 @@ class TerminalPane extends StatefulWidget {
 class _TerminalPaneState extends State<TerminalPane> {
   final _distro = DistroManager.instance;
   final _app = AppController.instance;
-  final _terminal = Terminal(maxLines: 10000);
+  final _terminal = _Terminal();
   PtySession? _session;
   StreamSubscription<String>? _outputSub;
 
@@ -452,6 +454,9 @@ class _TerminalPaneState extends State<TerminalPane> {
   bool _ctrl = false;
   bool _alt = false;
   bool _applyingModifier = false;
+
+  // Volume Down held = Ctrl, as in Termux.
+  bool _volumeCtrl = false;
 
   // The keyboard animates the view height frame by frame. Telling the shell
   // about every intermediate size makes it redraw its prompt dozens of times
@@ -481,6 +486,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     };
     _terminal.onTitleChange = widget.onTitle;
     _app.addListener(_onAppChanged);
+    HardwareKeyboard.instance.addHandler(_onHardwareKey);
     _start();
   }
 
@@ -491,12 +497,24 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (widget.active && !old.active) _focus.requestFocus();
   }
 
+  bool _onHardwareKey(KeyEvent e) {
+    if (e.logicalKey != LogicalKeyboardKey.audioVolumeDown) return false;
+    // Only while this tab's terminal is on screen; elsewhere it's volume.
+    if (!mounted || !widget.active || _app.tab != AppController.tabTerminal) {
+      _volumeCtrl = false;
+      return false;
+    }
+    if (e is KeyDownEvent) _volumeCtrl = true;
+    if (e is KeyUpEvent) _volumeCtrl = false;
+    return true;
+  }
+
   void _onUserInput(String data) {
-    if (!_applyingModifier && (_ctrl || _alt) && data.runes.length == 1) {
-      final ctrl = _ctrl, alt = _alt;
-      setState(() => _ctrl = _alt = false);
+    final ctrl = _ctrl || _volumeCtrl, alt = _alt;
+    if (!_applyingModifier && (ctrl || alt) && data.runes.length == 1) {
+      if (_ctrl || _alt) setState(() => _ctrl = _alt = false);
       _applyingModifier = true;
-      final handled = _terminal.charInput(data.toLowerCase().codeUnitAt(0), ctrl: ctrl, alt: alt);
+      final handled = _terminal.charInput(data.runes.first, ctrl: ctrl, alt: alt);
       _applyingModifier = false;
       if (handled) return;
     }
@@ -510,7 +528,7 @@ class _TerminalPaneState extends State<TerminalPane> {
 
   void _onExtraKey(ExtraKey k) {
     void key(TerminalKey t) {
-      final ctrl = _ctrl, alt = _alt;
+      final ctrl = _ctrl || _volumeCtrl, alt = _alt;
       if (ctrl || alt) setState(() => _ctrl = _alt = false);
       _terminal.keyInput(t, ctrl: ctrl, alt: alt);
     }
@@ -642,6 +660,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     _fixTimer?.cancel();
     _outputSub?.cancel();
     _app.removeListener(_onAppChanged);
+    HardwareKeyboard.instance.removeHandler(_onHardwareKey);
     _session?.dispose();
     _focus.dispose();
     super.dispose();
@@ -759,6 +778,21 @@ class _TerminalPaneState extends State<TerminalPane> {
     searchHitBackgroundCurrent: c.accent,
     searchHitForeground: c.bg,
   );
+}
+
+/// xterm's own mapping misses Ctrl+Space and friends and sends Alt+b as
+/// ESC B; use the Termux rules for both the key bar and hardware keyboards.
+class _Terminal extends Terminal {
+  _Terminal() : super(maxLines: 10000);
+
+  @override
+  bool charInput(int charCode, {bool alt = false, bool ctrl = false}) {
+    if (!ctrl && !alt) return false;
+    final out = modifiedChar(charCode, ctrl: ctrl, alt: alt);
+    if (out == null) return false;
+    onOutput?.call(out);
+    return true;
+  }
 }
 
 /// A one-line notice pinned to the top of the terminal.

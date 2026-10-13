@@ -63,6 +63,15 @@ Java_com_aiterm_aiterm_NativePty_createSubprocess(
         goto fail;
     }
 
+    /* Same line discipline as Termux: UTF-8 aware erase, and no XON/XOFF so
+     * Ctrl+S / Ctrl+Q reach programs instead of freezing output. */
+    struct termios tios;
+    if (tcgetattr(master, &tios) == 0) {
+        tios.c_iflag |= IUTF8;
+        tios.c_iflag &= ~(IXON | IXOFF);
+        tcsetattr(master, TCSANOW, &tios);
+    }
+
     struct winsize ws = {.ws_row = rows, .ws_col = cols};
     pid_t pid = fork();
     if (pid < 0) {
@@ -71,6 +80,13 @@ Java_com_aiterm_aiterm_NativePty_createSubprocess(
         goto fail;
     }
     if (pid == 0) {
+        /* ART ignores SIGPIPE (and blocks some signals); dispositions set to
+         * SIG_IGN survive execve, so `yes | head` would never stop. Give the
+         * shell the defaults a Linux login would have. */
+        struct sigaction dfl = {.sa_handler = SIG_DFL};
+        for (int sig = 1; sig < NSIG; sig++) {
+            if (sig != SIGKILL && sig != SIGSTOP) sigaction(sig, &dfl, NULL);
+        }
         sigset_t all;
         sigfillset(&all);
         sigprocmask(SIG_UNBLOCK, &all, NULL);

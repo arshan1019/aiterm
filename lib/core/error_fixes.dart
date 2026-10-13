@@ -47,11 +47,6 @@ ErrorFix? detectFix(String output, {required bool alpine}) {
 ErrorFix? _matchLine(String line, bool alpine) {
   RegExpMatch? m;
 
-  // npm installed the wrapper without its platform binary.
-  if (alpine && line.contains('claude native binary not installed')) {
-    return const ErrorFix('Claude Code install is incomplete', 'install-claude && claude');
-  }
-
   m = RegExp(r"Cannot find module '([^']+)'").firstMatch(line);
   if (m != null) {
     final mod = m.group(1)!;
@@ -76,8 +71,10 @@ ErrorFix? _matchLine(String line, bool alpine) {
       RegExp(r'command not found: ([\w.+-]+)').firstMatch(line);
   if (m != null) {
     final cmd = m.group(1)!;
+    if (cmd == 'claude') {
+      return const ErrorFix('Claude Code is not installed', 'npm i -g @anthropic-ai/claude-code');
+    }
     if (!alpine) return null; // no package manager in the Android shell
-    if (cmd == 'claude') return const ErrorFix('Claude Code is not installed', 'install-claude && claude');
     final pkg = _commandPackages[cmd] ?? cmd;
     return ErrorFix('$cmd is not installed', 'apk add $pkg');
   }

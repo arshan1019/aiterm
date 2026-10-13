@@ -18,9 +18,7 @@ void main() {
     expect(fix('bash: python: command not found'), 'apk add python3');
     expect(fix('zsh: command not found: jq'), 'apk add jq');
     expect(fix('/bin/sh: line 1: gcc: not found'), 'apk add gcc');
-    expect(fix('sh: claude: not found'), 'install-claude && claude');
-    expect(fix('Error: claude native binary not installed.\nEither postinstall did not run'),
-        'install-claude && claude');
+    expect(fix('sh: claude: not found'), 'npm i -g @anthropic-ai/claude-code');
     expect(fix('sh: rg: not found', alpine: false), isNull);
   });
 

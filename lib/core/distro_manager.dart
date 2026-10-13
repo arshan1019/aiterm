@@ -28,6 +28,7 @@ class DistroManager extends ChangeNotifier {
   late final String nativeLibDir;
   late final String filesDir;
   late final String cacheDir;
+  String _uptimeMs = '0';
   bool _ready = false;
   bool installed = false;
 
@@ -41,6 +42,7 @@ class DistroManager extends ChangeNotifier {
     nativeLibDir = p!['nativeLibDir']!;
     filesDir = p['filesDir']!;
     cacheDir = p['cacheDir']!;
+    _uptimeMs = p['uptimeMs'] ?? '0';
     _ready = true;
     installed = await File(_marker).exists();
     notifyListeners();
@@ -103,47 +105,22 @@ class DistroManager extends ChangeNotifier {
         .writeAsString('nameserver 1.1.1.1\nnameserver 8.8.8.8\n');
     await File('$rootfs/etc/hosts')
         .writeAsString('127.0.0.1 localhost\n::1 localhost\n');
+    await File('$rootfs/etc/hostname').writeAsString('localhost\n');
     await File(_marker).writeAsString(fileName);
-    await _provision();
 
     installed = true;
     notifyListeners();
   }
 
-  /// Helpers the app keeps in the guest. Rewritten on every launch so
-  /// existing installs pick up fixes with an app update.
-  Future<void> _provision() async {
-    await File('$rootfs/etc/profile.d/aiterm.sh').writeAsString(_profile);
-    final installer = File('$rootfs/usr/local/bin/install-claude');
-    await installer.parent.create(recursive: true);
-    await installer.writeAsString(_installClaude);
-    await Process.run('/system/bin/chmod', ['755', installer.path]);
-  }
+  static const _kernelRelease = '6.17.0-aiterm';
+  static const _kernelVersion = '#1 SMP PREEMPT_DYNAMIC Fri, 10 Oct 2025 00:00:00 +0000';
 
-  // ~/.local/bin first so the native Claude Code wins over npm's wrapper.
-  static const _profile = r'''
-export PATH="$HOME/.local/bin:$PATH"
-command -v rg >/dev/null 2>&1 && export USE_BUILTIN_RIPGREP=0
-''';
-
-  // npm's @anthropic-ai/claude-code is a wrapper whose real binary is an
-  // optional dependency; npm silently skips it when that download fails.
-  // The native installer has a musl build that runs under proot.
-  static const _installClaude = r'''#!/bin/sh
-set -e
-echo "Installing dependencies..."
-apk add --no-cache bash curl libgcc libstdc++ ripgrep
-echo "Installing Claude Code..."
-curl -fsSL https://claude.ai/install.sh | bash
-# Drop a broken npm copy so it can't shadow the native one.
-npm uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || true
-echo
-echo "Done. Run: claude"
-''';
-
+  /// The proot session, set up the way Termux's proot-distro sets up a
+  /// distro so programs see an ordinary Linux system: emulated hard links,
+  /// SysV IPC and a modern kernel version; the usual /dev entries; and
+  /// stand-ins for /proc files Android hides from apps.
   Future<SessionSpec> sessionSpec() async {
     await init();
-    if (installed) await _provision();
     // proot links against libtalloc.so.2, but jniLibs must be named lib*.so.
     // nativeLibDir moves on every app update, so rebuild the link each time.
     final libDir = Directory('$filesDir/lib');
@@ -154,31 +131,165 @@ echo "Done. Run: claude"
     final tmp = Directory('$cacheDir/proot-tmp');
     await tmp.create(recursive: true);
 
-    final argv = <String>[
+    // Sticky world-writable /tmp and /dev/shm, as on any Linux box.
+    final shm = Directory('$filesDir/shm');
+    await shm.create(recursive: true);
+    await Directory('$rootfs/tmp').create(recursive: true);
+    await Process.run('/system/bin/chmod', ['1777', shm.path, '$rootfs/tmp']);
+
+    final shell = await _loginShell();
+    final args = <String>[
       '$nativeLibDir/libproot.so',
       '--kill-on-exit',
       '--link2symlink',
-      '-0',
-      '-r', rootfs,
-      '-b', '/dev',
-      '-b', '/proc',
-      '-b', '/sys',
-      if (await _canRead('/storage/emulated/0')) ...['-b', '/storage/emulated/0:/sdcard'],
-      '-w', '/root',
+      '--sysvipc',
+      // Android kernels report old versions some tools refuse to run on.
+      '--kernel-release=\\Linux\\localhost\\$_kernelRelease\\$_kernelVersion\\aarch64\\localdomain\\-1\\',
+      '-L',
+      '--change-id=0:0',
+      '--rootfs=$rootfs',
+      '--cwd=/root',
+      '--bind=/dev',
+      '--bind=/proc',
+      '--bind=/sys',
+      '--bind=/dev/urandom:/dev/random',
+      '--bind=${shm.path}:/dev/shm',
+      if (!_exists('/dev/fd')) '--bind=/proc/self/fd:/dev/fd',
+      for (final (i, name) in [(0, 'stdin'), (1, 'stdout'), (2, 'stderr')])
+        if (!_exists('/dev/$name')) '--bind=/proc/self/fd/$i:/dev/$name',
+      ...await _sysdataBinds(),
+      // Android's own tree, for running device tools like getprop.
+      for (final p in const [
+        '/apex', '/odm', '/product', '/system', '/system_ext', '/vendor',
+        '/linkerconfig/ld.config.txt', '/linkerconfig/com.android.art/ld.config.txt',
+        '/plat_property_contexts', '/property_contexts',
+      ])
+        if (_exists(p)) '--bind=$p',
+      if (await _canRead('/storage/emulated/0')) ...[
+        '--bind=/storage',
+        '--bind=/storage/emulated/0:/sdcard',
+        '--bind=/storage/emulated/0:/mnt/sdcard',
+      ],
       '/usr/bin/env', '-i',
-      'HOME=/root',
-      'USER=root',
-      'TERM=xterm-256color',
-      'LANG=C.UTF-8',
-      'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      '/bin/sh', '-l',
+      for (final e in _guestEnv(shell).entries) '${e.key}=${e.value}',
+      shell, '-l',
     ];
     final env = {
       'PROOT_LOADER': '$nativeLibDir/libproot-loader.so',
       'PROOT_TMP_DIR': tmp.path,
       'LD_LIBRARY_PATH': '${libDir.path}:$nativeLibDir',
     };
-    return SessionSpec(argv, env, filesDir);
+    return SessionSpec(args, env, filesDir);
+  }
+
+  // Deliberately no ANDROID_* variables: installers use them to detect
+  // Android and pick Android builds, which a musl Linux can't run.
+  Map<String, String> _guestEnv(String shell) => {
+        'HOME': '/root',
+        'USER': 'root',
+        'LOGNAME': 'root',
+        'SHELL': shell,
+        'TERM': 'xterm-256color',
+        'COLORTERM': 'truecolor',
+        'LANG': 'C.UTF-8',
+        'TMPDIR': '/tmp',
+        'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+      };
+
+  /// root's shell from /etc/passwd, so `chsh -s /bin/bash` sticks.
+  Future<String> _loginShell() async {
+    try {
+      for (final line in await File('$rootfs/etc/passwd').readAsLines()) {
+        final f = line.split(':');
+        if (f.length >= 7 && f[0] == 'root' && f[6].isNotEmpty && _exists('$rootfs${f[6]}')) return f[6];
+      }
+    } catch (_) {}
+    return '/bin/sh';
+  }
+
+  /// Android (SELinux) denies apps /proc/stat, /proc/uptime and friends;
+  /// top, ps, free, Node's os.cpus() and psutil all read them. Bind
+  /// believable stand-ins over the ones this device blocks, like
+  /// proot-distro does. They live outside the rootfs so the guest can't
+  /// swap them for links to host files.
+  Future<List<String>> _sysdataBinds() async {
+    final dir = Directory('$filesDir/sysdata');
+    await dir.create(recursive: true);
+    final selinux = Directory('${dir.path}/empty');
+    await selinux.create();
+    final binds = ['--bind=${selinux.path}:/sys/fs/selinux'];
+
+    final cpus = _cpuIds();
+    final uptime = (int.tryParse(_uptimeMs) ?? 0) / 1000;
+    final idle = uptime * cpus.length * 0.9;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    String jiffies(double share) => '${(uptime * 100 * share).round()}';
+    final stat = StringBuffer()
+      ..writeln('cpu  ${jiffies(0.05 * cpus.length)} 0 ${jiffies(0.03 * cpus.length)} '
+          '${(idle * 100).round()} 0 0 0 0 0 0');
+    for (final id in cpus) {
+      stat.writeln('cpu$id ${jiffies(0.05)} 0 ${jiffies(0.03)} ${jiffies(0.9)} 0 0 0 0 0 0');
+    }
+    stat
+      ..writeln('intr 0')
+      ..writeln('ctxt 0')
+      ..writeln('btime ${now - uptime.round()}')
+      ..writeln('processes 1')
+      ..writeln('procs_running 1')
+      ..writeln('procs_blocked 0')
+      ..writeln('softirq 0');
+
+    final entries = {
+      '/proc/stat': stat.toString(),
+      '/proc/uptime': '${uptime.toStringAsFixed(2)} ${idle.toStringAsFixed(2)}\n',
+      '/proc/loadavg': '0.12 0.07 0.02 1/100 100\n',
+      '/proc/version': 'Linux version $_kernelRelease (aiterm@localhost) '
+          '(clang version 18) $_kernelVersion\n',
+      '/proc/vmstat': '${const [
+        'nr_free_pages 100000', 'nr_inactive_anon 0', 'nr_active_anon 0',
+        'nr_inactive_file 0', 'nr_active_file 0', 'nr_dirty 0', 'nr_writeback 0',
+        'pgpgin 0', 'pgpgout 0', 'pswpin 0', 'pswpout 0', 'pgfault 0', 'pgmajfault 0',
+      ].join('\n')}\n',
+      '/proc/sys/kernel/cap_last_cap': '40\n',
+      '/proc/sys/fs/inotify/max_user_watches': '8192\n',
+      '/proc/sys/kernel/overflowuid': '65534\n',
+      '/proc/sys/kernel/overflowgid': '65534\n',
+    };
+    for (final MapEntry(key: real, value: content) in entries.entries) {
+      if (_readable(real)) continue; // the real file is fine on this device
+      final stub = File('${dir.path}/${real.substring(1).replaceAll('/', '_')}');
+      await stub.writeAsString(content);
+      binds.add('--bind=${stub.path}:$real');
+    }
+    return binds;
+  }
+
+  List<int> _cpuIds() {
+    try {
+      final ids = RegExp(r'^processor\s*:\s*(\d+)', multiLine: true)
+          .allMatches(File('/proc/cpuinfo').readAsStringSync())
+          .map((m) => int.parse(m.group(1)!))
+          .toList();
+      if (ids.isNotEmpty) return ids;
+    } catch (_) {}
+    return List.generate(Platform.numberOfProcessors, (i) => i);
+  }
+
+  static bool _exists(String path) =>
+      FileSystemEntity.typeSync(path, followLinks: false) != FileSystemEntityType.notFound;
+
+  static bool _readable(String path) {
+    try {
+      final f = File(path).openSync();
+      try {
+        f.readSync(1);
+      } finally {
+        f.closeSync();
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> _canRead(String path) async {
