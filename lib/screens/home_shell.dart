@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../app_theme.dart';
 import '../core/app_controller.dart';
 import 'file_explorer_screen.dart';
@@ -11,7 +12,12 @@ class HomeShell extends StatelessWidget {
   final bool isDark;
   final ValueChanged<bool> onThemeChanged;
 
-  const HomeShell({super.key, required this.colors, required this.isDark, required this.onThemeChanged});
+  const HomeShell({
+    super.key,
+    required this.colors,
+    required this.isDark,
+    required this.onThemeChanged,
+  });
 
   static const _tabs = ['terminal', 'files', 'settings'];
 
@@ -20,27 +26,40 @@ class HomeShell extends StatelessWidget {
     final c = colors;
     final app = AppController.instance;
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(
-        statusBarColor: c.bg,
-        systemNavigationBarColor: c.surface,
-      ),
-      child: Scaffold(
-        backgroundColor: c.bg,
-        body: SafeArea(
-          child: Column(
-            children: [
-              _TabRow(colors: c, tabs: _tabs, selected: app.tab, onSelect: app.openTab),
-              Expanded(
-                child: IndexedStack(
-                  index: app.tab,
-                  children: [
-                    TerminalScreen(colors: c),
-                    FileExplorerScreen(colors: c),
-                    SettingsScreen(colors: c, isDark: isDark, onThemeChanged: onThemeChanged),
-                  ],
+      value: (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+          .copyWith(statusBarColor: c.bg, systemNavigationBarColor: c.surface),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && !app.handleBack()) SystemNavigator.pop();
+        },
+        child: Scaffold(
+          backgroundColor: c.bg,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _TabRow(
+                  colors: c,
+                  tabs: _tabs,
+                  selected: app.tab,
+                  onSelect: app.openTab,
                 ),
-              ),
-            ],
+                Expanded(
+                  child: IndexedStack(
+                    index: app.tab,
+                    children: [
+                      TerminalScreen(colors: c),
+                      FileExplorerScreen(colors: c),
+                      SettingsScreen(
+                        colors: c,
+                        isDark: isDark,
+                        onThemeChanged: onThemeChanged,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -54,7 +73,12 @@ class _TabRow extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
 
-  const _TabRow({required this.colors, required this.tabs, required this.selected, required this.onSelect});
+  const _TabRow({
+    required this.colors,
+    required this.tabs,
+    required this.selected,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +86,9 @@ class _TabRow extends StatelessWidget {
     return Container(
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.border, width: 0.5)),
+      ),
       child: Row(
         children: [
           for (var i = 0; i < tabs.length; i++)
@@ -79,7 +105,9 @@ class _TabRow extends StatelessWidget {
                       style: TextStyle(
                         color: i == selected ? c.text : c.textMuted,
                         fontSize: 13,
-                        fontWeight: i == selected ? FontWeight.w600 : FontWeight.w400,
+                        fontWeight: i == selected
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -87,7 +115,10 @@ class _TabRow extends StatelessWidget {
                       duration: const Duration(milliseconds: 150),
                       height: 2,
                       width: i == selected ? 16 : 0,
-                      decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(1)),
+                      decoration: BoxDecoration(
+                        color: c.accent,
+                        borderRadius: BorderRadius.circular(1),
+                      ),
                     ),
                   ],
                 ),

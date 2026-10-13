@@ -15,6 +15,20 @@ class AppController extends ChangeNotifier {
   /// A folder the Files tab should open; consumed by the Files tab.
   String? pendingFilesPath;
 
+  /// Set by the Files tab: steps back in its history, false when at the start.
+  bool Function()? filesBack;
+
+  /// Android back button: Files history first, then back to the terminal.
+  /// Returns false when the app should close.
+  bool handleBack() {
+    if (tab == tabFiles && (filesBack?.call() ?? false)) return true;
+    if (tab != tabTerminal) {
+      openTab(tabTerminal);
+      return true;
+    }
+    return false;
+  }
+
   void setDark(bool v) {
     isDark = v;
     notifyListeners();

@@ -17,44 +17,58 @@ class FileExplorerScreen extends StatefulWidget {
 class _FileExplorerScreenState extends State<FileExplorerScreen> {
   final _fs = FileSystemService();
   String? _root;
-  late String _current;
+  String _current = '';
   List<FsEntry> _entries = [];
   bool _loading = true;
+  bool _showHidden = false;
+
+  // Browser-style history: back pops onto forward and vice versa.
+  final _back = <String>[];
+  final _forward = <String>[];
+  final _scroll = ScrollController();
+  final _crumbScroll = ScrollController();
+  final _offsets = <String, double>{};
 
   final _distro = DistroManager.instance;
+  final _app = AppController.instance;
 
   @override
   void initState() {
     super.initState();
     _distro.addListener(_init);
-    AppController.instance.addListener(_openPending);
+    _app.addListener(_openPending);
+    _app.filesBack = _handleSystemBack;
     _init();
   }
 
   @override
   void dispose() {
     _distro.removeListener(_init);
-    AppController.instance.removeListener(_openPending);
+    _app.removeListener(_openPending);
+    if (_app.filesBack == _handleSystemBack) _app.filesBack = null;
+    _scroll.dispose();
+    _crumbScroll.dispose();
     super.dispose();
   }
 
   Future<void> _init() async {
     await _distro.init();
     final home = _distro.installed ? _distro.home : await ShellEnv.androidHome();
-    if (!mounted) return;
+    if (!mounted || home == _root) return;
     _root = home;
-    _current = home;
-    await _refresh();
+    _back.clear();
+    _forward.clear();
+    _offsets.clear();
+    await _show(home);
   }
 
   /// Opens a folder the assistant asked for ("show src in files"). Paths are
   /// relative to the home folder; absolute guest paths map into the rootfs.
   Future<void> _openPending() async {
-    final app = AppController.instance;
-    final requested = app.pendingFilesPath;
+    final requested = _app.pendingFilesPath;
     final root = _root;
     if (requested == null || root == null) return;
-    app.pendingFilesPath = null;
+    _app.pendingFilesPath = null;
     String target;
     if (requested == '~' || requested.isEmpty) {
       target = root;
@@ -63,6 +77,7 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
     } else {
       target = '$root/${requested.replaceFirst(RegExp(r'^~/'), '')}';
     }
+    target = target.replaceAll(RegExp(r'/+$'), '');
     if (!await Directory(target).exists()) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -70,23 +85,85 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
       }
       return;
     }
-    setState(() => _current = target);
-    await _refresh();
+    await _goTo(target);
   }
 
-  Future<void> _refresh() async {
-    setState(() => _loading = true);
-    final entries = await _fs.list(_current);
+  /// Loads [path] before switching to it, so the old listing stays on screen
+  /// until the new one is ready (no spinner flash between folders).
+  Future<void> _show(String path) async {
+    if (_entries.isEmpty) setState(() => _loading = true);
+    final entries = await _fs.list(path);
+    if (!mounted) return;
     setState(() {
+      _current = path;
       _entries = entries;
       _loading = false;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.jumpTo((_offsets[path] ?? 0).clamp(0, _scroll.position.maxScrollExtent));
+      }
+      if (_crumbScroll.hasClients) {
+        _crumbScroll.jumpTo(_crumbScroll.position.maxScrollExtent);
+      }
+    });
   }
+
+  void _rememberOffset() {
+    if (_scroll.hasClients) _offsets[_current] = _scroll.offset;
+  }
+
+  Future<void> _goTo(String path) async {
+    if (path == _current) return;
+    _rememberOffset();
+    _back.add(_current);
+    _forward.clear();
+    await _show(path);
+  }
+
+  Future<void> _goBack() async {
+    if (_back.isEmpty) return;
+    _rememberOffset();
+    _forward.add(_current);
+    await _show(_back.removeLast());
+  }
+
+  Future<void> _goForward() async {
+    if (_forward.isEmpty) return;
+    _rememberOffset();
+    _back.add(_current);
+    await _show(_forward.removeLast());
+  }
+
+  String? get _parent {
+    final base = _crumbs.first.path;
+    if (_current == base) return null;
+    return Directory(_current).parent.path;
+  }
+
+  Future<void> _goUp() async {
+    final p = _parent;
+    if (p != null) await _goTo(p);
+  }
+
+  /// Android back: history first, then the parent folder.
+  bool _handleSystemBack() {
+    if (_back.isNotEmpty) {
+      _goBack();
+      return true;
+    }
+    if (_parent != null) {
+      _goUp();
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _refresh() => _show(_current);
 
   void _open(FsEntry e) {
     if (e.kind == EntryKind.directory) {
-      setState(() => _current = e.path);
-      _refresh();
+      _goTo(e.path);
     } else if (_fs.looksLikeText(e.name)) {
       Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => _TextViewerScreen(colors: widget.colors, entry: e, fs: _fs),
@@ -98,23 +175,33 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
     }
   }
 
-  List<String> get _crumbs {
+  /// Home-relative crumbs ("~ › src › lib"); folders outside home (opened via
+  /// an absolute path) are shown from the distro root ("/ › etc").
+  List<({String label, String path})> get _crumbs {
     final root = _root!;
-    if (_current == root) return ['home'];
-    final rel = _current.substring(root.length).replaceAll(RegExp(r'^/'), '');
-    return ['home', ...rel.split('/')];
+    String base, label;
+    if (_current == root || _current.startsWith('$root/')) {
+      base = root;
+      label = '~';
+    } else if (_distro.installed && _current.startsWith(_distro.rootfs)) {
+      base = _distro.rootfs;
+      label = '/';
+    } else {
+      base = '/';
+      label = '/';
+    }
+    final crumbs = [(label: label, path: base)];
+    var path = base == '/' ? '' : base;
+    for (final part in _current.substring(base.length).split('/')) {
+      if (part.isEmpty) continue;
+      path = '$path/$part';
+      crumbs.add((label: part, path: path));
+    }
+    return crumbs;
   }
 
-  void _goToCrumb(int index) {
-    final root = _root!;
-    if (index == 0) {
-      setState(() => _current = root);
-    } else {
-      final parts = _crumbs.sublist(1, index + 1);
-      setState(() => _current = '$root/${parts.join('/')}');
-    }
-    _refresh();
-  }
+  List<FsEntry> get _visible =>
+      _showHidden ? _entries : _entries.where((e) => !e.name.startsWith('.')).toList();
 
   Future<void> _newEntry(bool isFolder) async {
     final controller = TextEditingController();
@@ -206,78 +293,117 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
     if (_root == null) {
       return Center(child: CircularProgressIndicator(color: c.accent));
     }
+    final crumbs = _crumbs;
+    final visible = _visible;
     return Scaffold(
       backgroundColor: c.bg,
       body: Column(
         children: [
           Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            height: 40,
             decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+            child: Row(
               children: [
-                for (var i = 0; i < _crumbs.length; i++)
-                  Row(
-                    children: [
-                      if (i > 0)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(Icons.chevron_right, size: 16, color: c.textMuted),
-                        ),
-                      InkWell(
-                        onTap: () => _goToCrumb(i),
-                        child: Center(
-                          child: Text(
-                            _crumbs[i],
-                            style: TextStyle(
-                              color: i == _crumbs.length - 1 ? c.text : c.textMuted,
-                              fontSize: 13,
+                _NavButton(icon: Icons.arrow_back, colors: c, onTap: _back.isEmpty ? null : _goBack),
+                _NavButton(icon: Icons.arrow_forward, colors: c, onTap: _forward.isEmpty ? null : _goForward),
+                _NavButton(icon: Icons.arrow_upward, colors: c, onTap: _parent == null ? null : _goUp),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: ListView.builder(
+                    controller: _crumbScroll,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: crumbs.length,
+                    itemBuilder: (context, i) {
+                      final last = i == crumbs.length - 1;
+                      return Row(
+                        children: [
+                          if (i > 0) Icon(Icons.chevron_right, size: 14, color: c.textMuted),
+                          InkWell(
+                            onTap: last ? null : () => _goTo(crumbs[i].path),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                              child: Text(
+                                crumbs[i].label,
+                                style: TextStyle(
+                                  color: last ? c.text : c.textMuted,
+                                  fontSize: 13,
+                                  fontWeight: last ? FontWeight.w600 : FontWeight.w400,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
+                ),
+                PopupMenuButton<String>(
+                  color: c.surface,
+                  iconSize: 18,
+                  icon: Icon(Icons.more_vert, color: c.textMuted),
+                  onSelected: (v) {
+                    if (v == 'hidden') setState(() => _showHidden = !_showHidden);
+                    if (v == 'home') _goTo(_root!);
+                    if (v == 'refresh') _refresh();
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(value: 'home', child: Text('Go home', style: TextStyle(color: c.text))),
+                    CheckedPopupMenuItem(
+                      value: 'hidden',
+                      checked: _showHidden,
+                      child: Text('Show hidden', style: TextStyle(color: c.text)),
+                    ),
+                    PopupMenuItem(value: 'refresh', child: Text('Refresh', style: TextStyle(color: c.text))),
+                  ],
+                ),
               ],
             ),
           ),
           Expanded(
             child: _loading
                 ? Center(child: CircularProgressIndicator(color: c.accent))
-                : _entries.isEmpty
-                    ? Center(
-                        child: Text('Empty', style: TextStyle(color: c.textMuted)))
-                    : RefreshIndicator(
-                        onRefresh: _refresh,
-                        color: c.accent,
-                        backgroundColor: c.surface,
-                        child: ListView.separated(
-                          itemCount: _entries.length,
-                          separatorBuilder: (_, _) => const SizedBox.shrink(),
-                          itemBuilder: (context, i) {
-                            final e = _entries[i];
-                            final isDir = e.kind == EntryKind.directory;
-                            return ListTile(
-                              dense: true,
-                              visualDensity: VisualDensity.compact,
-                              leading: Icon(
-                                isDir ? Icons.folder_outlined : Icons.description_outlined,
-                                color: isDir ? c.accent : c.textMuted,
-                              ),
-                              title: Text(e.name, style: TextStyle(color: c.text)),
-                              subtitle: isDir
-                                  ? null
-                                  : Text(
-                                      _formatSize(e.size),
-                                      style: TextStyle(color: c.textMuted, fontSize: 12),
-                                    ),
-                              onTap: () => _open(e),
-                              onLongPress: () => _entryActions(e),
-                            );
-                          },
-                        ),
-                      ),
+                : RefreshIndicator(
+                    onRefresh: _refresh,
+                    color: c.accent,
+                    backgroundColor: c.surface,
+                    child: visible.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              const SizedBox(height: 120),
+                              Center(child: Text('Empty folder', style: TextStyle(color: c.textMuted))),
+                            ],
+                          )
+                        : ListView.builder(
+                            controller: _scroll,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 80),
+                            itemCount: visible.length,
+                            itemBuilder: (context, i) {
+                              final e = visible[i];
+                              final isDir = e.kind == EntryKind.directory;
+                              return ListTile(
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                                leading: Icon(
+                                  isDir ? Icons.folder_outlined : Icons.description_outlined,
+                                  color: isDir ? c.accent : c.textMuted,
+                                ),
+                                title: Text(e.name, style: TextStyle(color: c.text)),
+                                subtitle: isDir
+                                    ? null
+                                    : Text(
+                                        _formatSize(e.size),
+                                        style: TextStyle(color: c.textMuted, fontSize: 12),
+                                      ),
+                                trailing: isDir ? Icon(Icons.chevron_right, size: 18, color: c.textMuted) : null,
+                                onTap: () => _open(e),
+                                onLongPress: () => _entryActions(e),
+                              );
+                            },
+                          ),
+                  ),
           ),
         ],
       ),
@@ -302,6 +428,27 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final AppColors colors;
+  final VoidCallback? onTap;
+  const _NavButton({required this.icon, required this.colors, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 36,
+      height: 40,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        iconSize: 18,
+        onPressed: onTap,
+        icon: Icon(icon, color: onTap == null ? colors.border : colors.text),
+      ),
+    );
   }
 }
 
