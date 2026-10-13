@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.aiterm.aiterm"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requires compiling against SDK 37;
+    // flutter.compileSdkVersion is pinned lower on this Flutter version.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
