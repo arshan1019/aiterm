@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/app/app.dart';
 import 'package:aiterm/app/services.dart';
 import 'package:aiterm/terminal/terminal_session.dart';
+import 'package:xterm/xterm.dart';
 
 // Widget tests overflow the stack inside the Acode sandbox this project is
 // developed in; they run on CI (.github/workflows/test.yml).
@@ -106,9 +107,12 @@ void main() {
     // Row 6: clear of the notice that floats over the top rows.
     session.terminal.write('\r\n' * 6 + 'see https://example.com/some/long/path now\r\n');
     await tester.pump();
-    final term = tester.getRect(find.byWidgetPredicate((w) => w.runtimeType.toString() == 'TerminalView'));
-    // Test font: square glyphs of the font size (14), line height 1.25.
-    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 4 + 14 * 1.25 * 6.5));
+    Offset cell(int x, int y) {
+      final render = tester.state<TerminalViewState>(find.byType(TerminalView).first).renderTerminal;
+      return render.localToGlobal(render.getOffset(CellOffset(x, y)) + render.cellSize.center(Offset.zero));
+    }
+    final url = cell(10, 6);
+    await tester.tapAt(url);
     await tester.pumpAndSettle();
     expect(find.text('Open'), findsOneWidget);
 
@@ -120,13 +124,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // Show the toolbar again, then close the tab underneath it.
-    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 4 + 14 * 1.25 * 6.5));
+    await tester.tapAt(url);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('New tab'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('shell'));
     await tester.pumpAndSettle();
-    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 4 + 14 * 1.25 * 6.5));
+    await tester.tapAt(url);
     await tester.pumpAndSettle();
     services.tabs.close(session);
     await tester.pumpAndSettle();
