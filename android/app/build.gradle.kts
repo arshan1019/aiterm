@@ -48,6 +48,20 @@ android {
         }
     }
 
+    // CI signs every build with one shared key (repo secret, written to
+    // AITERM_KEYSTORE) so each new APK installs as an update. Local builds
+    // without it keep the usual per-machine debug key.
+    signingConfigs {
+        getByName("debug") {
+            System.getenv("AITERM_KEYSTORE")?.let {
+                storeFile = file(it)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
