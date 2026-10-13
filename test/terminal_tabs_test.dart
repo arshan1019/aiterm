@@ -87,4 +87,14 @@ void main() {
       tabs.dispose();
     });
   });
+
+  test('listeners always see a valid active tab while pinning', () async {
+    final tabs = TerminalTabs(dir.path);
+    await tabs.load();
+    final seen = <String>[];
+    tabs.addListener(() => seen.add(tabs.active.title));
+    tabs.togglePin(tabs.active);
+    expect(seen, isNotEmpty);
+    tabs.dispose();
+  });
 }

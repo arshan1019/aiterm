@@ -5,6 +5,7 @@ import 'package:xterm/xterm.dart';
 import '../assistant/error_fixes.dart';
 import '../linux/session_spec.dart';
 import '../platform/pty.dart';
+import '../preview/ports.dart';
 import 'key_mapping.dart';
 import 'shell_integration.dart';
 
@@ -122,6 +123,9 @@ class TerminalSession {
   /// Something worth saving changed (folder, output).
   VoidCallback? onPersistable;
 
+  /// Local ports the output says a server is listening on.
+  void Function(Set<int> ports)? onPortsMentioned;
+
   final _commands = CommandTracker();
 
   /// A command is running (shell integration saw Enter but no prompt yet).
@@ -209,6 +213,10 @@ class TerminalSession {
     _output = pty.output.cast<List<int>>().transform(const Utf8Decoder(allowMalformed: true)).listen((text) {
       terminal.write(text);
       _watchForErrors(text);
+      if (onPortsMentioned != null && text.contains(':')) {
+        final ports = portsMentionedIn(text);
+        if (ports.isNotEmpty) onPortsMentioned!(ports);
+      }
     });
     pty.exitCode.then((code) {
       if (_disposed || _pty != pty) return;

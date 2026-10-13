@@ -20,9 +20,12 @@ class TerminalTabs extends ChangeNotifier {
   int _activeId = 0;
   Timer? _saveTimer;
 
+  /// Ports any tab's output mentioned (for the preview watcher).
+  void Function(Set<int> ports)? onPortsMentioned;
+
   List<TerminalSession> get tabs => List.unmodifiable(_tabs);
   int get activeId => _activeId;
-  TerminalSession get active => _tabs.firstWhere((t) => t.id == _activeId);
+  TerminalSession get active => _tabs.firstWhere((t) => t.id == _activeId, orElse: () => _tabs.first);
   int get activeIndex => _tabs.indexWhere((t) => t.id == _activeId);
 
   Future<void> load() async {
@@ -75,6 +78,7 @@ class TerminalTabs extends ChangeNotifier {
       notifyListeners();
     };
     s.onPersistable = _scheduleSave;
+    s.onPortsMentioned = (ports) => onPortsMentioned?.call(ports);
     s.state.addListener(notifyListeners); // e.g. a shell started or exited
     _tabs.add(s);
     return s;
@@ -126,8 +130,9 @@ class TerminalTabs extends ChangeNotifier {
   /// Pins or unpins [s], keeping pinned tabs grouped at the front in the
   /// order they were pinned.
   void togglePin(TerminalSession s) {
-    _tabs.remove(s);
+    // Flip first: listeners run while the tab is still in the list.
     s.pinned = !s.pinned;
+    _tabs.remove(s);
     _tabs.insert(_tabs.where((t) => t.pinned).length, s);
     _scheduleSave();
     notifyListeners();

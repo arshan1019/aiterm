@@ -76,7 +76,7 @@ void main() {
 
   group('shell profile (needs busybox ash)', () {
     // Alpine's shell is busybox ash; other "ash"es (e.g. Debian's dash) differ.
-    final ash = ['/bin/busybox', '/usr/bin/busybox'].firstWhere((p) => File(p).existsSync(), orElse: () => '');
+    final ash = File('/etc/alpine-release').existsSync() ? '/bin/busybox' : '';
 
     test('script output parses into the expected events', () async {
       final dir = Directory.systemTemp.createTempSync('aiterm_profile');
@@ -96,6 +96,6 @@ void main() {
       expect(events, contains(CwdChanged(work.path)));
       expect(events, contains(const CommandFinished(1)));
       expect(events.whereType<PromptShown>().length, greaterThanOrEqualTo(3));
-    }, skip: ash.isEmpty ? 'no ash here' : null);
+    }, skip: ash.isEmpty ? 'needs Alpine (busybox ash)' : null);
   });
 }

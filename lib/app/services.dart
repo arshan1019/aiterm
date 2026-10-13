@@ -7,6 +7,7 @@ import '../linux/linux_environment.dart';
 import '../platform/android_env.dart';
 import '../settings/settings.dart';
 import '../platform/pty.dart';
+import '../preview/preview_controller.dart';
 import '../terminal/session_presence.dart';
 import '../terminal/terminal_tabs.dart';
 import 'navigation.dart';
@@ -28,11 +29,13 @@ class AppServices {
     // soon as the app leaves the screen.
     _lifecycle = AppLifecycleListener(
       onHide: () {
+        preview.stop();
         _appVisible = false;
         _updatePresence();
         tabs.save().ignore();
       },
       onShow: () {
+        if (linux.installed) preview.start().ignore();
         _appVisible = true;
         _updatePresence();
       },
@@ -42,6 +45,8 @@ class AppServices {
     navigation.addListener(_updatePresence);
     tabs.addListener(_updatePresence);
     PtyHost.instance.onOpenRequest = _openSession;
+    tabs.onPortsMentioned = preview.portsMentioned;
+    if (linux.installed) preview.start().ignore();
     _updatePresence();
   }
 
@@ -72,6 +77,7 @@ class AppServices {
   final LinuxEnvironment linux;
   final TerminalTabs tabs;
   final Assistant assistant;
+  final preview = PreviewController();
   late final KeepAliveController keepAlive;
 
   /// Loads everything the first frame depends on.

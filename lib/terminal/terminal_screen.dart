@@ -4,6 +4,8 @@ import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../assistant/ask_sheet.dart';
+import '../preview/preview_controller.dart';
+import '../preview/preview_screen.dart';
 import '../shared/fade_indexed_stack.dart';
 import '../shared/name_dialog.dart';
 import 'terminal_session.dart';
@@ -132,12 +134,19 @@ class _WorkspaceState extends State<_Workspace> {
             children: [
               TabStrip(tabs: tabs, onMenu: _tabMenu),
               Expanded(
-                child: FadeIndexedStack(
-                  index: tabs.activeIndex,
-                  duration: Motion.quick,
+                child: Stack(
                   children: [
-                    for (final s in tabs.tabs)
-                      TerminalPane(key: ValueKey(s.id), session: s, visible: showing && s.id == active.id),
+                    Positioned.fill(
+                      child: FadeIndexedStack(
+                        index: tabs.activeIndex,
+                        duration: Motion.quick,
+                        children: [
+                          for (final s in tabs.tabs)
+                            TerminalPane(key: ValueKey(s.id), session: s, visible: showing && s.id == active.id),
+                        ],
+                      ),
+                    ),
+                    Positioned(left: 8, right: 8, bottom: 8, child: _PortAnnouncement(preview: _services.preview)),
                   ],
                 ),
               ),
@@ -146,6 +155,71 @@ class _WorkspaceState extends State<_Workspace> {
           );
         },
       ),
+    );
+  }
+}
+
+/// "localhost:5173 is live · Preview", sliding up when a dev server starts.
+class _PortAnnouncement extends StatelessWidget {
+  const _PortAnnouncement({required this.preview});
+
+  final PreviewController preview;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: preview,
+      builder: (context, _) {
+        final port = preview.announced;
+        return AnimatedSwitcher(
+          duration: Motion.standard,
+          switchInCurve: Motion.enter,
+          switchOutCurve: Motion.exit,
+          transitionBuilder: (child, a) => FadeTransition(
+            opacity: a,
+            child: SlideTransition(
+              position: Tween(begin: const Offset(0, 0.5), end: Offset.zero).animate(a),
+              child: child,
+            ),
+          ),
+          child: port == null
+              ? const SizedBox.shrink(key: ValueKey('none'))
+              : Material(
+                  key: ValueKey(port),
+                  color: c.surface,
+                  elevation: 6,
+                  shadowColor: Colors.black38,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: c.border)),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.wifi_tethering_rounded, size: 16, color: c.accent),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text('localhost:$port is live', style: TextStyle(color: c.text, fontSize: 12)),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            preview.dismiss();
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(builder: (_) => PreviewScreen(port: port)),
+                            );
+                          },
+                          child: const Text('Preview'),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
+                          onPressed: preview.dismiss,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        );
+      },
     );
   }
 }
