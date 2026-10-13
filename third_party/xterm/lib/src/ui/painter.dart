@@ -26,6 +26,20 @@ class TerminalPainter {
   /// [_textStyle] is changed, or when the system font changes.
   final _paragraphCache = ParagraphCache(10240);
 
+  /// aiterm patch: recorded pictures of whole lines, keyed by
+  /// [BufferLine.contentKey]. A scroll frame then draws ~50 pictures
+  /// instead of thousands of single-character paragraphs.
+  static bool lineCacheEnabled = true;
+  static const _lineCacheSize = 600;
+  final _lineCache = <int, Picture>{}; // insertion order = recency
+
+  void _clearLineCache() {
+    for (final picture in _lineCache.values) {
+      picture.dispose();
+    }
+    _lineCache.clear();
+  }
+
   TerminalStyle get textStyle => _textStyle;
   TerminalStyle _textStyle;
   set textStyle(TerminalStyle value) {
@@ -33,6 +47,7 @@ class TerminalPainter {
     _textStyle = value;
     _cellSize = _measureCharSize();
     _paragraphCache.clear();
+    _clearLineCache();
   }
 
   TextScaler get textScaler => _textScaler;
@@ -42,6 +57,7 @@ class TerminalPainter {
     _textScaler = value;
     _cellSize = _measureCharSize();
     _paragraphCache.clear();
+    _clearLineCache();
   }
 
   TerminalTheme get theme => _theme;
@@ -51,6 +67,7 @@ class TerminalPainter {
     _theme = value;
     _colorPalette = PaletteBuilder(value).build();
     _paragraphCache.clear();
+    _clearLineCache();
   }
 
   Size _measureCharSize() {
@@ -83,6 +100,7 @@ class TerminalPainter {
   void clearFontCache() {
     _cellSize = _measureCharSize();
     _paragraphCache.clear();
+    _clearLineCache();
   }
 
   /// Paints the cursor based on the current cursor type.
@@ -144,6 +162,26 @@ class TerminalPainter {
     Offset offset,
     BufferLine line,
   ) {
+    if (!lineCacheEnabled) return _paintLineCells(canvas, offset, line);
+    final key = line.contentKey();
+    var picture = _lineCache.remove(key);
+    if (picture == null) {
+      final recorder = PictureRecorder();
+      _paintLineCells(Canvas(recorder), Offset.zero, line);
+      picture = recorder.endRecording();
+      if (_lineCache.length >= _lineCacheSize) {
+        final oldest = _lineCache.keys.first;
+        _lineCache.remove(oldest)!.dispose();
+      }
+    }
+    _lineCache[key] = picture; // most recent last
+    canvas.save();
+    canvas.translate(offset.dx, offset.dy);
+    canvas.drawPicture(picture);
+    canvas.restore();
+  }
+
+  void _paintLineCells(Canvas canvas, Offset offset, BufferLine line) {
     final cellData = CellData.empty();
     final cellWidth = _cellSize.width;
 
@@ -173,6 +211,9 @@ class TerminalPainter {
   void paintCellForeground(Canvas canvas, Offset offset, CellData cellData) {
     final charCode = cellData.content & CellContent.codepointMask;
     if (charCode == 0) return;
+    // aiterm patch: a plain space draws nothing (its background is painted
+    // separately); only an underlined one is visible.
+    if (charCode == 0x20 && cellData.flags & CellFlags.underline == 0) return;
 
     final cacheKey = cellData.getHash() ^ _textScaler.hashCode;
     var paragraph = _paragraphCache.getLayoutFromCache(cacheKey);

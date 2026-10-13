@@ -155,7 +155,9 @@ class RenderTerminal extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
   void _onScroll() {
     _stickToBottom = _scrollOffset >= _maxScrollExtent;
-    markNeedsLayout();
+    // aiterm patch: scrolling changes only what's painted; the viewport
+    // and content sizes are the same, so no layout pass per frame.
+    markNeedsPaint();
     _notifyEditableRect();
   }
 

@@ -5,13 +5,15 @@ enum TerminalMouseButton {
 
   right(id: 2),
 
-  wheelUp(id: 64 + 4, isWheel: true),
+  // aiterm patch: wheel buttons are 64-67 in the mouse protocol; 64 + 4
+  // (X11's button 4) meant every wheel arrived with the Shift bit set.
+  wheelUp(id: 64, isWheel: true),
 
-  wheelDown(id: 64 + 5, isWheel: true),
+  wheelDown(id: 65, isWheel: true),
 
-  wheelLeft(id: 64 + 6, isWheel: true),
+  wheelLeft(id: 66, isWheel: true),
 
-  wheelRight(id: 64 + 7, isWheel: true),
+  wheelRight(id: 67, isWheel: true),
   ;
 
   /// The id that is used to report a button press or release to the terminal.

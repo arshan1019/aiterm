@@ -22,3 +22,10 @@ copied from the pub.dev 4.0.0 release (`lib/` only). Changes, all in
 Tests: `test/escape_sequences_test.dart` in the app.
 7. **Only `< = > ?` are private prefixes.** `:` and `;` were too, so
    `CSI ; 4 m` lost its first parameter.
+8. **Mouse wheel buttons are 64–67** (`lib/src/core/mouse/button.dart`).
+   They were 64 + 4 … 64 + 7, X11's button numbers on top of the
+   protocol's 64, so every wheel event carried the Shift bit: full-screen
+   programs that scroll on the wheel (Claude Code, less, vim) saw
+   Shift+wheel and didn't scroll.
+9. **X10/UTF-8 mouse rows** were reported one row too low
+   (`lib/src/core/mouse/reporter.dart`, `32 + y + 1` → `32 + y`).

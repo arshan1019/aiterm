@@ -29,6 +29,17 @@ class BufferLine with IndexedItem {
 
   Uint32List get data => _data;
 
+  /// aiterm patch: a hash of every cell (text, colours, attributes), so the
+  /// painter can reuse a recorded picture of an unchanged line.
+  int contentKey() {
+    var h = 0x811C9DC5 ^ _length;
+    final n = _length * _cellSize;
+    for (var i = 0; i < n; i++) {
+      h = ((h ^ _data[i]) * 0x01000193) & 0x3FFFFFFFFFFFFFFF;
+    }
+    return h;
+  }
+
   var isWrapped = false;
 
   int get length => _length;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
+
 import '../../app/services.dart';
 import '../../app/theme.dart';
 import '../../assistant/error_fixes.dart';
@@ -131,21 +132,24 @@ class _TerminalPaneState extends State<TerminalPane> {
                 visible: widget.visible,
                 onPaste: _session.paste,
                 onOpenUrl: _openUrl,
-                child: ListenableBuilder(
-                  listenable: settings,
-                  builder: (context, _) => TerminalView(
-                    _session.terminal,
-                    key: _viewKey,
-                    controller: _session.selection,
-                    focusNode: _focus,
-                    backgroundOpacity: 0,
-                    theme: _themeFor(c),
-                    textStyle: _styleFor(settings.fontSize),
-                    // No suggestions or autocorrect: predictive keyboards
-                    // rewrite composed text and move the cursor.
-                    keyboardType: TextInputType.visiblePassword,
-                    deleteDetection: true,
-                    cursorType: TerminalCursorType.block,
+                // Scrolling repaints only the terminal, not what's around it.
+                child: RepaintBoundary(
+                  child: ListenableBuilder(
+                    listenable: settings,
+                    builder: (context, _) => TerminalView(
+                      _session.terminal,
+                      key: _viewKey,
+                      controller: _session.selection,
+                      focusNode: _focus,
+                      backgroundOpacity: 0,
+                      theme: _themeFor(c),
+                      textStyle: _styleFor(settings.fontSize),
+                      // No suggestions or autocorrect: predictive keyboards
+                      // rewrite composed text and move the cursor.
+                      keyboardType: TextInputType.visiblePassword,
+                      deleteDetection: true,
+                      cursorType: TerminalCursorType.block,
+                    ),
                   ),
                 ),
               ),
@@ -194,27 +198,27 @@ class _TerminalPaneState extends State<TerminalPane> {
 }
 
 TerminalTheme _terminalTheme(AppColors c) => TerminalTheme(
-      cursor: c.accent,
-      selection: c.accent.withValues(alpha: 0.35),
-      foreground: c.text,
-      background: c.bg,
-      black: c.bg,
-      red: const Color(0xFFE2685A),
-      green: const Color(0xFF6FBF73),
-      yellow: const Color(0xFFD9B35C),
-      blue: const Color(0xFF6C9EE5),
-      magenta: const Color(0xFFB07CD1),
-      cyan: const Color(0xFF5EC4A8),
-      white: c.text,
-      brightBlack: c.textMuted,
-      brightRed: const Color(0xFFE2685A),
-      brightGreen: const Color(0xFF6FBF73),
-      brightYellow: const Color(0xFFD9B35C),
-      brightBlue: const Color(0xFF6C9EE5),
-      brightMagenta: const Color(0xFFB07CD1),
-      brightCyan: const Color(0xFF5EC4A8),
-      brightWhite: c.text,
-      searchHitBackground: c.accent,
-      searchHitBackgroundCurrent: c.accent,
-      searchHitForeground: c.bg,
-    );
+  cursor: c.accent,
+  selection: c.accent.withValues(alpha: 0.35),
+  foreground: c.text,
+  background: c.bg,
+  black: c.bg,
+  red: const Color(0xFFE2685A),
+  green: const Color(0xFF6FBF73),
+  yellow: const Color(0xFFD9B35C),
+  blue: const Color(0xFF6C9EE5),
+  magenta: const Color(0xFFB07CD1),
+  cyan: const Color(0xFF5EC4A8),
+  white: c.text,
+  brightBlack: c.textMuted,
+  brightRed: const Color(0xFFE2685A),
+  brightGreen: const Color(0xFF6FBF73),
+  brightYellow: const Color(0xFFD9B35C),
+  brightBlue: const Color(0xFF6C9EE5),
+  brightMagenta: const Color(0xFFB07CD1),
+  brightCyan: const Color(0xFF5EC4A8),
+  brightWhite: c.text,
+  searchHitBackground: c.accent,
+  searchHitBackgroundCurrent: c.accent,
+  searchHitForeground: c.bg,
+);
