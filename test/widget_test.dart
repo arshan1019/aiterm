@@ -169,4 +169,58 @@ void main() {
     services.settings.dark = true;
     await tester.pumpAndSettle();
   });
+
+  testWidgets('name dialogs, rename tab, selection handles', (tester) async {
+    File('${dir.path}/alpine/.aiterm-installed')
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync('x');
+    Directory('${dir.path}/alpine/root').createSync(recursive: true);
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+    final services = await boot(tester);
+    await settleIo(tester);
+
+    // Rename the terminal tab through its menu.
+    await tester.tap(find.text('shell'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'build');
+    await tester.tap(find.widgetWithText(TextButton, 'Rename'));
+    await tester.pumpAndSettle();
+    expect(find.text('build'), findsOneWidget);
+
+    // Long-press a word: selection with two handles; drag the end handle.
+    final session = services.tabs.active;
+    session.terminal.write('\r\n' * 6 + 'hello wonderful world\r\n');
+    await tester.pump();
+    Offset cell(int x, int y) {
+      final render = tester.state<TerminalViewState>(find.byType(TerminalView).first).renderTerminal;
+      return render.localToGlobal(render.getOffset(CellOffset(x, y)) + render.cellSize.center(Offset.zero));
+    }
+
+    await tester.longPressAt(cell(8, 6));
+    await tester.pumpAndSettle();
+    expect(session.selection.selection, isNotNull);
+    final handles = find.byWidgetPredicate((w) => w.runtimeType.toString() == '_Handle');
+    expect(handles, findsNWidgets(2));
+    final before = session.selection.selection!.normalized.end;
+    await tester.drag(handles.last, Offset(cell(20, 6).dx - cell(15, 6).dx, 0));
+    await tester.pumpAndSettle();
+    expect(session.selection.selection!.normalized.end.x, greaterThan(before.x));
+    expect(find.text('Copy'), findsOneWidget);
+    await tester.tap(find.text('Copy'));
+    await tester.pumpAndSettle();
+
+    // Files: new folder via the dialog.
+    await tester.tap(find.text('files'));
+    await settleIo(tester);
+    await tester.tap(find.byIcon(Icons.add_rounded).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New folder'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'made');
+    await tester.tap(find.widgetWithText(TextButton, 'Create'));
+    await settleIo(tester);
+    expect(find.text('made'), findsOneWidget);
+  });
 }

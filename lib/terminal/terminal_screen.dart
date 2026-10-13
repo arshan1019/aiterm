@@ -5,6 +5,7 @@ import '../app/services.dart';
 import '../app/theme.dart';
 import '../assistant/ask_sheet.dart';
 import '../shared/fade_indexed_stack.dart';
+import '../shared/name_dialog.dart';
 import 'terminal_session.dart';
 import 'widgets/extra_keys_bar.dart';
 import 'widgets/setup_view.dart';
@@ -112,24 +113,8 @@ class _WorkspaceState extends State<_Workspace> {
   }
 
   Future<void> _rename(TerminalSession session) async {
-    final controller = TextEditingController(text: session.title);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('Rename tab', style: TextStyle(fontSize: 16)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          onSubmitted: (v) => Navigator.pop(dialog, v.trim()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(dialog, controller.text.trim()), child: const Text('Rename')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (name != null && name.isNotEmpty) session.rename(name);
+    final name = await showNameDialog(context, title: 'Rename tab', action: 'Rename', initial: session.title);
+    if (name != null) session.rename(name);
   }
 
   @override

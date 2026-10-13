@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../shared/name_dialog.dart';
 import 'file_system_service.dart';
 import 'files_browser.dart';
 import 'text_editor_screen.dart';
@@ -66,27 +67,8 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
-  Future<String?> _askName(String title, String action, {String initial = ''}) async {
-    final controller = TextEditingController(text: initial);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontSize: 16)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'name'),
-          onSubmitted: (v) => Navigator.pop(d, v.trim()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(d, controller.text.trim()), child: Text(action)),
-        ],
-      ),
-    );
-    controller.dispose();
-    return name == null || name.isEmpty ? null : name;
-  }
+  Future<String?> _askName(String title, String action, {String initial = ''}) =>
+      showNameDialog(context, title: title, action: action, initial: initial, hint: 'name');
 
   Future<void> _create(bool folder) async {
     final name = await _askName(folder ? 'New folder' : 'New file', 'Create');
