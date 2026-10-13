@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../platform/android_env.dart';
 import '../shared/download.dart';
 import '../shared/fs_atomic.dart';
+import '../git/git_runner.dart';
 import 'proc_stubs.dart';
 import 'session_spec.dart';
 import 'shell_profile.dart';
@@ -225,6 +226,22 @@ class LinuxEnvironment extends ChangeNotifier {
     final existing = await f.exists() ? await f.readAsString() : '';
     final updated = withProotGitDefaults(existing);
     if (updated != existing) await writeFileAtomic(f.path, updated);
+  }
+
+  /// Runs [commandLine] with sh inside Linux, keeping stdout, stderr and
+  /// stdin separate (git and other tools parsed by the app).
+  Future<GitResult> runCommandLine(String commandLine, {Map<String, String> env = const {}, String? stdin}) async {
+    if (!installed) return const GitResult(127, '', 'Linux is not installed');
+    final exports = env.entries.map((e) => 'export ${e.key}=${shellQuote(e.value)}; ').join();
+    final spec = await _prootSpec(null, command: ['/bin/sh', '-c', '$exports$commandLine']);
+    final p = await Process.start(spec.argv.first, spec.argv.sublist(1),
+        environment: spec.env, workingDirectory: spec.cwd);
+    if (stdin != null) p.stdin.write(stdin);
+    await p.stdin.close();
+    final out = p.stdout.transform(const Utf8Decoder(allowMalformed: true)).join();
+    final err = p.stderr.transform(const Utf8Decoder(allowMalformed: true)).join();
+    final code = await p.exitCode;
+    return GitResult(code, await out, await err);
   }
 
   /// root's shell from /etc/passwd, so `chsh -s /bin/bash` sticks.

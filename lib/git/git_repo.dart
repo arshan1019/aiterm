@@ -21,6 +21,9 @@ enum GitErrorKind {
 
   /// No remote to sync with.
   noRemote,
+
+  /// git itself isn't installed in Linux yet.
+  notInstalled,
   other,
 }
 
@@ -42,6 +45,9 @@ class GitError implements Exception {
 GitError mapGitError(GitResult r) {
   final e = '${r.stderr}\n${r.stdout}';
   final l = e.toLowerCase();
+  if (r.code == 127 || l.contains('git: not found') || l.contains('git: command not found')) {
+    return GitError(GitErrorKind.notInstalled, 'Git isn\'t installed yet.', detail: e);
+  }
   if (l.contains('please tell me who you are') || l.contains('empty ident') || l.contains('unable to auto-detect email')) {
     return GitError(GitErrorKind.identity, 'Set your name and email for commits.', detail: e);
   }

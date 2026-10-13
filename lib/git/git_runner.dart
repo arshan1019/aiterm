@@ -41,3 +41,21 @@ class ProcessGitRunner implements GitRunner {
 
 /// Single-quotes [s] for sh.
 String shellQuote(String s) => "'${s.replaceAll("'", r"'\''")}'";
+
+/// The sh command that runs git with [args] in [repo].
+String gitCommandLine(String repo, List<String> args) =>
+    'cd ${shellQuote(repo)} && exec git ${args.map(shellQuote).join(' ')}';
+
+/// Runs a shell command line inside Linux: (stdout, stderr, exit code).
+typedef LinuxCommand = Future<GitResult> Function(String commandLine, {Map<String, String> env, String? stdin});
+
+/// Git inside Alpine (repo paths as the shell sees them, e.g. /root/proj).
+class LinuxGitRunner implements GitRunner {
+  LinuxGitRunner(this._command);
+
+  final LinuxCommand _command;
+
+  @override
+  Future<GitResult> run(String repo, List<String> args, {String? stdin}) =>
+      _command(gitCommandLine(repo, args), env: gitEnvironment, stdin: stdin);
+}

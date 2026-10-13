@@ -263,4 +263,10 @@ void main() {
       expect(withProotGitDefaults(once), once);
     });
   });
+
+  test('missing git is reported so the app can offer to install it', () {
+    expect(mapGitError(const GitResult(127, '', 'sh: git: not found')).kind, GitErrorKind.notInstalled);
+    expect(mapGitError(const GitResult(128, '', 'fatal: Authentication failed for https://github.com/a/b')).kind,
+        GitErrorKind.auth);
+  });
 }
