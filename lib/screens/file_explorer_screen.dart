@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../app_theme.dart';
 import '../core/distro_manager.dart';
 import '../core/file_system_service.dart';
+import '../core/app_controller.dart';
 import '../core/shell_env.dart';
 
 class FileExplorerScreen extends StatefulWidget {
@@ -25,12 +27,14 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
   void initState() {
     super.initState();
     _distro.addListener(_init);
+    AppController.instance.addListener(_openPending);
     _init();
   }
 
   @override
   void dispose() {
     _distro.removeListener(_init);
+    AppController.instance.removeListener(_openPending);
     super.dispose();
   }
 
@@ -40,6 +44,33 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
     if (!mounted) return;
     _root = home;
     _current = home;
+    await _refresh();
+  }
+
+  /// Opens a folder the assistant asked for ("show src in files"). Paths are
+  /// relative to the home folder; absolute guest paths map into the rootfs.
+  Future<void> _openPending() async {
+    final app = AppController.instance;
+    final requested = app.pendingFilesPath;
+    final root = _root;
+    if (requested == null || root == null) return;
+    app.pendingFilesPath = null;
+    String target;
+    if (requested == '~' || requested.isEmpty) {
+      target = root;
+    } else if (requested.startsWith('/') && _distro.installed) {
+      target = '${_distro.rootfs}$requested';
+    } else {
+      target = '$root/${requested.replaceFirst(RegExp(r'^~/'), '')}';
+    }
+    if (!await Directory(target).exists()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('No folder named $requested here')));
+      }
+      return;
+    }
+    setState(() => _current = target);
     await _refresh();
   }
 
@@ -180,9 +211,9 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
       body: Column(
         children: [
           Container(
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            color: c.surfaceAlt,
+            height: 36,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
@@ -223,12 +254,13 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
                         backgroundColor: c.surface,
                         child: ListView.separated(
                           itemCount: _entries.length,
-                          separatorBuilder: (_, _) =>
-                              Divider(height: 1, color: c.border),
+                          separatorBuilder: (_, _) => const SizedBox.shrink(),
                           itemBuilder: (context, i) {
                             final e = _entries[i];
                             final isDir = e.kind == EntryKind.directory;
                             return ListTile(
+                              dense: true,
+                              visualDensity: VisualDensity.compact,
                               leading: Icon(
                                 isDir ? Icons.folder_outlined : Icons.description_outlined,
                                 color: isDir ? c.accent : c.textMuted,
@@ -257,8 +289,8 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
           PopupMenuItem(value: true, child: Text('New folder', style: TextStyle(color: c.text))),
         ],
         child: Container(
-          width: 56,
-          height: 56,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle),
           child: Icon(Icons.add, color: c.bg),
         ),
@@ -334,7 +366,7 @@ class _TextViewerScreenState extends State<_TextViewerScreen> {
                 maxLines: null,
                 expands: true,
                 onChanged: (_) => setState(() => _dirty = true),
-                style: TextStyle(color: c.text, fontFamily: 'monospace', fontSize: 13),
+                style: TextStyle(color: c.text, fontFamily: 'JetBrainsMono', fontSize: 13),
                 decoration: const InputDecoration(border: InputBorder.none),
               ),
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app_theme.dart';
+import '../core/app_controller.dart';
 import '../core/distro_manager.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -26,6 +27,33 @@ class SettingsScreen extends StatelessWidget {
             title: Text('Dark theme', style: TextStyle(color: c.text)),
             value: isDark,
             onChanged: onThemeChanged,
+          ),
+          ListenableBuilder(
+            listenable: AppController.instance,
+            builder: (context, _) {
+              final app = AppController.instance;
+              return ListTile(
+                title: Text('Terminal text size', style: TextStyle(color: c.text)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.remove, size: 18, color: c.textMuted),
+                      onPressed: () => app.changeFontSize(-1),
+                    ),
+                    SizedBox(
+                      width: 28,
+                      child: Text('${app.fontSize.round()}',
+                          textAlign: TextAlign.center, style: TextStyle(color: c.text)),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.add, size: 18, color: c.textMuted),
+                      onPressed: () => app.changeFontSize(1),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ]),
         const SizedBox(height: 24),

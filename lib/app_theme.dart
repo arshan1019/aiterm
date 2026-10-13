@@ -52,7 +52,7 @@ class AiTermTheme {
     return ThemeData(
       brightness: brightness,
       scaffoldBackgroundColor: c.bg,
-      fontFamily: 'monospace',
+      fontFamily: 'JetBrainsMono',
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: c.accent,
@@ -74,7 +74,7 @@ class AiTermTheme {
           color: c.text,
           fontSize: 17,
           fontWeight: FontWeight.w600,
-          fontFamily: 'monospace',
+          fontFamily: 'JetBrainsMono',
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -87,7 +87,7 @@ class AiTermTheme {
       textTheme: Typography.whiteMountainView.apply(
         bodyColor: c.text,
         displayColor: c.text,
-        fontFamily: 'monospace',
+        fontFamily: 'JetBrainsMono',
       ),
       useMaterial3: true,
     );

@@ -61,6 +61,25 @@ Java_com_aiterm_aiterm_NeedleNative_init(JNIEnv *env, jclass, jstring j_system,
 }
 
 extern "C" JNIEXPORT jstring JNICALL
+Java_com_aiterm_aiterm_NeedleNative_transcribe(JNIEnv *env, jclass, jfloatArray j_pcm,
+                                               jstring j_keywords) {
+    std::string keywords = utf(env, j_keywords);
+    jsize n = env->GetArrayLength(j_pcm);
+    std::vector<float> pcm(n);
+    env->GetFloatArrayRegion(j_pcm, 0, n, pcm.data());
+    std::vector<char> out(16 * 1024);
+    // English only: the command model that reads the transcript is English.
+    int r = needle_transcribe(pcm.data(), n, "en", keywords.empty() ? nullptr : keywords.c_str(), 0,
+                              out.data(), static_cast<int>(out.size()));
+    if (r < 0) {
+        throwIllegalState(env, lastError("needle_transcribe"));
+        return nullptr;
+    }
+    out.back() = '\0';
+    return env->NewStringUTF(out.data());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
 Java_com_aiterm_aiterm_NeedleNative_complete(JNIEnv *env, jclass, jstring j_input,
                                              jint max_tokens) {
     std::string input = utf(env, j_input);
