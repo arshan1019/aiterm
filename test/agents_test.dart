@@ -50,7 +50,7 @@ void main() {
 
   group('installer', () {
     late List<String> scripts;
-    late List<(String, List<String>)> launched;
+    late List<(String, List<String>, String?)> launched;
     late (String, int) Function(String) respond;
 
     AgentInstaller make() => AgentInstaller(
@@ -62,13 +62,20 @@ void main() {
             }
             return code;
           },
-          launch: (title, commands) => launched.add((title, commands)),
+          launch: (title, commands, cwd) => launched.add((title, commands, cwd)),
         );
 
     setUp(() {
       scripts = [];
       launched = [];
       respond = (_) => ('', 0);
+    });
+
+    test('menus list only installed agents, in catalog order', () async {
+      respond = (s) => s.contains('command -v') ? ('codex\nclaude\n', 0) : ('', 0);
+      final i = make();
+      await i.refresh();
+      expect(i.installed.map((a) => a.id), ['claude', 'codex']);
     });
 
     test('detects what is installed', () async {
@@ -113,22 +120,63 @@ void main() {
     });
 
     test('open starts the agent in its own tab; login happens there', () async {
+      respond = (s) => s.contains('command -v') ? ('claude\n', 0) : ('', 0);
       final i = make();
+      await i.refresh();
       await i.open('claude');
       expect(launched.single.$1, 'Claude Code');
       expect(launched.single.$2, ['claude']);
     });
 
     test('open first adds dependencies a newer recipe needs', () async {
-      respond = (s) => s.contains('apk info -e') ? ('', 1) : ('', 0); // something missing
+      respond = (s) => s.contains('apk info -e')
+          ? ('', 1) // something missing
+          : (s.contains('command -v') ? ('codex\n', 0) : ('', 0));
       final i = make();
+      await i.refresh();
       await i.open('codex');
       expect(scripts.any((s) => s.contains('apk add') && s.contains('procps-ng')), isTrue);
       expect(launched.single.$2, ['codex']);
     });
 
-    test('open skips the install when everything is present', () async {
+    test('open in a folder starts the agent there, named after the folder', () async {
+      respond = (s) => s.contains('command -v') ? ('claude\n', 0) : ('', 0);
       final i = make();
+      await i.refresh();
+      await i.open('claude', cwd: '/root/myproject');
+      final (title, commands, cwd) = launched.single;
+      expect(title, 'Claude Code · myproject');
+      expect(commands, ['claude']);
+      expect(cwd, '/root/myproject');
+    });
+
+    test('opening an agent that is not installed installs it first, then opens', () async {
+      var installed = false;
+      respond = (s) {
+        if (s.contains('command -v')) return (installed ? 'gemini\n' : '', 0);
+        if (s.contains('@google/gemini-cli')) installed = true;
+        return ('', 0);
+      };
+      final i = make();
+      await i.refresh();
+      await i.open('gemini', cwd: '/root/app');
+      expect(scripts.any((s) => s.contains('@google/gemini-cli')), isTrue);
+      expect(launched.single.$3, '/root/app');
+    });
+
+    test('a failed install does not open a tab', () async {
+      respond = (s) => s.contains('npm install') ? ('npm ERR! network', 1) : ('', 0);
+      final i = make();
+      await i.refresh();
+      await i.open('codex', cwd: '/root/app');
+      expect(launched, isEmpty);
+      expect(i.stateOf('codex').status, AgentStatus.failed);
+    });
+
+    test('open skips the install when everything is present', () async {
+      respond = (s) => s.contains('command -v') ? ('codex\n', 0) : ('', 0);
+      final i = make();
+      await i.refresh();
       await i.open('codex');
       expect(scripts.where((s) => s.contains('apk add')), isEmpty);
       expect(launched, hasLength(1));

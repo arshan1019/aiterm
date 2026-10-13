@@ -234,7 +234,7 @@ void main() {
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
-  testWidgets('Files: open a terminal here from the menu and from empty space', (tester) async {
+  testWidgets('Files: terminal (and installed agents) from the top menu and each folder\'s menu', (tester) async {
     Directory('${dir.path}/alpine/root/proj').createSync(recursive: true);
     File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
     messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
@@ -243,22 +243,21 @@ void main() {
 
     await tester.tap(find.text('files'));
     await settleIo(tester);
-    await tester.tap(find.byIcon(Icons.more_vert_rounded));
+    await tester.tap(find.byTooltip('Folder actions'));
     await tester.pumpAndSettle();
+    // No agent is installed here, so none is offered (only installed ones are).
+    expect(find.textContaining('Open in '), findsNothing);
     await tester.tap(find.text('Open terminal here'));
     await tester.pumpAndSettle();
     expect(services.navigation.tab.name, 'terminal');
     expect(services.tabs.active.cwd, '/root');
-    expect(find.text('root'), findsOneWidget); // the new tab, named after the folder
 
-    // Hold empty space below the entries.
+    // Each row has a visible actions button; nothing needs a long-press.
     await tester.tap(find.text('files'));
     await settleIo(tester);
-    await tester.tap(find.text('proj'));
-    await settleIo(tester);
-    await tester.longPressAt(tester.getCenter(find.text('Empty folder')) + const Offset(0, 80));
+    await tester.tap(find.byTooltip('Actions').first);
     await tester.pumpAndSettle();
-    expect(find.text('New folder'), findsOneWidget);
+    expect(find.textContaining('Open in '), findsNothing);
     await tester.tap(find.text('Open terminal here'));
     await tester.pumpAndSettle();
     expect(services.tabs.active.cwd, '/root/proj');

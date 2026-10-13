@@ -101,8 +101,8 @@ class AppServices {
   /// One-tap AI agents; "Open" starts one in its own terminal tab.
   late final agents = AgentInstaller(
     run: linux.runScriptStreaming,
-    launch: (title, commands) {
-      tabs.open(title: title, commands: commands);
+    launch: (title, commands, cwd) {
+      tabs.open(title: title, commands: commands, cwd: cwd);
       navigation.open(AppTab.terminal);
     },
   );

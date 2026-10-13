@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../agents/agent_installer.dart';
 import '../shared/name_dialog.dart';
 import 'file_system_service.dart';
 import 'files_browser.dart';
@@ -88,26 +89,10 @@ class _FilesScreenState extends State<FilesScreen> {
     _services.navigation.open(AppTab.terminal);
   }
 
-  Future<void> _backgroundMenu(Offset at) async {
-    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final choice = await showMenu<String>(
-      context: context,
-      position: RelativeRect.fromRect(at & const Size(1, 1), Offset.zero & overlay.size),
-      items: const [
-        PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
-        PopupMenuItem(value: 'file', child: Text('New file')),
-        PopupMenuItem(value: 'folder', child: Text('New folder')),
-      ],
-    );
-    switch (choice) {
-      case 'terminal':
-        _openTerminalHere();
-      case 'file':
-        await _create(false);
-      case 'folder':
-        await _create(true);
-    }
-  }
+  /// Opens [folder] (a host path; the current folder by default) in an
+  /// installed AI agent's own tab.
+  void _openInAgent(String id, [String? folder]) =>
+      _services.agents.open(id, cwd: _services.linux.guestPath(folder ?? _browser.current));
 
   void _entryActions(FsEntry e) {
     showModalBottomSheet<void>(
@@ -127,6 +112,16 @@ class _FilesScreenState extends State<FilesScreen> {
                     _openTerminalHere(e.path);
                   },
                 ),
+              if (e.kind == EntryKind.directory)
+                for (final agent in _services.agents.installed)
+                  ListTile(
+                    leading: Icon(Icons.auto_awesome_rounded, color: c.accent),
+                    title: Text('Open in ${agent.name}', style: const TextStyle(fontSize: 14)),
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      _openInAgent(agent.id, e.path);
+                    },
+                  ),
               ListTile(
                 leading: Icon(Icons.drive_file_rename_outline_rounded, color: c.textMuted),
                 title: const Text('Rename', style: TextStyle(fontSize: 14)),
@@ -160,7 +155,12 @@ class _FilesScreenState extends State<FilesScreen> {
         listenable: _browser,
         builder: (context, _) => Column(
           children: [
-            _Header(browser: _browser, onOpenTerminal: _openTerminalHere),
+            _Header(
+              browser: _browser,
+              agents: _services.agents,
+              onOpenTerminal: _openTerminalHere,
+              onOpenAgent: _openInAgent,
+            ),
             Expanded(
               child: !_browser.loaded
                   ? const SizedBox.expand()
@@ -186,7 +186,6 @@ class _FilesScreenState extends State<FilesScreen> {
                         browser: _browser,
                         onOpen: _open,
                         onActions: _entryActions,
-                        onBackgroundMenu: _backgroundMenu,
                       ),
                     ),
             ),
@@ -212,10 +211,12 @@ class _FilesScreenState extends State<FilesScreen> {
 }
 
 class _Header extends StatefulWidget {
-  const _Header({required this.browser, required this.onOpenTerminal});
+  const _Header({required this.browser, required this.agents, required this.onOpenTerminal, required this.onOpenAgent});
 
   final FilesBrowser browser;
   final VoidCallback onOpenTerminal;
+  final void Function(String agentId) onOpenAgent;
+  final AgentInstaller agents;
 
   @override
   State<_Header> createState() => _HeaderState();
@@ -288,15 +289,20 @@ class _HeaderState extends State<_Header> {
             ),
           ),
           PopupMenuButton<String>(
+            tooltip: 'Folder actions',
             icon: Icon(Icons.more_vert_rounded, color: c.textMuted, size: 20),
             onSelected: (v) => switch (v) {
               'terminal' => widget.onOpenTerminal(),
+              final v when v.startsWith('agent:') => widget.onOpenAgent(v.substring(6)),
               'home' => b.open(b.root),
               'hidden' => b.toggleHidden(),
               _ => b.refresh(),
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
+              for (final agent in widget.agents.installed)
+                PopupMenuItem(value: 'agent:${agent.id}', child: Text('Open in ${agent.name}')),
+              const PopupMenuDivider(),
               const PopupMenuItem(value: 'home', child: Text('Go home')),
               CheckedPopupMenuItem(value: 'hidden', checked: b.showHidden, child: const Text('Show hidden')),
               const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
@@ -335,20 +341,11 @@ class _NavButton extends StatelessWidget {
 /// One folder's entries. Each folder gets its own list (and scroll
 /// position), so the old and new listings can animate side by side.
 class _Listing extends StatefulWidget {
-  const _Listing({
-    super.key,
-    required this.browser,
-    required this.onOpen,
-    required this.onActions,
-    required this.onBackgroundMenu,
-  });
+  const _Listing({super.key, required this.browser, required this.onOpen, required this.onActions});
 
   final FilesBrowser browser;
   final ValueChanged<FsEntry> onOpen;
   final ValueChanged<FsEntry> onActions;
-
-  /// Long-press on empty space, at this global position.
-  final ValueChanged<Offset> onBackgroundMenu;
 
   @override
   State<_Listing> createState() => _ListingState();
@@ -369,53 +366,55 @@ class _ListingState extends State<_Listing> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final entries = widget.browser.entries;
-    // Entries take their own long-press; one on empty space reaches here.
-    return GestureDetector(
-      onLongPressStart: (d) => widget.onBackgroundMenu(d.globalPosition),
-      child: RefreshIndicator(
-        onRefresh: widget.browser.refresh,
-        color: c.accent,
-        backgroundColor: c.surface,
-        child: entries.isEmpty
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  const SizedBox(height: 140),
-                  Center(
-                    child: Text('Empty folder', style: TextStyle(color: c.textMuted)),
+    return RefreshIndicator(
+      onRefresh: widget.browser.refresh,
+      color: c.accent,
+      backgroundColor: c.surface,
+      child: entries.isEmpty
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                const SizedBox(height: 140),
+                Center(
+                  child: Text('Empty folder', style: TextStyle(color: c.textMuted)),
+                ),
+              ],
+            )
+          : ListView.builder(
+              controller: _scroll,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 4, bottom: 96),
+              itemCount: entries.length,
+              itemExtent: 52,
+              itemBuilder: (context, i) {
+                final e = entries[i];
+                final dir = e.kind == EntryKind.directory;
+                return ListTile(
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  leading: Icon(
+                    dir ? Icons.folder_rounded : Icons.description_outlined,
+                    color: dir ? c.accent : c.textMuted,
                   ),
-                ],
-              )
-            : ListView.builder(
-                controller: _scroll,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(top: 4, bottom: 96),
-                itemCount: entries.length,
-                itemExtent: 52,
-                itemBuilder: (context, i) {
-                  final e = entries[i];
-                  final dir = e.kind == EntryKind.directory;
-                  return ListTile(
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    leading: Icon(
-                      dir ? Icons.folder_rounded : Icons.description_outlined,
-                      color: dir ? c.accent : c.textMuted,
-                    ),
-                    title: Text(
-                      e.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    subtitle: dir ? null : Text(_size(e.size), style: TextStyle(color: c.textMuted, fontSize: 11)),
-                    trailing: dir ? Icon(Icons.chevron_right_rounded, size: 18, color: c.border) : null,
-                    onTap: () => widget.onOpen(e),
-                    onLongPress: () => widget.onActions(e),
-                  );
-                },
-              ),
-      ),
+                  title: Text(
+                    e.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  subtitle: dir ? null : Text(_size(e.size), style: TextStyle(color: c.textMuted, fontSize: 11)),
+                  // Actions are always a visible tap away; long-press is
+                  // only a shortcut to the same menu.
+                  trailing: IconButton(
+                    tooltip: 'Actions',
+                    icon: Icon(Icons.more_vert_rounded, size: 18, color: c.textMuted),
+                    onPressed: () => widget.onActions(e),
+                  ),
+                  onTap: () => widget.onOpen(e),
+                  onLongPress: () => widget.onActions(e),
+                );
+              },
+            ),
     );
   }
 

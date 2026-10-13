@@ -21,8 +21,9 @@ class AgentState {
 /// Runs a script in Linux, streaming output lines; returns the exit status.
 typedef ScriptRunner = Future<int> Function(String script, void Function(String line) onOutput);
 
-/// Opens a terminal tab titled [title] and runs [commands] in it.
-typedef AgentLauncher = void Function(String title, List<String> commands);
+/// Opens a terminal tab titled [title], in folder [cwd] (a guest path) if
+/// given, and runs [commands] in it.
+typedef AgentLauncher = void Function(String title, List<String> commands, String? cwd);
 
 /// One-tap install of AI coding agents: dependencies and the agent itself
 /// install in the background with progress; the user only signs in, in the
@@ -36,6 +37,10 @@ class AgentInstaller extends ChangeNotifier {
   String? _installing;
 
   bool get busy => _installing != null;
+
+  /// Agents ready to open, in catalog order (menus list only these).
+  List<AgentRecipe> get installed =>
+      [for (final a in agentCatalog) if (stateOf(a.id).status == AgentStatus.installed) a];
 
   AgentState stateOf(String id) => _states[id] ?? const AgentState(AgentStatus.unknown);
 
@@ -88,12 +93,16 @@ class AgentInstaller extends ChangeNotifier {
     await refresh();
   }
 
-  /// Starts the agent in its own tab; first start walks through sign-in.
-  /// Dependencies a newer recipe added (e.g. procps for Codex) are
-  /// installed first, so existing installs keep working.
-  Future<void> open(String id) async {
+  /// Starts the agent in its own tab, in [cwd] if given; first start walks
+  /// through sign-in. Not installed yet: installs it first (one tap from
+  /// anywhere). Dependencies a newer recipe added (e.g. procps for Codex)
+  /// are installed first, so existing installs keep working.
+  Future<void> open(String id, {String? cwd}) async {
     final agent = recipe(id);
-    if (!busy) {
+    if (stateOf(id).status != AgentStatus.installed && !busy) {
+      await install(id);
+      if (stateOf(id).status != AgentStatus.installed) return;
+    } else if (!busy) {
       final present = await _run('apk info -e ${agent.allPackages.join(' ')} >/dev/null', (_) {});
       if (present != 0) {
         _installing = id;
@@ -112,7 +121,8 @@ class AgentInstaller extends ChangeNotifier {
         }
       }
     }
-    _launch(agent.name, [agent.command]);
+    final folder = cwd?.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => '/');
+    _launch(folder == null ? agent.name : '${agent.name} · $folder', [agent.command], cwd);
   }
 
   static String _reason(String log, int code) {
