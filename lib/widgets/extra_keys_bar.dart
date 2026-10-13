@@ -6,8 +6,9 @@ import '../app_theme.dart';
 class ExtraKeysBar extends StatelessWidget {
   final AppColors colors;
   final void Function(String data) onKey;
+  final VoidCallback? onAsk;
 
-  const ExtraKeysBar({super.key, required this.colors, required this.onKey});
+  const ExtraKeysBar({super.key, required this.colors, required this.onKey, this.onAsk});
 
   static const _keys = <(String, String)>[
     ('ESC', '\x1b'),
@@ -31,9 +32,13 @@ class ExtraKeysBar extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 6),
-        itemCount: _keys.length,
+        itemCount: _keys.length + (onAsk == null ? 0 : 1),
         separatorBuilder: (_, _) => const SizedBox(width: 4),
         itemBuilder: (context, i) {
+          if (onAsk != null) {
+            if (i == 0) return _KeyButton(label: '✦', colors: colors, onTap: onAsk!);
+            i -= 1;
+          }
           final (label, data) = _keys[i];
           return _KeyButton(label: label, colors: colors, onTap: () => onKey(data));
         },

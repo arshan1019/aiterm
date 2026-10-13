@@ -1,9 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import '../app_theme.dart';
 import '../core/distro_manager.dart';
 import '../core/file_system_service.dart';
+import '../core/shell_env.dart';
 
 class FileExplorerScreen extends StatefulWidget {
   final AppColors colors;
@@ -36,14 +35,8 @@ class _FileExplorerScreenState extends State<FileExplorerScreen> {
   }
 
   Future<void> _init() async {
-    String home;
-    if (_distro.installed) {
-      home = _distro.home;
-    } else {
-      final dir = await getApplicationDocumentsDirectory();
-      home = '${dir.path}/home';
-      await Directory(home).create(recursive: true);
-    }
+    await _distro.init();
+    final home = _distro.installed ? _distro.home : await ShellEnv.androidHome();
     if (!mounted) return;
     _root = home;
     _current = home;

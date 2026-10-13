@@ -23,6 +23,11 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
+            "aiterm/needle",
+        ).setMethodCallHandler(NeedlePlugin())
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
             "aiterm/env",
         ).setMethodCallHandler { call, result ->
             when (call.method) {

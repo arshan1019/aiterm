@@ -31,7 +31,7 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle.kts', 'android/app/build.gradle.kts') }}
 
-      - run: bash scripts/fetch_proot.sh
+      - run: bash scripts/fetch_deps.sh
 
       - run: flutter pub get
 

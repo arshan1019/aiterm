@@ -5,6 +5,7 @@ import '../app_theme.dart';
 import '../core/distro_manager.dart';
 import '../core/pty_channel.dart';
 import '../core/shell_env.dart';
+import '../widgets/ask_sheet.dart';
 import '../widgets/extra_keys_bar.dart';
 
 enum _Phase { loading, setup, running, exited }
@@ -106,6 +107,19 @@ class _TerminalScreenState extends State<TerminalScreen>
     }
   }
 
+  void _openAsk() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.colors.surface,
+      builder: (_) => AskSheet(
+        colors: widget.colors,
+        alpine: !_useAndroidShell,
+        onInsert: (cmd) => _session?.write(cmd),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _session?.dispose();
@@ -169,7 +183,11 @@ class _TerminalScreenState extends State<TerminalScreen>
                   ),
                 ),
               ),
-            ExtraKeysBar(colors: c, onKey: (data) => _session?.write(data)),
+            ExtraKeysBar(
+              colors: c,
+              onKey: (data) => _session?.write(data),
+              onAsk: _phase == _Phase.running ? _openAsk : null,
+            ),
           ],
         );
     }

@@ -1,8 +1,9 @@
 /.gradle
 /captures/
 /local.properties
-# fetched by scripts/fetch_proot.sh
+# fetched by scripts/fetch_deps.sh
 /app/src/main/jniLibs/
+/app/src/main/cpp/third_party/
 GeneratedPluginRegistrant.java
 .cxx/
 
