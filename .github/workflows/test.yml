@@ -17,6 +17,12 @@ jobs:
         with:
           flutter-version: "3.47.7"
           cache: true
+      # proot built from Termux's source at the commit pinned in fetch_deps.sh.
+      - uses: actions/cache@v4
+        with:
+          path: build/proot-*
+          key: proot-${{ hashFiles('scripts/fetch_deps.sh') }}
+
       - run: flutter test --reporter expanded
       - name: Kotlin unit tests
         run: |

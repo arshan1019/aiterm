@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Fetches prebuilt native dependencies, each checked against a SHA256:
-#  - proot + libs from Termux's apt repo (hashes from the signed repo index),
-#    installed as jniLibs because Android only lets an app exec files from
-#    its native library dir;
+# Fetches native dependencies, each checked against a SHA256:
+#  - libtalloc + libandroid-shmem from Termux's apt repo (hashes from the
+#    signed repo index), and proot built from Termux's source at a pinned
+#    commit with the NDK (see below). Installed as jniLibs because Android
+#    only lets an app exec files from its native library dir;
 #  - Needle's Android engine (libneedle.a + needle.h) from a pinned
 #    Hugging Face revision, linked into our JNI library by CMake.
 set -euo pipefail
@@ -30,13 +31,45 @@ fetch_deb() {
   (cd "$WORK/$pkg" && ar x "../$pkg.deb" && { tar --no-same-owner -xf data.tar.* 2>/dev/null || true; })
 }
 
-for p in proot libtalloc libandroid-shmem; do fetch_deb "$p"; done
+for p in libtalloc libandroid-shmem; do fetch_deb "$p"; done
 P=data/data/com.termux/files/usr
 mkdir -p "$JNI"
-cp -L "$WORK/proot/$P/bin/proot"                          "$JNI/libproot.so"
-cp -L "$WORK/proot/$P/libexec/proot/loader"               "$JNI/libproot-loader.so"
 cp -L "$WORK/libtalloc/$P/lib/libtalloc.so.2"             "$JNI/libtalloc.so"
 cp -L "$WORK/libandroid-shmem/$P/lib/libandroid-shmem.so" "$JNI/libandroid-shmem.so"
+
+# proot from Termux's source, ahead of the packaged v5.1.107.96: commit
+# b5af02e7 stops /proc/self/uid_map reads returning an empty map ("user
+# namespace without a mapping": Claude Code's cross-session messaging
+# turned itself off) and keeps SO_PEERCRED consistent across the one
+# proot per terminal tab we run. Built like Termux's package (build.sh).
+PROOT_COMMIT=b8c1f5c5c6730dc9d521d5bd5ce1cfeedecde087
+PROOT_SHA256=b2dd751e3e4083f4a7dd2104a6330daa3823e9c2410d2a5bd43bfa97ea989d42
+PROOT_CACHE="${PROOT_CACHE:-$ROOT/build/proot-$PROOT_COMMIT}"
+if [ ! -f "$PROOT_CACHE/proot" ] || [ ! -f "$PROOT_CACHE/loader" ]; then
+  NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/ndk/* | sort -V | tail -1)}}"
+  BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+  curl -fsSL "https://github.com/termux/proot/archive/$PROOT_COMMIT.tar.gz" -o "$WORK/proot.tar.gz"
+  echo "$PROOT_SHA256  $WORK/proot.tar.gz" | sha256sum -c - >/dev/null
+  tar -xzf "$WORK/proot.tar.gz" -C "$WORK"
+  SRC="$WORK/proot-$PROOT_COMMIT"
+  # The fix this build exists for.
+  grep -q '(flags & O_ACCMODE) == O_RDONLY' "$SRC/src/syscall/enter.c"
+  # Headers and link libraries from the Termux packages above.
+  mkdir -p "$WORK/sysroot/include" "$WORK/sysroot/lib"
+  cp -r "$WORK/libtalloc/$P/include/." "$WORK/libandroid-shmem/$P/include/." "$WORK/sysroot/include/"
+  cp -L "$WORK/libtalloc/$P/lib/libtalloc.so" "$WORK/libandroid-shmem/$P/lib/libandroid-shmem.so" "$WORK/sysroot/lib/"
+  make -C "$SRC/src" -j"$(nproc)" proot \
+    CC="$BIN/aarch64-linux-android24-clang" STRIP="$BIN/llvm-strip" \
+    OBJCOPY="$BIN/llvm-objcopy" OBJDUMP="$BIN/llvm-objdump" \
+    PROOT_WITH_LIBANDROID_SHMEM=true PROOT_UNBUNDLE_LOADER=/unused HAS_LOADER_32BIT= \
+    CPPFLAGS="-I$WORK/sysroot/include -DARG_MAX=131072 -DVERSION=\\\"5.1.107.96-g${PROOT_COMMIT:0:8}\\\"" \
+    LDFLAGS="-L$WORK/sysroot/lib"
+  mkdir -p "$PROOT_CACHE"
+  "$BIN/llvm-strip" -o "$PROOT_CACHE/proot" "$SRC/src/proot"
+  cp "$SRC/src/loader/loader" "$PROOT_CACHE/loader"
+fi
+cp "$PROOT_CACHE/proot"  "$JNI/libproot.so"
+cp "$PROOT_CACHE/loader" "$JNI/libproot-loader.so"
 
 # --- Needle --------------------------------------------------------------
 HF="https://huggingface.co/Cactus-Compute/needle3/resolve/93e88ede867e4311c39151285e74df513e4b835b/android-arm64"

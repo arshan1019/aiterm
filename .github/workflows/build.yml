@@ -37,6 +37,12 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle.kts', 'android/app/build.gradle.kts') }}
 
+      # proot built from Termux's source at the commit pinned in fetch_deps.sh.
+      - uses: actions/cache@v4
+        with:
+          path: build/proot-*
+          key: proot-${{ hashFiles('scripts/fetch_deps.sh') }}
+
       - run: bash scripts/fetch_deps.sh
 
       - run: flutter pub get
