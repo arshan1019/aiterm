@@ -104,13 +104,46 @@ class DistroManager extends ChangeNotifier {
     await File('$rootfs/etc/hosts')
         .writeAsString('127.0.0.1 localhost\n::1 localhost\n');
     await File(_marker).writeAsString(fileName);
+    await _provision();
 
     installed = true;
     notifyListeners();
   }
 
+  /// Helpers the app keeps in the guest. Rewritten on every launch so
+  /// existing installs pick up fixes with an app update.
+  Future<void> _provision() async {
+    await File('$rootfs/etc/profile.d/aiterm.sh').writeAsString(_profile);
+    final installer = File('$rootfs/usr/local/bin/install-claude');
+    await installer.parent.create(recursive: true);
+    await installer.writeAsString(_installClaude);
+    await Process.run('/system/bin/chmod', ['755', installer.path]);
+  }
+
+  // ~/.local/bin first so the native Claude Code wins over npm's wrapper.
+  static const _profile = r'''
+export PATH="$HOME/.local/bin:$PATH"
+command -v rg >/dev/null 2>&1 && export USE_BUILTIN_RIPGREP=0
+''';
+
+  // npm's @anthropic-ai/claude-code is a wrapper whose real binary is an
+  // optional dependency; npm silently skips it when that download fails.
+  // The native installer has a musl build that runs under proot.
+  static const _installClaude = r'''#!/bin/sh
+set -e
+echo "Installing dependencies..."
+apk add --no-cache bash curl libgcc libstdc++ ripgrep
+echo "Installing Claude Code..."
+curl -fsSL https://claude.ai/install.sh | bash
+# Drop a broken npm copy so it can't shadow the native one.
+npm uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || true
+echo
+echo "Done. Run: claude"
+''';
+
   Future<SessionSpec> sessionSpec() async {
     await init();
+    if (installed) await _provision();
     // proot links against libtalloc.so.2, but jniLibs must be named lib*.so.
     // nativeLibDir moves on every app update, so rebuild the link each time.
     final libDir = Directory('$filesDir/lib');

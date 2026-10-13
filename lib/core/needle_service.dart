@@ -247,7 +247,8 @@ class NeedleService {
         if (!alpine) return null;
         return needs('url', 'wget ${_q(arg('url'))}', 'wget ');
       case 'start_claude':
-        return cmd('command -v claude >/dev/null || npm i -g @anthropic-ai/claude-code; claude');
+        if (!alpine) return null;
+        return cmd('[ -x ~/.local/bin/claude ] || install-claude && claude');
       case 'set_font_size':
         final bigger = arg('change') != 'smaller';
         return app(bigger ? 'Make the text bigger' : 'Make the text smaller');
