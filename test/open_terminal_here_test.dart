@@ -43,4 +43,17 @@ void main() {
     expect(t.title, 'app'); // named after the folder
     tabs.dispose();
   });
+
+  test('shells advertise a 256-colour, truecolour terminal', () async {
+    final linux = env();
+    await linux.load();
+    linux.useAndroidShell();
+    final spec = await linux.sessionSpec();
+    expect(spec.env['TERM'], 'xterm-256color');
+    expect(spec.env['COLORTERM'], 'truecolor');
+    // Alpine sessions pass the same through `env -i` (see _prootSpec).
+    final source = File('lib/linux/linux_environment.dart').readAsStringSync();
+    expect(source, contains("'TERM=xterm-256color'"));
+    expect(source, contains("'COLORTERM=truecolor'"));
+  });
 }

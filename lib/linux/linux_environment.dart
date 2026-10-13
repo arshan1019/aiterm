@@ -101,7 +101,7 @@ class LinuxEnvironment extends ChangeNotifier {
 
   SessionSpec _androidSpec(String? cwd) => SessionSpec(
         const ['/system/bin/sh', '-l'],
-        {'HOME': androidHome, 'TERM': 'xterm-256color', 'PATH': '/system/bin:/system/xbin'},
+        {'HOME': androidHome, 'TERM': 'xterm-256color', 'COLORTERM': 'truecolor', 'PATH': '/system/bin:/system/xbin'},
         cwd != null && Directory(cwd).existsSync() ? cwd : androidHome,
       );
 

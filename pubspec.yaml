@@ -34,7 +34,9 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  xterm: ^4.0.0
+  # Vendored with parser fixes; see third_party/xterm/PATCHES.md.
+  xterm:
+    path: third_party/xterm
   http: ^1.6.0
   crypto: ^3.0.7
   webview_flutter: ^4.14.1

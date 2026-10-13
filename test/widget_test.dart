@@ -258,4 +258,29 @@ void main() {
     expect(services.tabs.active.cwd, '/root/proj');
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
+
+  testWidgets('switching tabs or screens does not pop the keyboard up', (tester) async {
+    await boot(tester);
+    await tester.tap(find.text('Use Android shell instead'));
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isFalse, reason: 'not on first show');
+
+    await tester.tap(find.byTooltip('New tab'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('shell'));
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isFalse, reason: 'not on tab switch');
+
+    await tester.tap(find.text('files'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('terminal'));
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isFalse, reason: 'not when returning to the terminal');
+
+    // Tapping the terminal is how the keyboard opens.
+    await tester.tap(find.byWidgetPredicate((w) => w.runtimeType.toString() == 'TerminalView').first);
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isTrue);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
 }

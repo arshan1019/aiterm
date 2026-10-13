@@ -48,8 +48,11 @@ class _TerminalPaneState extends State<TerminalPane> {
   @override
   void didUpdateWidget(TerminalPane old) {
     super.didUpdateWidget(old);
-    // Hidden tabs stay mounted; hand the keyboard to the one now showing.
-    if (widget.visible && !old.visible) _focus.requestFocus();
+    // Hidden tabs stay mounted. Hand the keyboard over only if it's already
+    // open; switching tabs must never pop it up (tapping the terminal does).
+    if (widget.visible && !old.visible && MediaQuery.viewInsetsOf(context).bottom > 0) {
+      _focus.requestFocus();
+    }
   }
 
   @override
@@ -135,7 +138,6 @@ class _TerminalPaneState extends State<TerminalPane> {
                     key: _viewKey,
                     controller: _session.selection,
                     focusNode: _focus,
-                    autofocus: widget.visible,
                     backgroundOpacity: 0,
                     theme: _themeFor(c),
                     textStyle: _styleFor(settings.fontSize),
