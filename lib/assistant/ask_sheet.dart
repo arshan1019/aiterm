@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../app/services.dart';
 import '../app/theme.dart';
 import 'commands.dart';
@@ -141,10 +142,18 @@ class _AskSheetState extends State<AskSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('What do you want to do?',
-                    style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(
+                  'What do you want to do?',
+                  style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 12),
-                Row(children: [Expanded(child: _field(c)), const SizedBox(width: 8), _micButton(c)]),
+                Row(
+                  children: [
+                    Expanded(child: _field(c)),
+                    const SizedBox(width: 8),
+                    _micButton(c),
+                  ],
+                ),
                 if (_downloading case final m?) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -159,7 +168,10 @@ class _AskSheetState extends State<AskSheet> {
                 ],
                 if (_mic == _Mic.recording) ...[
                   const SizedBox(height: 10),
-                  Text("Listening… tap the mic again when you're done.", style: TextStyle(color: c.accent, fontSize: 12)),
+                  Text(
+                    "Listening… tap the mic again when you're done.",
+                    style: TextStyle(color: c.accent, fontSize: 12),
+                  ),
                 ],
                 if (_results case final results?) ...[
                   const SizedBox(height: 12),
@@ -183,28 +195,28 @@ class _AskSheetState extends State<AskSheet> {
   }
 
   Widget _field(AppColors c) => TextField(
-        controller: _input,
-        autofocus: true,
-        textInputAction: TextInputAction.go,
-        onSubmitted: (_) => _ask(),
-        decoration: InputDecoration(
-          hintText: 'e.g. install node, make a folder called app',
-          suffixIcon: AnimatedSwitcher(
-            duration: Motion.quick,
-            child: _thinking
-                ? const Padding(
-                    key: ValueKey('busy'),
-                    padding: EdgeInsets.all(14),
-                    child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                  )
-                : IconButton(
-                    key: const ValueKey('send'),
-                    icon: Icon(Icons.arrow_upward_rounded, color: c.accent),
-                    onPressed: _ask,
-                  ),
-          ),
-        ),
-      );
+    controller: _input,
+    autofocus: true,
+    textInputAction: TextInputAction.go,
+    onSubmitted: (_) => _ask(),
+    decoration: InputDecoration(
+      hintText: 'e.g. install node, make a folder called app',
+      suffixIcon: AnimatedSwitcher(
+        duration: Motion.quick,
+        child: _thinking
+            ? const Padding(
+                key: ValueKey('busy'),
+                padding: EdgeInsets.all(14),
+                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            : IconButton(
+                key: const ValueKey('send'),
+                icon: Icon(Icons.arrow_upward_rounded, color: c.accent),
+                onPressed: _ask,
+              ),
+      ),
+    ),
+  );
 
   Widget _micButton(AppColors c) {
     final recording = _mic == _Mic.recording;
@@ -238,43 +250,45 @@ class _AskSheetState extends State<AskSheet> {
   }
 
   Widget _modelPrompt(AppColors c) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'That needs the assistant model, a one-time ${Needle.textModel.sizeMb} MB download '
-            'that runs offline on your phone.',
-            style: TextStyle(color: c.textMuted, height: 1.4),
-          ),
-          const SizedBox(height: 10),
-          FilledButton(
-            onPressed: _downloading == null ? () => _download(Needle.textModel, then: _ask) : null,
-            child: const Text('Download and retry'),
-          ),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'That needs the assistant model, a one-time ${Needle.textModel.sizeMb} MB download '
+        'that runs offline on your phone.',
+        style: TextStyle(color: c.textMuted, height: 1.4),
+      ),
+      const SizedBox(height: 10),
+      FilledButton(
+        onPressed: _downloading == null ? () => _download(Needle.textModel, then: _ask) : null,
+        child: const Text('Download and retry'),
+      ),
+    ],
+  );
 
   Widget _tile(AppColors c, Suggestion s) {
     final isApp = s.appAction != null;
     final hint = isApp
         ? 'Changes the app'
         : s.needsInput
-            ? 'Inserted without Enter. Finish it, e.g. type the name'
-            : s.source == SuggestionSource.rules
-                ? 'Exact match'
-                : 'Suggested. Check it before pressing Enter';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
+        ? 'Inserted without Enter. Finish it, e.g. type the name'
+        : s.source == SuggestionSource.rules
+        ? 'Exact match'
+        : 'Suggested. Check it before pressing Enter';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
         color: c.surfaceAlt,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: c.border),
-      ),
-      child: ListTile(
-        title: Text(isApp || !s.needsInput ? s.label : '${s.label}…',
-            style: TextStyle(color: c.text, fontSize: 13)),
-        subtitle: Text(hint, style: TextStyle(color: c.textMuted, fontSize: 12)),
-        trailing: TextButton(onPressed: () => _choose(s), child: Text(isApp ? 'Do it' : 'Insert')),
-        onTap: () => _choose(s),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: c.border),
+        ),
+        child: ListTile(
+          title: Text(isApp || !s.needsInput ? s.label : '${s.label}…', style: TextStyle(color: c.text, fontSize: 13)),
+          subtitle: Text(hint, style: TextStyle(color: c.textMuted, fontSize: 12)),
+          trailing: TextButton(onPressed: () => _choose(s), child: Text(isApp ? 'Do it' : 'Insert')),
+          onTap: () => _choose(s),
+        ),
       ),
     );
   }

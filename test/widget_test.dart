@@ -103,11 +103,12 @@ void main() {
     final session = services.tabs.active;
 
     // Tap a URL: the whole URL is selected and the toolbar offers Open.
-    session.terminal.write('see https://example.com/some/long/path now\r\n');
+    // Row 6: clear of the notice that floats over the top rows.
+    session.terminal.write('\r\n' * 6 + 'see https://example.com/some/long/path now\r\n');
     await tester.pump();
     final term = tester.getRect(find.byWidgetPredicate((w) => w.runtimeType.toString() == 'TerminalView'));
     // Test font: square glyphs of the font size (14), line height 1.25.
-    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 14 * 1.25 / 2));
+    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 4 + 14 * 1.25 * 6.5));
     await tester.pumpAndSettle();
     expect(find.text('Open'), findsOneWidget);
 
@@ -119,13 +120,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // Show the toolbar again, then close the tab underneath it.
-    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 14 * 1.25 / 2));
+    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 4 + 14 * 1.25 * 6.5));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('New tab'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('shell'));
     await tester.pumpAndSettle();
-    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 14 * 1.25 / 2));
+    await tester.tapAt(Offset(term.left + 14 * 10 + 7, term.top + 4 + 14 * 1.25 * 6.5));
     await tester.pumpAndSettle();
     services.tabs.close(session);
     await tester.pumpAndSettle();
