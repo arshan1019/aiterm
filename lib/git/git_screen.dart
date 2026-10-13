@@ -374,12 +374,13 @@ class _RepoViewState extends State<_RepoView> {
         final staged = s.staged, unstaged = s.unstaged;
         return Column(
           children: [
+            // Only mounted while busy: an indeterminate bar animates (and
+            // costs frames) even when transparent.
             SizedBox(
               height: 2,
-              child: AnimatedOpacity(
-                opacity: repo.busy ? 1 : 0,
+              child: AnimatedSwitcher(
                 duration: Motion.quick,
-                child: const LinearProgressIndicator(minHeight: 2),
+                child: repo.busy ? const LinearProgressIndicator(minHeight: 2) : const SizedBox.shrink(),
               ),
             ),
             _RepoBar(repo: repo, status: s, onSync: _sync),
