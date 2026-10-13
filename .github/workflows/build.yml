@@ -3,6 +3,12 @@ name: Build debug APK
 on:
   push:
     branches: [main]
+    paths:
+      - "lib/**"
+      - "android/**"
+      - "assets/**"
+      - "pubspec.*"
+      - "scripts/**"
   workflow_dispatch:
 
 permissions:

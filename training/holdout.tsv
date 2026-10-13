@@ -1,0 +1,75 @@
+# held-out phrasings: never used as training templates
+put node on here	install_package	name=node
+i want python installed	install_package	name=python
+install yarn please	install_package	name=yarn
+grab htop for me	install_package	name=htop
+could you set up rust	install_package	name=rust
+install neovim	install_package	name=neovim
+need ffmpeg	install_package	name=ffmpeg
+take off nano	remove_package	name=nano
+delete the curl package	remove_package	name=curl
+make everything up to date	update_packages	
+upgrade my packages	update_packages	
+refresh all installed software	update_packages	
+make a folder for my notes called notes	create_folder	name=notes
+new directory backend	create_folder	name=backend
+i want a folder named photos	create_folder	name=photos
+create an empty file todo.md	create_file	name=todo.md
+start a new file app.py	create_file	name=app.py
+trash old.zip	delete_file	name=old.zip
+remove log.txt	delete_file	name=log.txt
+change the name of draft.md to final.md	move_file	destination=final.md,source=draft.md
+put report.pdf in Documents	move_file	destination=Documents,source=report.pdf
+make a copy of index.html called index2.html	copy_file	destination=index2.html,source=index.html
+back up settings.json to settings.bak	copy_file	destination=settings.bak,source=settings.json
+let me see todo.md	show_file	name=todo.md
+open readme.txt	show_file	name=readme.txt
+modify server.js	edit_file	name=server.js
+i want to edit config.toml	edit_file	name=config.toml
+show everything in here	list_files	
+what files are here	list_files	
+list the src folder	list_files	path=src
+switch to the projects folder	change_directory	path=projects
+take me to Documents	change_directory	path=Documents
+back up a level	change_directory	path=..
+which directory is this	current_folder	
+locate all markdown files	find_files	type=m
+any jpg files around	find_files	type=jpg
+find where useState is used	search_text	query=useState
+search the code for api_key	search_text	query=api_key
+how full is my disk	free_space	
+check free storage	free_space	
+which folders are the largest	find_big_files	
+what's using all my space	find_big_files	
+list running processes	show_processes	
+what apps are running right now	show_processes	
+end the node process	kill_process	name=node
+terminate python	kill_process	name=python
+did anything change in git	git_status	
+is my repo clean	git_status	
+commit my work with the message added login page	git_commit	message=login
+save changes with message update readme	git_commit	message=readme
+send my commits to github	git_push	
+publish my changes	git_push	
+get the repo https://github.com/vercel/next.js	git_clone	url=vercel
+clone this project github.com/sindresorhus/got	git_clone	url=sindresorhus
+fire up the development server	run_script	script=dev
+execute the test suite	run_script	script=test
+compile the app	run_script	script=build
+set up the project dependencies	install_dependencies	
+fetch https://example.com/data.csv	download_file	url=example.com
+save this file https://x.io/a.png	download_file	url=x.io
+launch claude	start_claude	
+i want help from the coding ai	start_claude	
+play some music	NONE	
+what time is it	NONE	
+order a pizza	NONE	
+remove everything on my phone	NONE	
+the letters are too small	set_font_size	change=bigger
+shrink the text a bit	set_font_size	change=smaller
+it's too bright at night	set_theme	theme=dark
+use the white theme	set_theme	theme=light
+take me to the app preferences	open_tab	tab=settings
+i want to browse my files	open_tab	tab=files
+my shell froze	restart_shell	
+open Documents in the file manager	show_in_files	path=Documents

@@ -1,0 +1,111 @@
+# prompt	expected tool (NONE = no call)	arg=substring checks (optional, comma separated)
+install node	install_package	name=node
+install npm	install_package	name=npm
+install python	install_package	name=python
+get me python	install_package	name=python
+i need git	install_package	name=git
+add ripgrep	install_package	name=ripgrep
+install curl and wget	install_package	name=curl
+can you install gcc	install_package	name=gcc
+setup nodejs	install_package	name=node
+download and install vim	install_package	name=vim
+install the go compiler	install_package	name=go
+uninstall python	remove_package	name=python
+remove vim	remove_package	name=vim
+get rid of the nodejs package	remove_package	name=node
+update everything	update_packages
+upgrade all packages	update_packages
+update my system	update_packages
+find all python files	find_files	type=py
+where are my pdfs	find_files	type=pdf
+find files named config	find_files
+search for images	find_files	type=im
+find every .js file in src	find_files	type=js
+look for a file called notes	find_files
+search for TODO in my code	search_text	query=TODO
+grep for password	search_text	query=password
+which files mention express	search_text	query=express
+list all files	list_files
+list files	list_files
+show files	list_files
+what's in this folder	list_files
+ls	list_files
+show hidden files	list_files
+what is in the Download folder	list_files	path=Download
+go to Download	change_directory	path=Download
+cd into src	change_directory	path=src
+go up one folder	change_directory	path=..
+go home	change_directory	path=~
+where am i	current_folder
+what folder am i in	current_folder
+show current directory	current_folder
+what is taking up space	find_big_files
+show me the biggest files	find_big_files
+what's eating my storage	find_big_files
+how much space is left	free_space
+how much disk space do i have	free_space
+is my storage full	free_space
+create a folder	create_folder
+create a folder called projects	create_folder	name=projects
+make a directory named app	create_folder	name=app
+mkdir test	create_folder	name=test
+new folder src	create_folder	name=src
+make a new file notes.txt	create_file	name=notes.txt
+create file index.js	create_file	name=index.js
+touch readme.md	create_file	name=readme.md
+create a file	create_file
+delete old.log	delete_file	name=old.log
+remove the build folder	delete_file	name=build
+rm temp.txt	delete_file	name=temp.txt
+rename a.txt to b.txt	move_file	source=a.txt,destination=b.txt
+move photo.jpg into Pictures	move_file	source=photo.jpg,destination=Pictures
+copy config.json to backup.json	copy_file	source=config.json,destination=backup.json
+duplicate main.py as old.py	copy_file	source=main.py,destination=old.py
+show me readme.md	show_file	name=readme.md
+print package.json	show_file	name=package.json
+cat notes.txt	show_file	name=notes.txt
+what does config.yaml say	show_file	name=config.yaml
+edit main.py	edit_file	name=main.py
+open notes.txt in an editor	edit_file	name=notes.txt
+change the contents of app.js	edit_file	name=app.js
+download https://example.com/a.zip	download_file	url=example.com
+wget https://x.org/file.tar.gz	download_file	url=x.org
+what is running	show_processes
+show running processes	show_processes
+what programs are using cpu	show_processes
+stop node	kill_process	name=node
+kill python	kill_process	name=python
+close the server process called vite	kill_process	name=vite
+git status	git_status
+what changed	git_status
+show my changes	git_status
+commit everything with message fix login bug	git_commit	message=login
+commit with message wip	git_commit	message=wip
+save my work to git as initial commit	git_commit	message=initial
+push my changes	git_push
+push to github	git_push
+upload my commits	git_push
+clone https://github.com/arshan1019/aiterm	git_clone	url=aiterm
+download the repo github.com/foo/bar	git_clone	url=foo/bar
+start the dev server	run_script	script=dev
+run the tests	run_script	script=test
+build the project	run_script	script=build
+npm start	run_script	script=start
+install dependencies	install_dependencies
+npm install	install_dependencies
+install the project's packages	install_dependencies
+open claude	start_claude
+start claude code	start_claude
+i want to use the ai assistant	start_claude
+whats the weather	NONE
+tell me a joke	NONE
+delete everything	NONE
+send an email to bob	NONE
+make the text bigger	set_font_size	change=bigger
+zoom out	set_font_size	change=smaller
+dark mode	set_theme	theme=dark
+switch to light theme	set_theme	theme=light
+open settings	open_tab	tab=settings
+open the files tab	open_tab	tab=files
+restart the terminal	restart_shell	
+show src in the file browser	show_in_files	path=src
