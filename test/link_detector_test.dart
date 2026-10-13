@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aiterm/core/link_detector.dart';
+import 'package:aiterm/terminal/link_detector.dart';
 
 class Rows implements RowSource {
   final List<String> rows;

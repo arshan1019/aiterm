@@ -1,11 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aiterm/core/needle_service.dart';
-import 'package:aiterm/core/tool_call.dart';
+import 'package:aiterm/assistant/commands.dart';
+import 'package:aiterm/assistant/tool_call.dart';
 
 void main() {
-  final n = NeedleService.instance;
   Suggestion? s(String tool, [Map<String, String> args = const {}, bool alpine = true]) =>
-      n.fromCall(ToolCall(tool, args), alpine: alpine, source: 'model');
+      suggestionFor(ToolCall(tool, args), alpine: alpine, source: SuggestionSource.model);
   String? cmd(String tool, [Map<String, String> args = const {}, bool alpine = true]) =>
       s(tool, args, alpine)?.command;
 

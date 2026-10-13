@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aiterm/core/key_mapping.dart';
+import 'package:aiterm/terminal/key_mapping.dart';
 
 void main() {
   int? ctrl(String ch) => ctrlCode(ch.codeUnitAt(0));

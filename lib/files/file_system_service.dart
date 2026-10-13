@@ -18,10 +18,10 @@ class FsEntry {
   });
 }
 
-/// Thin wrapper around dart:io for the file explorer. Rooted at whatever
-/// [rootPath] the caller picks (the app's sandbox dir today; the Linux
-/// rootfs home directory once the distro backend lands).
+/// Thin wrapper around dart:io for the Files tab.
 class FileSystemService {
+  Future<bool> isDirectory(String path) => Directory(path).exists();
+
   Future<List<FsEntry>> list(String path) async {
     final dir = Directory(path);
     if (!await dir.exists()) return [];

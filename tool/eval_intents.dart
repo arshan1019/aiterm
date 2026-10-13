@@ -4,7 +4,7 @@
 //   dart run tool/eval_intents.dart <cases.tsv> <port> [--rules-only]
 import 'dart:convert';
 import 'dart:io';
-import 'package:aiterm/core/tool_call.dart';
+import 'package:aiterm/assistant/tool_call.dart';
 
 Future<void> main(List<String> argv) async {
   final cases = File(argv[0])

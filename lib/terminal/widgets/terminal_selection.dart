@@ -2,7 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart';
-import '../core/link_detector.dart';
+import '../../app/theme.dart';
+import '../link_detector.dart';
 
 /// Selection behaviour for the terminal, built on xterm's selection:
 ///
@@ -50,6 +51,7 @@ class _TerminalSelectionState extends State<TerminalSelection> {
   DateTime _downTime = DateTime.now();
   bool _moved = false;
   bool _adjusting = false;
+  int _shown = 0; // restarts the fade-in each time the toolbar appears
 
   @override
   void initState() {
@@ -127,6 +129,7 @@ class _TerminalSelectionState extends State<TerminalSelection> {
 
   void _show() {
     if (!mounted) return;
+    if (!_menu.isShowing) _shown++;
     setState(() {});
     _menu.show();
   }
@@ -215,7 +218,7 @@ class _TerminalSelectionState extends State<TerminalSelection> {
     final anchors = _anchors();
     if (anchors == null) return const SizedBox.shrink();
     final hasSelection = widget.controller.selection != null && _pasteAt == null;
-    return AdaptiveTextSelectionToolbar.buttonItems(
+    final toolbar = AdaptiveTextSelectionToolbar.buttonItems(
       anchors: anchors,
       buttonItems: [
         if (_link != null) ContextMenuButtonItem(label: 'Open', onPressed: _open),
@@ -227,6 +230,14 @@ class _TerminalSelectionState extends State<TerminalSelection> {
           ),
         ContextMenuButtonItem(type: ContextMenuButtonType.paste, onPressed: _paste),
       ],
+    );
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(_shown),
+      tween: Tween(begin: 0, end: 1),
+      duration: Motion.quick,
+      curve: Motion.enter,
+      builder: (context, t, child) => Opacity(opacity: t, child: child),
+      child: toolbar,
     );
   }
 

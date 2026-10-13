@@ -1,29 +1,21 @@
 import 'package:flutter/material.dart';
-import 'app_theme.dart';
-import 'core/app_controller.dart';
-import 'screens/home_shell.dart';
+import 'app/app.dart';
+import 'app/services.dart';
 
-void main() {
-  runApp(const AiTermApp());
-}
-
-class AiTermApp extends StatelessWidget {
-  const AiTermApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = AppController.instance;
-    return ListenableBuilder(
-      listenable: app,
-      builder: (context, _) {
-        final colors = app.isDark ? AppColors.dark : AppColors.light;
-        return MaterialApp(
-          title: 'aiterm',
-          debugShowCheckedModeBanner: false,
-          theme: AiTermTheme.build(colors, app.isDark ? Brightness.dark : Brightness.light),
-          home: HomeShell(colors: colors, isDark: app.isDark, onThemeChanged: app.setDark),
-        );
-      },
-    );
-  }
+/// Map of the code (each folder is one feature):
+///
+///   app/        bootstrap, theme + motion tokens, navigation, home shell
+///   platform/   method/event channels to the Android side
+///   linux/      Alpine under proot (set up like Termux's proot-distro)
+///   terminal/   sessions and tabs (models), terminal widgets
+///   files/      file browser model and screens
+///   assistant/  rules + Needle model, command templates, error fixes
+///   settings/   persisted preferences and their screen
+///   shared/     small reusable widgets and helpers
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Settings and paths load before the first frame (the native splash is
+  // still up), so the app opens in the right theme with nothing popping in.
+  final services = await AppServices.load();
+  runApp(AiTermApp(services: services));
 }

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aiterm/core/error_fixes.dart';
+import 'package:aiterm/assistant/error_fixes.dart';
 
 void main() {
   String? fix(String out, {bool alpine = true}) => detectFix(out, alpine: alpine)?.command;
