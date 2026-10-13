@@ -209,6 +209,8 @@ The single most important action per screen, and what is demoted.
 
 In order of impact; each step ships with tests (unit for models, widget on CI).
 
+**Status (2026-10-14):** steps 1–6 are built (commit 2ecd4dd). Not done yet: a "View on GitHub" link after a push, and a live preview dot on each project card (preview shows on the Projects home instead, because ports aren't tied to a project).
+
 1. **Keep-alive at the right time (F1).** A "Keep agents running" card set in onboarding; a tab notice when a session dies by signal 9 that deep-links to the step. *Files:* `keep_alive/`, `terminal_pane.dart`, new `onboarding/`.
 2. **Onboarding pipeline (F2, F3, F4).** `SetupPipeline` model: ordered steps (Linux → tools → agents), per-step status, resumable retry; agent picker; ends in "Create your first project". `SetupView` becomes the pipeline screen; Android shell moves to Settings → Advanced. *Tests:* pipeline order, retry keeps finished steps, failure isolation.
 3. **Sessions belong to projects (F6, F7, F9).** `TerminalSession.projectPath` + `agentId` (persisted with tabs); `AgentInstaller.open` resumes a live session for the same project+agent; opening an agent in any folder records it as a recent project. Tab strip shows a project chip linking back. *Tests:* resume vs new tab, persistence round-trip.
