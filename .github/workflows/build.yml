@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -34,7 +37,14 @@ jobs:
       # of all of them is what keeps this fast.
       - run: flutter build apk --debug --target-platform android-arm64
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: aiterm-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+      - name: Publish debug release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv build/app/outputs/flutter-apk/app-debug.apk aiterm-debug.apk
+          gh release delete debug-latest --yes || true
+          git push origin :refs/tags/debug-latest || true
+          gh release create debug-latest aiterm-debug.apk \
+            --title "aiterm debug build" \
+            --notes "Auto-built from commit ${{ github.sha }}" \
+            --prerelease
