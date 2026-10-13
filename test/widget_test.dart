@@ -290,11 +290,14 @@ void main() {
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
-  testWidgets('home is AI agents: Linux setup first, then one-tap installs', (tester) async {
+  testWidgets('home is AI agents; first launch sets up Linux there', (tester) async {
     await boot(tester, home: true);
     expect(find.text('agents'), findsOneWidget);
     expect(find.text('Install Alpine'), findsOneWidget); // first launch sets up Linux here
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
 
+  testWidgets('with Linux set up, home lists the agents to install', (tester) async {
     File('${dir.path}/alpine/.aiterm-installed')
       ..createSync(recursive: true)
       ..writeAsStringSync('x');
