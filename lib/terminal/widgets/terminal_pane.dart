@@ -112,13 +112,12 @@ class _TerminalPaneState extends State<TerminalPane> {
                 visible: widget.visible,
                 onPaste: _session.paste,
                 onOpenUrl: _openUrl,
-                builder: (onTapUp) => ListenableBuilder(
+                child: ListenableBuilder(
                   listenable: settings,
                   builder: (context, _) => TerminalView(
                     _session.terminal,
                     key: _viewKey,
                     controller: _session.selection,
-                    onTapUp: onTapUp,
                     focusNode: _focus,
                     autofocus: widget.visible,
                     backgroundOpacity: 0,

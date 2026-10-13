@@ -24,7 +24,7 @@ class TerminalSelection extends StatefulWidget {
 
   /// False while the terminal is in a background tab or another screen.
   final bool visible;
-  final Widget Function(void Function(TapUpDetails, CellOffset) onTapUp) builder;
+  final Widget child;
 
   const TerminalSelection({
     super.key,
@@ -34,7 +34,7 @@ class TerminalSelection extends StatefulWidget {
     required this.onPaste,
     required this.onOpenUrl,
     required this.visible,
-    required this.builder,
+    required this.child,
   });
 
   @override
@@ -48,7 +48,7 @@ class _TerminalSelectionState extends State<TerminalSelection> {
 
   bool _touching = false;
   Offset _downAt = Offset.zero;
-  DateTime _downTime = DateTime.now();
+  Duration _downStamp = Duration.zero;
   bool _moved = false;
   bool _adjusting = false;
   int _shown = 0; // restarts the fade-in each time the toolbar appears
@@ -80,7 +80,14 @@ class _TerminalSelectionState extends State<TerminalSelection> {
 
   _BufferRows get _rows => _BufferRows(widget.terminal.buffer);
 
-  void _onTapUp(TapUpDetails details, CellOffset cell) {
+  /// A tap at [global]: if it's on a URL, select the whole URL.
+  ///
+  /// Taps are detected here rather than through TerminalView.onTapUp, which
+  /// xterm 4.0.0 never calls.
+  void _tapAt(Offset global) {
+    final render = widget.viewKey.currentState?.renderTerminal;
+    if (!mounted || render == null || !render.attached) return;
+    final cell = render.getCellOffset(render.globalToLocal(global));
     final link = linkAt(_rows, CellPos(cell.x, cell.y));
     if (link == null) return;
     HapticFeedback.selectionClick();
@@ -142,7 +149,7 @@ class _TerminalSelectionState extends State<TerminalSelection> {
     _touching = true;
     _moved = false;
     _downAt = e.position;
-    _downTime = DateTime.now();
+    _downStamp = e.timeStamp;
     _pasteAt = null;
     _hide();
   }
@@ -153,9 +160,17 @@ class _TerminalSelectionState extends State<TerminalSelection> {
 
   void _onPointerUp(PointerUpEvent e) {
     _touching = false;
+    final held = e.timeStamp - _downStamp;
+    if (!_moved && held < kLongPressTimeout) {
+      // After this event finishes dispatching: xterm handles the same tap
+      // (clearing any old selection) before we select the URL.
+      final at = e.position;
+      Future.microtask(() => _tapAt(at));
+      return;
+    }
     if (widget.controller.selection != null) {
       _show();
-    } else if (!_moved && DateTime.now().difference(_downTime) >= kLongPressTimeout) {
+    } else if (!_moved) {
       HapticFeedback.selectionClick();
       _pasteAt = e.position;
       _show();
@@ -253,7 +268,7 @@ class _TerminalSelectionState extends State<TerminalSelection> {
         onPointerMove: _onPointerMove,
         onPointerUp: _onPointerUp,
         onPointerCancel: (_) => _touching = false,
-        child: widget.builder(_onTapUp),
+        child: widget.child,
       ),
     );
   }
