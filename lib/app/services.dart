@@ -17,6 +17,7 @@ import '../git/pty_process.dart';
 import '../platform/pty.dart';
 import '../projects/project_service.dart';
 import '../projects/project_store.dart';
+import '../shared/format.dart';
 import '../terminal/terminal_session.dart';
 import '../preview/preview_controller.dart';
 import '../terminal/session_presence.dart';
@@ -64,8 +65,13 @@ class AppServices {
     linux.addListener(_refreshGit);
     _refreshGit();
     tabs.onSignal = (session, signal) {
+      final cwd = session.cwd;
+      if (cwd == null) return;
       // A command finished in a terminal: its repo may have changed.
-      if (signal is CommandSignal && session.cwd != null) git.touched(session.cwd!);
+      if (signal is CommandSignal) git.touched(cwd);
+      // An agent finished (exited, or asked for attention): offer a review.
+      final agent = agents.installed.where((a) => session.title.startsWith(a.name)).firstOrNull;
+      if (agent != null) _offerReview(session, agent.name, cwd).ignore();
     };
     ssh.load().ignore();
     if (linux.installed) preview.start().ignore();
@@ -87,6 +93,15 @@ class AppServices {
     gitTools.refresh().then((_) {
       if (gitTools.ready) github.refresh();
     }).ignore();
+  }
+
+  Future<void> _offerReview(TerminalSession session, String agent, String cwd) async {
+    if (!gitTools.ready) return;
+    final repo = await git.repoFor(cwd);
+    if (repo == null) return;
+    await repo.refresh();
+    final n = repo.status?.changes.length ?? 0;
+    session.review.value = n == 0 ? null : ReviewHint('${plural(n, 'file')} changed · $agent', repo.path);
   }
 
   void _refreshAgents() {
@@ -119,17 +134,17 @@ class AppServices {
   late final backup = BackupController(BackupChannel(), filesDir: paths.filesDir, appVersion: '1.0.0');
   late final KeepAliveController keepAlive;
 
-  // Projects and git (real git and GitHub's gh inside Linux).
-  late final git = GitRegistry(LinuxGitRunner(linux.runCommandLine));
-  late final gitTools = GitTools(run: linux.runScriptStreaming);
-  late final github = GitHubAuth(
-    startLogin: () => PtyProcess.start(linux, 'BROWSER=true exec gh auth login -h github.com -p https --web'),
+  // Projects and git (real git and GitHub's gh inside Linux). Not final so
+  // widget tests can swap in fakes before the first frame.
+  late GitRegistry git = GitRegistry(LinuxGitRunner(linux.runCommandLine));
+  late GitTools gitTools = GitTools(run: linux.runScriptStreaming);
+  late GitHubAuth github = GitHubAuth(
+    startLogin: () => PtyProcess.start(linux, 'BROWSER=true exec gh auth login -h github.com -p https --web -s admin:public_key'),
     run: (args, {stdin}) =>
         linux.runCommandLine('exec gh ${args.map(shellQuote).join(' ')}', env: gitEnvironment, stdin: stdin),
   );
   late final projects = ProjectStore('${paths.filesDir}/projects.json');
-  late final projectService =
-      ProjectService(store: projects, git: git.runner, hostPath: linux.hostPath);
+  ProjectService get projectService => ProjectService(store: projects, git: git.runner, hostPath: linux.hostPath);
 
   /// One-tap AI agents; "Open" starts one in its own terminal tab.
   late final agents = AgentInstaller(

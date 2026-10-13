@@ -15,6 +15,15 @@ enum SessionState { idle, starting, running, exited }
 typedef SpecFor = Future<SessionSpec> Function(String? cwd);
 
 /// Something in a session worth telling the user about.
+/// "Claude Code changed 4 files": shown over the tab, opens the changes.
+class ReviewHint {
+  const ReviewHint(this.title, this.folder);
+  final String title;
+
+  /// Repository root (guest path).
+  final String folder;
+}
+
 sealed class SessionSignal {
   const SessionSignal();
 }
@@ -108,6 +117,9 @@ class TerminalSession {
 
   /// A suggested fix for the newest error in the output, if recognised.
   final fix = ValueNotifier<ErrorFix?>(null);
+
+  /// Changes worth reviewing (an agent in this tab edited files).
+  final review = ValueNotifier<ReviewHint?>(null);
 
   /// Called when the tab's title or pin changes (the tab strip listens).
   VoidCallback? onMetaChanged;
@@ -391,6 +403,7 @@ class TerminalSession {
     modifiers.dispose();
     state.dispose();
     fix.dispose();
+    review.dispose();
   }
 }
 

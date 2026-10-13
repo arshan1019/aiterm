@@ -90,6 +90,31 @@ void main() {
       expect(auth.state, isA<SignInFailed>().having((s) => s.message, 'message', contains('github.com')));
     });
 
+    test('repositories are listed for cloning, newest first', () async {
+      final lister = GitHubAuth(
+        startLogin: () async => gh,
+        run: (args, {stdin}) async {
+          commands.add(args);
+          return const GitResult(0,
+              '[{"nameWithOwner":"octocat/old","description":"","isPrivate":false,"updatedAt":"2024-01-01T00:00:00Z"},'
+              '{"nameWithOwner":"octocat/new","description":"Fresh","isPrivate":true,"updatedAt":"2026-05-01T00:00:00Z"}]',
+              '');
+        },
+      );
+      final repos = await lister.repositories();
+      expect(repos.map((r) => r.fullName), ['octocat/new', 'octocat/old']);
+      expect(repos.first.private, isTrue);
+      expect(repos.first.description, 'Fresh');
+      expect(repos.last.description, isNull);
+      expect(repos.first.cloneUrl, 'https://github.com/octocat/new.git');
+      expect(commands.single.take(2), ['repo', 'list']);
+    });
+
+    test('publishing creates the GitHub repo from the folder and pushes', () async {
+      await auth.publish('/root/projects/my app', name: 'my-app', private: true);
+      expect(commands.last, ['repo', 'create', 'my-app', '--private', '--source', '/root/projects/my app', '--remote', 'origin', '--push']);
+    });
+
     test('refresh picks up an existing sign-in', () async {
       final signedIn = GitHubAuth(
         startLogin: () async => gh,

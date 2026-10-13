@@ -38,6 +38,24 @@ void main() {
     expect(await reg.rootFor(dir), dir);
   });
 
+  test('commit identity: none at first, then set globally', () async {
+    final reg = GitRegistry(git);
+    expect(await reg.identity(), isNull);
+    await reg.setIdentity('Mona Lisa', '42+octocat@users.noreply.github.com');
+    expect(await reg.identity(), ('Mona Lisa', '42+octocat@users.noreply.github.com'));
+  });
+
+  test('remotes are known after a refresh, and adding one updates them', () async {
+    final dir = '${tmp.path}/r';
+    Directory(dir).createSync();
+    await git.run(dir, ['init', '-q', '-b', 'main']);
+    final repo = (await GitRegistry(git).repoFor(dir))!;
+    await repo.refresh();
+    expect(repo.remotes, isEmpty);
+    await repo.addRemote('https://github.com/octocat/r.git');
+    expect(repo.remotes, ['origin']);
+  });
+
   test('the shell quoting used for Linux runs survives odd names', () {
     expect(shellQuote("it's a file"), "'it'\\''s a file'");
     expect(gitCommandLine('/root/my app', ['commit', '-m', "fix: user's \$HOME"]),

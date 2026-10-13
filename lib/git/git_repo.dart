@@ -86,6 +86,9 @@ class GitRepo extends ChangeNotifier {
   GitStatus? status;
   bool busy = false;
 
+  /// Remote names (e.g. origin); null until the first refresh.
+  List<String>? remotes;
+
   Future<void> _queue = Future.value();
   Timer? _debounce;
   bool _refreshing = false, _refreshAgain = false;
@@ -140,6 +143,7 @@ class GitRepo extends ChangeNotifier {
                 f[0], f[1], f[2], DateTime.fromMillisecondsSinceEpoch(int.parse(f[3]) * 1000)));
           }
         }
+        if (remotes == null) await _readRemotes();
         status = s;
         notifyListeners();
       } while (_refreshAgain);
@@ -147,6 +151,16 @@ class GitRepo extends ChangeNotifier {
       _refreshing = false;
     }
   }
+
+  Future<void> _readRemotes() async {
+    final r = await _run(['remote'], check: false);
+    remotes = r.ok ? r.stdout.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList() : [];
+  }
+
+  Future<void> addRemote(String url, {String name = 'origin'}) => _op(() async {
+        await _run(['remote', 'add', name, url]);
+        await _readRemotes();
+      });
 
   Future<void> stage(List<String> paths) => _op(() => _run(['add', '-A', '--', ...paths]));
 

@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/app/app.dart';
 import 'package:aiterm/app/services.dart';
+import 'package:aiterm/git/git_registry.dart';
+import 'package:aiterm/git/git_runner.dart';
+import 'package:aiterm/git/git_screen.dart';
+import 'package:aiterm/git/git_tools.dart';
 import 'package:aiterm/terminal/terminal_session.dart';
 import 'package:xterm/xterm.dart';
 
@@ -289,24 +294,113 @@ void main() {
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
-  testWidgets('home is AI agents; first launch sets up Linux there', (tester) async {
+  testWidgets('home is Projects; first launch sets up Linux there', (tester) async {
     await boot(tester, home: true);
-    expect(find.text('agents'), findsOneWidget);
+    expect(find.text('projects'), findsOneWidget);
     expect(find.text('Install Alpine'), findsOneWidget); // first launch sets up Linux here
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
-  testWidgets('with Linux set up, home lists the agents to install', (tester) async {
+  testWidgets('with Linux set up: empty projects, an agent prompt, the agents page, new project choices', (tester) async {
     File('${dir.path}/alpine/.aiterm-installed')
       ..createSync(recursive: true)
       ..writeAsStringSync('x');
     final services = await boot(tester, home: true);
-    expect(services.navigation.tab.name, 'agents');
+    expect(services.navigation.tab.name, 'projects');
+    expect(find.text('Start a project'), findsOneWidget);
+    expect(find.text('Set up an AI agent'), findsOneWidget);
+
+    await tester.tap(find.text('Agents'));
+    await tester.pumpAndSettle();
     for (final name in ['Claude Code', 'Gemini CLI', 'Codex CLI']) {
       expect(find.text(name), findsOneWidget);
     }
     expect(find.text('Install'), findsNWidgets(3));
     expect(find.textContaining('Sign in the first time'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    for (final way in ['Empty project', 'From a template', 'Clone a repository', 'Open a folder in Linux']) {
+      expect(find.text(way), findsOneWidget);
+    }
+    await tester.tap(find.text('From a template'));
+    await tester.pumpAndSettle();
+    expect(find.text('Node.js'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'Weather app');
+    await tester.pump();
+    expect(find.text('~/projects/weather-app'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
+  testWidgets('a project opens its workspace; changes are reviewed and committed', (tester) async {
+    Directory('${dir.path}/alpine/root/app').createSync(recursive: true);
+    File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    File('${dir.path}/projects.json').writeAsStringSync(
+        jsonEncode([{'id': '1', 'name': 'Weather app', 'path': '/root/app', 'created': now, 'opened': now}]));
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+
+    final services = (await tester.runAsync(AppServices.load))!;
+    final git = _FakeGit();
+    services.gitTools = GitTools(run: (script, onLine) async => 0);
+    await services.gitTools.refresh();
+    services.git = GitRegistry(git);
+    await tester.pumpWidget(AiTermApp(services: services));
+    await settleIo(tester);
+
+    expect(find.text('Weather app'), findsOneWidget);
+    expect(find.text('2 changes'), findsOneWidget); // on the card
+    await tester.tap(find.text('Weather app'));
+    await settleIo(tester);
+    expect(find.text('AGENTS'), findsOneWidget);
+    await tester.tap(find.text('2 changed files to review'));
+    await settleIo(tester);
+
+    expect(find.text('CHANGES · 2'), findsOneWidget);
+    expect(find.text('Publish'), findsOneWidget); // no remote yet
+    expect(find.text('README.md'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'First');
+    await tester.pump();
+    await tester.tap(find.text('Commit all'));
+    await settleIo(tester);
+    expect(git.calls, contains('add -A -- README.md notes.txt'));
+    expect(git.calls, contains('commit -q -m First'));
+
+    // Back in the workspace, Terminal opens a tab in the project.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Terminal'));
+    await tester.tap(find.text('Terminal'));
+    await settleIo(tester);
+    expect(services.navigation.tab.name, 'terminal');
+    expect(services.tabs.active.cwd, '/root/app');
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
+  testWidgets('a folder that is not a repo offers to start tracking it', (tester) async {
+    File('${dir.path}/alpine/.aiterm-installed')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('x');
+    final services = (await tester.runAsync(AppServices.load))!;
+    final git = _FakeGit()..repo = false;
+    services.gitTools = GitTools(run: (script, onLine) async => 0);
+    await services.gitTools.refresh();
+    services.git = GitRegistry(git);
+    await tester.pumpWidget(AiTermApp(services: services));
+    await tester.pumpAndSettle();
+    services.navigation.navigatorKey.currentState!
+        .push(MaterialPageRoute<void>(builder: (_) => const GitScreen(folder: '/root/plain')));
+    await settleIo(tester);
+    expect(find.text('Not tracked by git'), findsOneWidget);
+    git.repo = true;
+    await tester.tap(find.text('Start tracking'));
+    await settleIo(tester);
+    expect(git.calls, contains('init -q'));
+    expect(find.text('CHANGES · 2'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
@@ -352,4 +446,23 @@ void main() {
     expect(File('${dir.path}/alpine/root/proj/notes.txt').existsSync(), isTrue);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
+}
+
+/// git as the app sees it: a repo at /root/app with a modified and an
+/// untracked file, no remote. Records every command.
+class _FakeGit implements GitRunner {
+  final calls = <String>[];
+  bool repo = true;
+
+  @override
+  Future<GitResult> run(String folder, List<String> args, {String? stdin}) async {
+    calls.add(args.join(' '));
+    return switch (args.first) {
+      'rev-parse' => repo ? GitResult(0, '$folder\n', '') : const GitResult(128, '', 'fatal: not a git repository'),
+      'status' => const GitResult(
+          0, '# branch.oid abc\x00# branch.head main\x001 .M N... 100644 100644 100644 aaa bbb README.md\x00? notes.txt\x00', ''),
+      'log' => const GitResult(1, '', ''),
+      _ => const GitResult(0, '', ''),
+    };
+  }
 }

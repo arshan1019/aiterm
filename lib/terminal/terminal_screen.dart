@@ -5,6 +5,7 @@ import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../assistant/ask_sheet.dart';
+import '../git/git_screen.dart';
 import '../preview/preview_controller.dart';
 import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
@@ -94,6 +95,10 @@ class _WorkspaceState extends State<_Workspace> {
           () => tabs.togglePin(session),
         ),
         SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () => _rename(session)),
+        if (session.cwd case final cwd? when !_services.linux.usesAndroidShell)
+          SheetAction(Icons.call_split_rounded, 'Git changes here', () {
+            Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => GitScreen(folder: cwd)));
+          }),
         if (hasOthers) SheetAction(Icons.tab_unselected_rounded, 'Close other tabs', () => tabs.closeOthers(session)),
         if (!session.pinned) SheetAction(Icons.close_rounded, 'Close', () => tabs.close(session), danger: true),
       ],

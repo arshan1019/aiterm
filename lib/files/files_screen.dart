@@ -7,6 +7,8 @@ import '../app/services.dart';
 import '../app/theme.dart';
 import '../agents/agent_installer.dart';
 import '../platform/android_env.dart';
+import '../git/git_screen.dart';
+import '../projects/project_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/name_dialog.dart';
 import 'file_clipboard.dart';
@@ -74,6 +76,7 @@ class _FilesScreenState extends State<FilesScreen> {
     try {
       final done = await _clipboard.paste(_browser.current);
       await _browser.refresh();
+      _touched();
       messenger.showSnackBar(
         SnackBar(content: Text(done.length == 1 ? 'Pasted 1 item' : 'Pasted ${done.length} items')),
       );
@@ -121,6 +124,7 @@ class _FilesScreenState extends State<FilesScreen> {
   Future<void> _create(bool folder) async {
     final name = await _askName(folder ? 'New folder' : 'New file', 'Create');
     if (name != null) await _browser.create(name, folder: folder);
+    _touched();
   }
 
   /// A new terminal tab in [folder] (a host path; the current folder by
@@ -135,6 +139,23 @@ class _FilesScreenState extends State<FilesScreen> {
   /// installed AI agent's own tab.
   void _openInAgent(String id, [String? folder]) =>
       _services.agents.open(id, cwd: _services.linux.guestPath(folder ?? _browser.current));
+
+  /// Git changes for the repository [folder] (a host path) is in.
+  void _openGit([String? folder]) {
+    final guest = _services.linux.guestPath(folder ?? _browser.current);
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => GitScreen(folder: guest)));
+  }
+
+  /// Adds [folder] (a host path) to Projects and opens it.
+  Future<void> _openAsProject([String? folder]) async {
+    final project = await _services.projectService.openExisting(_services.linux.guestPath(folder ?? _browser.current));
+    if (mounted) await openProject(context, project);
+  }
+
+  /// Files changed: repos showing this folder refresh.
+  void _touched() => _services.git.touched(_services.linux.guestPath(_browser.current));
+
+  bool get _inLinux => _browser.location.kind == LocationKind.linux;
 
   Future<bool> _confirmDelete(FsEntry e) async =>
       await showDialog<bool>(
@@ -169,6 +190,10 @@ class _FilesScreenState extends State<FilesScreen> {
               () => _openInAgent(agent.id, e.path),
               accent: true,
             ),
+          if (_inLinux) ...[
+            SheetAction(Icons.folder_special_outlined, 'Open as project', () => _openAsProject(e.path)),
+            SheetAction(Icons.call_split_rounded, 'Git changes', () => _openGit(e.path)),
+          ],
           null,
         ],
         SheetAction(Icons.copy_rounded, 'Copy', () => _clipboard.copy([e])),
@@ -176,9 +201,11 @@ class _FilesScreenState extends State<FilesScreen> {
         SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () async {
           final name = await _askName('Rename', 'Rename', initial: e.name);
           if (name != null) await _browser.rename(e, name);
+          _touched();
         }),
         SheetAction(Icons.delete_outline_rounded, 'Delete', () async {
           if (await _confirmDelete(e)) await _browser.delete(e);
+          _touched();
         }, danger: true),
       ],
     );
@@ -198,6 +225,8 @@ class _FilesScreenState extends State<FilesScreen> {
               agents: _services.agents,
               onOpenTerminal: _openTerminalHere,
               onOpenAgent: _openInAgent,
+              onGit: _inLinux ? _openGit : null,
+              onProject: _inLinux ? _openAsProject : null,
             ),
             Expanded(
               child: _browser.location.kind == LocationKind.phone && !_phoneAccess
@@ -252,7 +281,17 @@ class _FilesScreenState extends State<FilesScreen> {
 }
 
 class _Header extends StatefulWidget {
-  const _Header({required this.browser, required this.agents, required this.onOpenTerminal, required this.onOpenAgent});
+  const _Header({
+    required this.browser,
+    required this.agents,
+    required this.onOpenTerminal,
+    required this.onOpenAgent,
+    this.onGit,
+    this.onProject,
+  });
+
+  /// Only in Linux storage (git doesn't work on the phone's storage).
+  final VoidCallback? onGit, onProject;
 
   final FilesBrowser browser;
   final VoidCallback onOpenTerminal;
@@ -335,6 +374,8 @@ class _HeaderState extends State<_Header> {
             onSelected: (v) => switch (v) {
               'terminal' => widget.onOpenTerminal(),
               final v when v.startsWith('agent:') => widget.onOpenAgent(v.substring(6)),
+              'git' => widget.onGit?.call(),
+              'project' => widget.onProject?.call(),
               'home' => b.open(b.root),
               'hidden' => b.toggleHidden(),
               _ => b.refresh(),
@@ -343,6 +384,8 @@ class _HeaderState extends State<_Header> {
               const PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
               for (final agent in widget.agents.installed)
                 PopupMenuItem(value: 'agent:${agent.id}', child: Text('Open in ${agent.name}')),
+              if (widget.onProject != null) const PopupMenuItem(value: 'project', child: Text('Open as project')),
+              if (widget.onGit != null) const PopupMenuItem(value: 'git', child: Text('Git changes')),
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'home', child: Text('Go home')),
               CheckedPopupMenuItem(value: 'hidden', checked: b.showHidden, child: const Text('Show hidden')),

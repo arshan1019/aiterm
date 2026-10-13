@@ -16,6 +16,7 @@ class AiTermApp extends StatelessWidget {
         listenable: services.settings,
         builder: (context, _) => MaterialApp(
           title: 'aiterm',
+          navigatorKey: services.navigation.navigatorKey,
           debugShowCheckedModeBanner: false,
           // MaterialApp animates between themes; AppColors interpolates, so
           // light/dark cross-fades.

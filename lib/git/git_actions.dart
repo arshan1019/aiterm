@@ -1,0 +1,360 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../app/services.dart';
+import '../app/theme.dart';
+import '../platform/android_env.dart';
+import 'git_repo.dart';
+import 'git_tools.dart';
+import 'github_auth.dart';
+
+/// The git flows every screen shares: one-time tool install, GitHub
+/// sign-in, commit identity, and git errors turned into a next step.
+
+/// Makes sure git, GitHub's CLI and ssh are in Linux (installing them the
+/// first time, with progress). True when ready.
+Future<bool> ensureGitTools(BuildContext context) async {
+  final tools = context.services.gitTools;
+  if (tools.status == ToolsStatus.unknown) await tools.refresh();
+  if (tools.ready) return true;
+  if (!context.mounted) return false;
+  return await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _ToolsDialog(tools: tools),
+      ) ??
+      false;
+}
+
+class _ToolsDialog extends StatefulWidget {
+  const _ToolsDialog({required this.tools});
+  final GitTools tools;
+
+  @override
+  State<_ToolsDialog> createState() => _ToolsDialogState();
+}
+
+class _ToolsDialogState extends State<_ToolsDialog> {
+  @override
+  void initState() {
+    super.initState();
+    _install();
+  }
+
+  Future<void> _install() async {
+    if (await widget.tools.ensure() && mounted) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: widget.tools,
+      builder: (context, _) {
+        final failed = widget.tools.status == ToolsStatus.failed;
+        return AlertDialog(
+          title: Text(failed ? 'Couldn\'t install git' : 'Setting up git', style: const TextStyle(fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                failed
+                    ? widget.tools.error ?? 'Check your connection and try again.'
+                    : 'Installing git and GitHub\'s CLI in Linux. This happens once.',
+                style: TextStyle(color: failed ? c.danger : c.textMuted, fontSize: 13, height: 1.4),
+              ),
+              if (!failed) ...[
+                const SizedBox(height: 16),
+                const LinearProgressIndicator(minHeight: 3),
+              ],
+            ],
+          ),
+          actions: failed
+              ? [
+                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+                  TextButton(onPressed: _install, child: const Text('Retry')),
+                ]
+              : null,
+        );
+      },
+    );
+  }
+}
+
+/// Signs in to GitHub with the device code flow. True when signed in.
+/// The first sign-in also sets the commit identity if there is none.
+Future<bool> signInToGitHub(BuildContext context) async {
+  final s = context.services;
+  if (s.github.user != null) return true;
+  if (!await ensureGitTools(context) || !context.mounted) return false;
+  final ok = await showModalBottomSheet<bool>(
+        context: context,
+        isDismissible: false,
+        enableDrag: false,
+        builder: (_) => _SignInSheet(auth: s.github),
+      ) ??
+      false;
+  final user = s.github.user;
+  if (ok && user != null && await s.git.identity() == null) {
+    final (name, email) = identityFor(user);
+    await s.git.setIdentity(name, email);
+  }
+  return ok;
+}
+
+class _SignInSheet extends StatefulWidget {
+  const _SignInSheet({required this.auth});
+  final GitHubAuth auth;
+
+  @override
+  State<_SignInSheet> createState() => _SignInSheetState();
+}
+
+class _SignInSheetState extends State<_SignInSheet> {
+  @override
+  void initState() {
+    super.initState();
+    widget.auth.addListener(_changed);
+    widget.auth.signIn();
+  }
+
+  @override
+  void dispose() {
+    widget.auth.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (widget.auth.state is SignedIn && mounted) Navigator.pop(context, true);
+  }
+
+  void _cancel() {
+    widget.auth.cancel();
+    Navigator.pop(context, false);
+  }
+
+  Future<void> _copyAndOpen(AwaitingCode s) async {
+    await Clipboard.setData(ClipboardData(text: s.code));
+    try {
+      await AndroidEnv.openUrl(s.url);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: widget.auth,
+      builder: (context, _) {
+        final state = widget.auth.state;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
+            child: AnimatedSize(
+              duration: Motion.standard,
+              curve: Motion.move,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Sign in to GitHub', style: TextStyle(color: c.text, fontSize: 17, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  ...switch (state) {
+                    AwaitingCode() => [
+                        Text('Copy this code, then paste it on the GitHub page that opens.',
+                            style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4)),
+                        const SizedBox(height: 18),
+                        SelectableText(
+                          state.code,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: c.text, fontSize: 30, fontWeight: FontWeight.w600, letterSpacing: 4),
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton.icon(
+                          onPressed: () => _copyAndOpen(state),
+                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          label: const Text('Copy code & open GitHub'),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5)),
+                            const SizedBox(width: 8),
+                            Text('Waiting for GitHub…', style: TextStyle(color: c.textMuted, fontSize: 12)),
+                          ],
+                        ),
+                      ],
+                    SignInFailed(:final message) => [
+                        Text(message, style: TextStyle(color: c.danger, fontSize: 13, height: 1.4)),
+                        const SizedBox(height: 12),
+                        FilledButton(onPressed: widget.auth.signIn, child: const Text('Try again')),
+                      ],
+                    _ => [
+                        Text('Connecting to GitHub…', style: TextStyle(color: c.textMuted, fontSize: 13)),
+                        const SizedBox(height: 16),
+                        const LinearProgressIndicator(minHeight: 3),
+                      ],
+                  },
+                  const SizedBox(height: 4),
+                  TextButton(onPressed: _cancel, child: Text('Cancel', style: TextStyle(color: c.textMuted))),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Asks for the name and email commits are signed with (prefilled from
+/// GitHub when signed in). True when saved.
+Future<bool> askCommitIdentity(BuildContext context) async {
+  final s = context.services;
+  if (!await ensureGitTools(context) || !context.mounted) return false;
+  final current = await s.git.identity();
+  final user = s.github.user;
+  final (name, email) = current ?? (user != null ? identityFor(user) : ('', ''));
+  if (!context.mounted) return false;
+  final result = await showDialog<(String, String)>(
+    context: context,
+    builder: (_) => _IdentityDialog(name: name, email: email),
+  );
+  if (result == null) return false;
+  await s.git.setIdentity(result.$1, result.$2);
+  return true;
+}
+
+class _IdentityDialog extends StatefulWidget {
+  const _IdentityDialog({required this.name, required this.email});
+  final String name, email;
+
+  @override
+  State<_IdentityDialog> createState() => _IdentityDialogState();
+}
+
+class _IdentityDialogState extends State<_IdentityDialog> {
+  late final _name = TextEditingController(text: widget.name);
+  late final _email = TextEditingController(text: widget.email);
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    super.dispose();
+  }
+
+  bool get _valid => _name.text.trim().isNotEmpty && _email.text.contains('@');
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AlertDialog(
+      title: const Text('Who\'s committing?', style: TextStyle(fontSize: 16)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Commits carry a name and email. Set once for all projects.',
+              style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _name,
+            autofocus: widget.name.isEmpty,
+            decoration: const InputDecoration(labelText: 'Name'),
+            onChanged: (_) => setState(() {}),
+          ),
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email'),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: _valid ? () => Navigator.pop(context, (_name.text.trim(), _email.text.trim())) : null,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Runs a git [action]; when it fails, offers the fix (set identity, sign
+/// in, install git, pull first) and retries once fixed. True on success.
+Future<bool> runGit(BuildContext context, Future<void> Function() action, {GitRepo? repo, String? done}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await action();
+    if (done != null) messenger.showSnackBar(SnackBar(content: Text(done)));
+    return true;
+  } on GitError catch (e) {
+    if (!context.mounted) return false;
+    Future<bool> fix() async {
+      switch (e.kind) {
+        case GitErrorKind.identity:
+          return askCommitIdentity(context);
+        case GitErrorKind.notInstalled:
+          return ensureGitTools(context);
+        case GitErrorKind.auth:
+          if (!await _confirm(context, 'Sign in to sync', e.message, 'Sign in') || !context.mounted) return false;
+          return signInToGitHub(context);
+        default:
+          return false;
+      }
+    }
+
+    final fixed = await fix();
+    if (fixed && context.mounted) return runGit(context, action, repo: repo, done: done);
+    if (!context.mounted || e.kind == GitErrorKind.identity || e.kind == GitErrorKind.notInstalled) return false;
+    if (e.kind == GitErrorKind.auth) return false;
+    messenger.showSnackBar(SnackBar(
+      content: Text(e.message),
+      action: e.kind == GitErrorKind.pullFirst && repo != null
+          ? SnackBarAction(label: 'Pull', onPressed: () {
+              if (context.mounted) runGit(context, repo.pull, repo: repo, done: 'Up to date');
+            })
+          : SnackBarAction(label: 'Details', onPressed: () {
+              if (context.mounted) showGitDetails(context, e.detail);
+            }),
+    ));
+    return false;
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('$e')));
+    return false;
+  }
+}
+
+Future<bool> _confirm(BuildContext context, String title, String message, String action) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontSize: 16)),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(d, true), child: Text(action)),
+        ],
+      ),
+    ) ??
+    false;
+
+/// git's own output, for when the plain-language message isn't enough.
+void showGitDetails(BuildContext context, String detail) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheet) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.6),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: SelectableText(detail.trim(), style: TextStyle(color: sheet.colors.text, fontSize: 11, height: 1.4)),
+        ),
+      ),
+    ),
+  );
+}

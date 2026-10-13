@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../agents/agents_screen.dart';
 import '../files/files_screen.dart';
+import '../projects/projects_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shared/fade_indexed_stack.dart';
 import '../terminal/terminal_screen.dart';
@@ -14,7 +14,7 @@ import 'theme.dart';
 class HomeShell extends StatelessWidget {
   const HomeShell({super.key});
 
-  static const _screens = [AgentsScreen(), TerminalScreen(), FilesScreen(), SettingsScreen()];
+  static const _screens = [ProjectsScreen(), TerminalScreen(), FilesScreen(), SettingsScreen()];
 
   @override
   Widget build(BuildContext context) {

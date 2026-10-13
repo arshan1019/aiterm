@@ -9,6 +9,7 @@ import '../../platform/android_env.dart';
 import '../../shared/settled_size.dart';
 import '../terminal_session.dart';
 import 'notice.dart';
+import '../../git/git_screen.dart';
 import 'terminal_selection.dart';
 
 /// Renders one [TerminalSession]: the terminal itself, link/selection
@@ -161,7 +162,7 @@ class _TerminalPaneState extends State<TerminalPane> {
           right: 8,
           top: 8,
           child: ListenableBuilder(
-            listenable: Listenable.merge([_session.state, _session.fix]),
+            listenable: Listenable.merge([_session.state, _session.fix, _session.review]),
             builder: (context, _) => NoticeSlot(child: _notice()),
           ),
         ),
@@ -181,7 +182,7 @@ class _TerminalPaneState extends State<TerminalPane> {
       );
     }
     final ErrorFix? fix = _session.fix.value;
-    if (fix == null) return null;
+    if (fix == null) return _review();
     return Notice(
       key: ValueKey(fix),
       icon: Icons.lightbulb_outline_rounded,
@@ -193,6 +194,22 @@ class _TerminalPaneState extends State<TerminalPane> {
         _session.fix.value = null;
       },
       onDismiss: _session.dismissFix,
+    );
+  }
+
+  Widget? _review() {
+    final hint = _session.review.value;
+    if (hint == null) return null;
+    return Notice(
+      key: ValueKey(hint),
+      icon: Icons.call_split_rounded,
+      title: hint.title,
+      action: 'Review',
+      onAction: () {
+        _session.review.value = null;
+        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => GitScreen(folder: hint.folder)));
+      },
+      onDismiss: () => _session.review.value = null,
     );
   }
 }

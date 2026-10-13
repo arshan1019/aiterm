@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../backup/backup_controller.dart';
+import '../git/git_actions.dart';
+import '../git/github_auth.dart';
+import '../projects/projects_screen.dart';
 import '../keep_alive/keep_alive.dart';
 import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
@@ -73,12 +76,23 @@ class SettingsScreen extends StatelessWidget {
                   LinuxStatus.missing => 'Not installed. Set it up from the Terminal tab.',
                 }, style: TextStyle(color: c.textMuted, fontSize: 12)),
               ),
+              ListTile(
+                title: const Text('AI agents', style: TextStyle(fontSize: 14)),
+                subtitle: Text('Install or open Claude Code, Gemini CLI, Codex CLI',
+                    style: TextStyle(color: c.textMuted, fontSize: 12)),
+                trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+                onTap: () => openAgents(context),
+              ),
             ],
           ),
+          if (s.linux.installed && !s.linux.usesAndroidShell) ...[
+            const SizedBox(height: 20),
+            const _GitHubSection(),
+          ],
           const SizedBox(height: 20),
           _KeepAliveSection(controller: s.keepAlive),
           const SizedBox(height: 20),
-          _SshSection(keys: s.ssh),
+          _SshSection(keys: s.ssh, github: s.github),
           const SizedBox(height: 20),
           _BackupSection(backup: s.backup, linuxInstalled: s.linux.installed),
           const SizedBox(height: 20),
@@ -88,7 +102,7 @@ class SettingsScreen extends StatelessWidget {
               ListTile(
                 title: const Text('aiterm', style: TextStyle(fontSize: 14)),
                 subtitle: Text(
-                  'A minimal terminal and file explorer for your phone.',
+                  'AI coding agents on your phone: projects, git, terminal and files.',
                   style: TextStyle(color: c.textMuted, fontSize: 12),
                 ),
               ),
@@ -205,10 +219,65 @@ class _KeepAliveSection extends StatelessWidget {
   };
 }
 
+/// GitHub account: sign in once; git (HTTPS) and the clone picker use it.
+class _GitHubSection extends StatelessWidget {
+  const _GitHubSection();
+
+  Future<void> _identity(BuildContext context) => askCommitIdentity(context);
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.services;
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: s.github,
+      builder: (context, _) {
+        final user = s.github.user;
+        return _Section(
+          title: 'GitHub',
+          children: [
+            if (user == null)
+              ListTile(
+                leading: Icon(Icons.login_rounded, color: c.accent, size: 20),
+                title: const Text('Sign in to GitHub', style: TextStyle(fontSize: 14)),
+                subtitle: Text('Clone, push and pull without passwords', style: TextStyle(color: c.textMuted, fontSize: 12)),
+                onTap: () => signInToGitHub(context),
+              )
+            else ...[
+              ListTile(
+                leading: Icon(Icons.account_circle_outlined, color: c.accent, size: 20),
+                title: Text(user.name ?? user.login, style: const TextStyle(fontSize: 14)),
+                subtitle: Text('Signed in as ${user.login}', style: TextStyle(color: c.textMuted, fontSize: 12)),
+                trailing: TextButton(onPressed: s.github.signOut, child: const Text('Sign out')),
+              ),
+            ],
+            ListTile(
+              leading: Icon(Icons.badge_outlined, color: c.textMuted, size: 20),
+              title: const Text('Commit name & email', style: TextStyle(fontSize: 14)),
+              onTap: () => _identity(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _SshSection extends StatelessWidget {
-  const _SshSection({required this.keys});
+  const _SshSection({required this.keys, required this.github});
 
   final SshKeys keys;
+  final GitHubAuth github;
+
+  Future<void> _addToGitHub(BuildContext context, SshKey key) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final r = await github.addSshKey(key.publicKey, 'aiterm: ${key.name}');
+    messenger.showSnackBar(SnackBar(
+      content: Text(r.ok
+          ? 'Added “${key.name}” to GitHub'
+          : (r.stderr.contains('already') ? 'GitHub already has this key' : 'Couldn\'t add the key: ${r.stderr.trim()}')),
+    ));
+  }
 
   Future<void> _create(BuildContext context) async {
     final name = await showNameDialog(context, title: 'New SSH key', action: 'Create', hint: 'e.g. github');
@@ -242,7 +311,7 @@ class _SshSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return ListenableBuilder(
-      listenable: keys,
+      listenable: Listenable.merge([keys, github]),
       builder: (context, _) => _Section(
         title: 'SSH keys',
         children: [
@@ -267,6 +336,12 @@ class _SshSection extends StatelessWidget {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (github.user != null)
+                    IconButton(
+                      tooltip: 'Add to GitHub',
+                      icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                      onPressed: () => _addToGitHub(context, key),
+                    ),
                   IconButton(
                     tooltip: 'Copy public key',
                     icon: const Icon(Icons.copy_rounded, size: 18),

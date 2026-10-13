@@ -31,6 +31,21 @@ class GitRegistry {
   /// Repositories currently known (for refresh triggers).
   Iterable<GitRepo> get repos => _repos.values;
 
+  /// The global commit identity (name, email), or null if unset.
+  Future<(String, String)?> identity() async {
+    final name = await runner.run('/', ['config', '--global', 'user.name']);
+    final email = await runner.run('/', ['config', '--global', 'user.email']);
+    if (!name.ok || !email.ok || name.stdout.trim().isEmpty || email.stdout.trim().isEmpty) return null;
+    return (name.stdout.trim(), email.stdout.trim());
+  }
+
+  Future<void> setIdentity(String name, String email) async {
+    for (final (key, value) in [('user.name', name), ('user.email', email)]) {
+      final r = await runner.run('/', ['config', '--global', key, value]);
+      if (!r.ok) throw mapGitError(r);
+    }
+  }
+
   /// Refreshes repos containing [folder] (a command finished there, or
   /// Files changed something).
   void touched(String folder) {

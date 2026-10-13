@@ -36,6 +36,17 @@ class GitHubUser {
   }
 }
 
+class GitHubRepo {
+  const GitHubRepo({required this.fullName, this.description, required this.private, required this.updatedAt});
+  final String fullName;
+  final String? description;
+  final bool private;
+  final DateTime updatedAt;
+
+  String get name => fullName.split('/').last;
+  String get cloneUrl => 'https://github.com/$fullName.git';
+}
+
 sealed class GitHubAuthState {
   const GitHubAuthState();
 }
@@ -165,6 +176,27 @@ class GitHubAuth extends ChangeNotifier {
     await _run(['auth', 'logout', '--hostname', 'github.com']);
     _set(const SignedOut());
   }
+
+  /// The account's repositories (own and member), most recently updated first.
+  Future<List<GitHubRepo>> repositories() async {
+    final r = await _run(['repo', 'list', '--limit', '200', '--json', 'nameWithOwner,description,isPrivate,updatedAt']);
+    if (!r.ok) throw Exception(r.stderr.trim().isEmpty ? 'Couldn\'t list your repositories.' : r.stderr.trim());
+    final list = (jsonDecode(r.stdout) as List).cast<Map<String, dynamic>>();
+    return [
+      for (final m in list)
+        GitHubRepo(
+          fullName: m['nameWithOwner'] as String,
+          description: (m['description'] as String?)?.trim().isEmpty ?? true ? null : (m['description'] as String).trim(),
+          private: m['isPrivate'] as bool? ?? false,
+          updatedAt: DateTime.tryParse(m['updatedAt'] as String? ?? '') ?? DateTime(1970),
+        ),
+    ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  /// Creates a GitHub repository for the local repo at [folder], adds it
+  /// as origin and pushes.
+  Future<GitResult> publish(String folder, {required String name, required bool private}) => _run(
+      ['repo', 'create', name, private ? '--private' : '--public', '--source', folder, '--remote', 'origin', '--push']);
 
   /// Uploads an SSH public key to the signed-in account.
   Future<GitResult> addSshKey(String publicKey, String title) =>
