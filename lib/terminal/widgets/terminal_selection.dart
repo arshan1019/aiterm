@@ -106,7 +106,15 @@ class _TerminalSelectionState extends State<TerminalSelection> {
     if (!mounted || render == null) return;
     final cell = render.getCellOffset(render.globalToLocal(global));
     final link = linkAt(_rows, CellPos(cell.x, cell.y));
-    if (link == null) return;
+    if (link == null) {
+      // A plain tap clears the selection (xterm); one still here came from
+      // a long-press or double-tap, so show its handles and toolbar.
+      if (widget.controller.selection != null) {
+        _shown++;
+        _refresh();
+      }
+      return;
+    }
     HapticFeedback.selectionClick();
     _select(link);
     _refresh();
