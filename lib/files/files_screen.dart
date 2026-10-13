@@ -9,6 +9,7 @@ import '../agents/agent_installer.dart';
 import '../platform/android_env.dart';
 import '../git/git_screen.dart';
 import '../shared/action_sheet.dart';
+import '../shared/form.dart';
 import '../shared/name_dialog.dart';
 import 'file_clipboard.dart';
 import 'file_system_service.dart';
@@ -195,23 +196,15 @@ class _FilesScreenState extends State<FilesScreen> {
 
   bool get _inLinux => _browser.location.kind == LocationKind.linux;
 
-  Future<bool> _confirmDelete(FsEntry e) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (d) => AlertDialog(
-          title: Text('Delete “${e.name}”?', style: const TextStyle(fontSize: 16)),
-          content: Text(
-            e.kind == EntryKind.directory
-                ? 'The folder and everything in it will be deleted. This can\'t be undone.'
-                : 'This can\'t be undone.',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Delete')),
-          ],
-        ),
-      ) ??
-      false;
+  Future<bool> _confirmDelete(FsEntry e) => confirmAction(
+        context,
+        title: 'Delete “${e.name}”?',
+        message: e.kind == EntryKind.directory
+            ? 'The folder and everything in it will be deleted. This can\'t be undone.'
+            : 'This can\'t be undone.',
+        action: 'Delete',
+        danger: true,
+      );
 
   void _entryActions(FsEntry e) {
     final folder = e.kind == EntryKind.directory;

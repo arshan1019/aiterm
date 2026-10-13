@@ -14,6 +14,7 @@ import '../platform/android_env.dart';
 import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/fade_indexed_stack.dart';
+import '../shared/form.dart';
 import '../shared/format.dart';
 import '../shared/name_dialog.dart';
 import '../shared/text_tabs.dart';
@@ -162,19 +163,8 @@ class _ProjectScreenState extends State<ProjectScreen> {
     } on FileSystemException catch (_) {}
   }
 
-  Future<bool> _confirm(String title, String message, String action) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (d) => AlertDialog(
-          title: Text(title, style: const TextStyle(fontSize: 16)),
-          content: Text(message),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.pop(d, true), child: Text(action)),
-          ],
-        ),
-      ) ??
-      false;
+  Future<bool> _confirm(String title, String message, String action) =>
+      confirmAction(context, title: title, message: message, action: action, danger: action == 'Delete');
 
   String _label(WorkspaceTab t) {
     final changed = _repo?.status?.changes.length ?? 0;

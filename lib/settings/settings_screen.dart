@@ -10,6 +10,7 @@ import '../keep_alive/keep_alive_view.dart';
 import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
 import '../shared/name_dialog.dart';
+import '../shared/form.dart';
 import '../ssh/ssh_keys.dart';
 
 import 'package:flutter/services.dart';
@@ -161,8 +162,19 @@ class _KeepAliveSection extends StatelessWidget {
   final KeepAliveController controller;
 
   @override
-  Widget build(BuildContext context) =>
-      _Section(title: 'Keep sessions alive', children: [KeepAliveSteps(controller: controller)]);
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: controller,
+        builder: (context, _) => _Section(title: 'Keep sessions alive', children: [
+          if (controller.steps.isEmpty)
+            ListTile(
+              title: const Text('Checking…', style: TextStyle(fontSize: 14)),
+              subtitle: Text('Battery, notifications and Android\'s process limit',
+                  style: TextStyle(color: context.colors.textMuted, fontSize: 12)),
+            )
+          else
+            KeepAliveSteps(controller: controller),
+        ]),
+      );
 }
 
 /// GitHub account: sign in once; git (HTTPS) and the clone picker use it.
@@ -184,22 +196,21 @@ class _GitHubSection extends StatelessWidget {
           children: [
             if (user == null)
               ListTile(
-                leading: Icon(Icons.login_rounded, color: c.accent, size: 20),
                 title: const Text('Sign in to GitHub', style: TextStyle(fontSize: 14)),
                 subtitle: Text('Clone, push and pull without passwords', style: TextStyle(color: c.textMuted, fontSize: 12)),
-                onTap: () => signInToGitHub(context),
+                trailing: TextButton(onPressed: () => signInToGitHub(context), child: const Text('Sign in')),
               )
             else ...[
               ListTile(
-                leading: Icon(Icons.account_circle_outlined, color: c.accent, size: 20),
                 title: Text(user.name ?? user.login, style: const TextStyle(fontSize: 14)),
                 subtitle: Text('Signed in as ${user.login}', style: TextStyle(color: c.textMuted, fontSize: 12)),
                 trailing: TextButton(onPressed: s.github.signOut, child: const Text('Sign out')),
               ),
             ],
             ListTile(
-              leading: Icon(Icons.badge_outlined, color: c.textMuted, size: 20),
               title: const Text('Commit name & email', style: TextStyle(fontSize: 14)),
+              subtitle: Text('Shown on every commit you make', style: TextStyle(color: c.textMuted, fontSize: 12)),
+              trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
               onTap: () => _identity(context),
             ),
           ],
@@ -239,18 +250,12 @@ class _SshSection extends StatelessWidget {
   }
 
   Future<void> _delete(BuildContext context, SshKey key) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text('Delete “${key.name}”?', style: const TextStyle(fontSize: 16)),
-        content: const Text('Servers that trust this key will stop accepting it. This can\'t be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Delete')),
-        ],
-      ),
-    );
-    if (ok == true) await keys.delete(key.name);
+    final ok = await confirmAction(context,
+        title: 'Delete “${key.name}”?',
+        message: 'Servers that trust this key will stop accepting it. This can\'t be undone.',
+        action: 'Delete',
+        danger: true);
+    if (ok) await keys.delete(key.name);
   }
 
   @override
@@ -271,7 +276,6 @@ class _SshSection extends StatelessWidget {
           ),
           for (final key in keys.keys)
             ListTile(
-              leading: Icon(Icons.key_rounded, color: c.accent, size: 20),
               title: Text(key.name, style: const TextStyle(fontSize: 14)),
               subtitle: Text(
                 key.publicKey,
@@ -309,7 +313,7 @@ class _SshSection extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
               child: TextButton.icon(
                 onPressed: () => _create(context),
                 icon: const Icon(Icons.add_rounded, size: 18),
@@ -330,20 +334,11 @@ class _BackupSection extends StatelessWidget {
   final bool linuxInstalled;
 
   Future<void> _restore(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('Restore a backup?', style: TextStyle(fontSize: 16)),
-        content: const Text(
-          'This replaces Linux, your files in it, and aiterm\'s settings and tabs. '
-          'Running sessions end and the app restarts.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Choose backup')),
-        ],
-      ),
-    );
+    final ok = await confirmAction(context,
+        title: 'Restore a backup?',
+        message: 'This replaces Linux, your files in it, and aiterm\'s settings and tabs. '
+            'Running sessions end and the app restarts.',
+        action: 'Choose backup');
     if (ok == true) await backup.restore();
   }
 
@@ -364,7 +359,7 @@ class _BackupSection extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
             child: Row(
               children: [
                 TextButton.icon(

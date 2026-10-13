@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../shared/form.dart';
 import '../app/theme.dart';
 import 'file_system_service.dart';
 
@@ -52,17 +53,9 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 
   Future<void> _confirmDiscard() async {
-    final discard = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('Discard changes?', style: TextStyle(fontSize: 16)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Keep editing')),
-          TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Discard')),
-        ],
-      ),
-    );
-    if (discard == true && mounted) Navigator.pop(context);
+    final discard = await confirmAction(context,
+        title: 'Discard changes?', message: 'Your edits to this file will be lost.', action: 'Discard', danger: true);
+    if (discard && mounted) Navigator.pop(context);
   }
 
   @override

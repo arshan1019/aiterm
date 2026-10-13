@@ -39,10 +39,8 @@ class _AgentList extends StatelessWidget {
       color: c.accent,
       backgroundColor: c.surface,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          Text('AI coding agents', style: TextStyle(color: c.text, fontSize: 20, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
           Text(
             'Install with one tap. Sign in the first time you open one, in a project.',
             style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),

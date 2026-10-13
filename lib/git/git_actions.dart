@@ -6,6 +6,7 @@ import '../platform/android_env.dart';
 import 'git_repo.dart';
 import 'git_tools.dart';
 import 'github_auth.dart';
+import '../shared/form.dart';
 
 /// The git flows every screen shares: one-time tool install, GitHub
 /// sign-in, commit identity, and git errors turned into a next step.
@@ -247,38 +248,39 @@ class _IdentityDialogState extends State<_IdentityDialog> {
 
   bool get _valid => _name.text.trim().isNotEmpty && _email.text.contains('@');
 
+  void _save() => Navigator.pop(context, (_name.text.trim(), _email.text.trim()));
+
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    return AlertDialog(
-      title: const Text('Who\'s committing?', style: TextStyle(fontSize: 16)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Commits carry a name and email. Set once for all projects.',
-              style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4)),
-          const SizedBox(height: 12),
-          TextField(
+    return AppDialog(
+      title: 'Who\'s committing?',
+      message: 'Commits carry a name and email. Set once for all projects.',
+      fields: [
+        LabeledField(
+          label: 'Name',
+          child: TextField(
             controller: _name,
             autofocus: widget.name.isEmpty,
-            decoration: const InputDecoration(labelText: 'Name'),
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(hintText: 'Your name'),
             onChanged: (_) => setState(() {}),
           ),
-          TextField(
+        ),
+        LabeledField(
+          label: 'Email',
+          child: TextField(
             controller: _email,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email'),
+            autocorrect: false,
+            decoration: const InputDecoration(hintText: 'you@example.com'),
             onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _valid ? _save() : null,
           ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        TextButton(
-          onPressed: _valid ? () => Navigator.pop(context, (_name.text.trim(), _email.text.trim())) : null,
-          child: const Text('Save'),
         ),
       ],
+      action: 'Save',
+      onAction: _valid ? _save : null,
     );
   }
 }
@@ -349,19 +351,8 @@ Future<bool> runGit(BuildContext context, Future<void> Function() action,
   }
 }
 
-Future<bool> _confirm(BuildContext context, String title, String message, String action) async =>
-    await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontSize: 16)),
-        content: Text(message),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(d, true), child: Text(action)),
-        ],
-      ),
-    ) ??
-    false;
+Future<bool> _confirm(BuildContext context, String title, String message, String action) =>
+    confirmAction(context, title: title, message: message, action: action);
 
 /// git's own output, for when the plain-language message isn't enough.
 void showGitDetails(BuildContext context, String detail) {

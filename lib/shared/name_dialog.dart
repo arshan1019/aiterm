@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'form.dart';
 
 /// Asks for a name (new file, rename…). Returns the trimmed name, or null
 /// if cancelled or left empty.
@@ -50,18 +51,18 @@ class _NameDialogState extends State<_NameDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title, style: const TextStyle(fontSize: 16)),
-      content: TextField(
-        controller: _text,
-        autofocus: true,
-        decoration: InputDecoration(hintText: widget.hint),
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        TextButton(onPressed: _submit, child: Text(widget.action)),
+    return AppDialog(
+      title: widget.title,
+      fields: [
+        TextField(
+          controller: _text,
+          autofocus: true,
+          decoration: InputDecoration(hintText: widget.hint),
+          onSubmitted: (_) => _submit(),
+        ),
       ],
+      action: widget.action,
+      onAction: _submit,
     );
   }
 }

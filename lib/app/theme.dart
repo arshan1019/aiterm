@@ -138,6 +138,8 @@ ThemeData buildTheme({required bool dark}) {
       foregroundColor: c.text,
       elevation: 0,
       scrolledUnderElevation: 0,
+      // Titles start right after the back arrow on every page.
+      titleSpacing: 0,
       titleTextStyle: TextStyle(color: c.text, fontSize: 15, fontWeight: FontWeight.w600, fontFamily: 'JetBrainsMono'),
     ),
     dialogTheme: DialogThemeData(
@@ -179,14 +181,53 @@ ThemeData buildTheme({required bool dark}) {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
+    // One button shape everywhere: 10px corners, 44px tall.
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: c.accent,
         foregroundColor: c.bg,
+        disabledBackgroundColor: c.surfaceAlt,
+        disabledForegroundColor: c.textMuted,
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     ),
-    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(foregroundColor: c.accent)),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: c.accent,
+        disabledForegroundColor: c.textMuted,
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        side: BorderSide(color: c.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: c.accent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: c.accent,
+      foregroundColor: c.bg,
+      elevation: 0,
+      focusElevation: 0,
+      hoverElevation: 0,
+      highlightElevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      side: BorderSide(color: c.textMuted, width: 1.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: c.surface,
+      side: BorderSide(color: c.border),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      labelStyle: TextStyle(color: c.text, fontSize: 13, fontFamily: 'JetBrainsMono'),
+    ),
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {TargetPlatform.android: PredictiveBackPageTransitionsBuilder()},
     ),

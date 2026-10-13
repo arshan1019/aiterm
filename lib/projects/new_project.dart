@@ -250,9 +250,10 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
     final c = context.colors;
     if (_s.github.user == null) {
       return OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         onPressed: _signIn,
         icon: const Icon(Icons.login_rounded, size: 18),
-        label: const Text('Sign in to GitHub to pick from your repositories'),
+        label: const Text('Sign in to list your repositories'),
       );
     }
     if (_reposError case final e?) return Text(e, style: TextStyle(color: c.danger, fontSize: 12));

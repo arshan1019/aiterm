@@ -162,7 +162,7 @@ void main() {
     // Assistant sheet opens and closes.
     services.tabs.active.state.value = SessionState.running;
     await tester.pumpAndSettle();
-    await tester.tap(find.text('✦'));
+    await tester.tap(find.byIcon(Icons.auto_awesome_rounded).last);
     await tester.pumpAndSettle();
     expect(find.text('What do you want to do?'), findsOneWidget);
     await tester.tapAt(const Offset(10, 10));

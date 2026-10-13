@@ -5,6 +5,7 @@ import '../app/theme.dart';
 import '../shared/action_sheet.dart';
 import '../shared/format.dart';
 import '../shared/name_dialog.dart';
+import '../shared/form.dart';
 import 'diff_screen.dart';
 import 'commit_message.dart';
 import 'git_actions.dart';
@@ -207,30 +208,34 @@ class _PublishDialogState extends State<_PublishDialog> {
     super.dispose();
   }
 
+  void _publish() => Navigator.pop(context, (_name.text.trim(), _private));
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Publish to GitHub', style: TextStyle(fontSize: 16)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: _name, decoration: const InputDecoration(labelText: 'Repository name')),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
+    final c = context.colors;
+    return AppDialog(
+      title: 'Publish to GitHub',
+      message: 'Creates a repository on your GitHub account and pushes this project to it.',
+      fields: [
+        LabeledField(
+          label: 'Repository name',
+          child: TextField(controller: _name, autocorrect: false, onChanged: (_) => setState(() {})),
+        ),
+        Material(
+          color: c.surfaceAlt,
+          borderRadius: BorderRadius.circular(10),
+          clipBehavior: Clip.antiAlias,
+          child: SwitchListTile(
             title: const Text('Private', style: TextStyle(fontSize: 14)),
+            subtitle: Text(_private ? 'Only you (and people you invite) can see it' : 'Anyone can see it',
+                style: TextStyle(color: c.textMuted, fontSize: 12)),
             value: _private,
             onChanged: (v) => setState(() => _private = v),
           ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        TextButton(
-          onPressed: () => _name.text.trim().isEmpty ? null : Navigator.pop(context, (_name.text.trim(), _private)),
-          child: const Text('Publish'),
         ),
       ],
+      action: 'Publish',
+      onAction: _name.text.trim().isEmpty ? null : _publish,
     );
   }
 }
@@ -316,18 +321,14 @@ class _RepoViewState extends State<_RepoView> {
 
   Future<void> _discard(GitChange change) async {
     final untracked = change.unstaged == GitChangeKind.untracked;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text('Discard changes to “${change.path.split('/').last}”?', style: const TextStyle(fontSize: 16)),
-        content: Text(untracked ? 'The new file will be deleted. This can\'t be undone.' : 'Your edits since the last commit will be lost. This can\'t be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Discard')),
-        ],
-      ),
-    );
-    if (ok == true && mounted) await _run(() => repo.discard([change]));
+    final ok = await confirmAction(context,
+        title: 'Discard changes to “${change.path.split('/').last}”?',
+        message: untracked
+            ? 'The new file will be deleted. This can\'t be undone.'
+            : 'Your edits since the last commit will be lost. This can\'t be undone.',
+        action: 'Discard',
+        danger: true);
+    if (ok && mounted) await _run(() => repo.discard([change]));
   }
 
   void _rowActions(GitChange change, bool staged) {
@@ -503,15 +504,18 @@ class _RepoBar extends StatelessWidget {
       decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
       child: Row(
         children: [
-          Flexible(
-            child: ActionChip(
-              tooltip: 'Branches',
-              avatar: Icon(Icons.call_split_rounded, size: 16, color: c.accent),
-              label: Text(s.branch ?? 'detached', overflow: TextOverflow.ellipsis),
-              onPressed: () => showBranchSheet(context, repo),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ActionChip(
+                tooltip: 'Branches',
+                avatar: Icon(Icons.call_split_rounded, size: 16, color: c.accent),
+                label: Text(s.branch ?? 'detached', overflow: TextOverflow.ellipsis),
+                onPressed: () => showBranchSheet(context, repo),
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           TextButton.icon(
             onPressed: repo.busy ? null : onSync,
             icon: Icon(icon, size: 18),

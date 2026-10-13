@@ -37,7 +37,7 @@ class ExtraKeysBar extends StatelessWidget {
                 ValueListenableBuilder(
                   valueListenable: session.state,
                   builder: (context, state, _) => _Key(
-                    label: '✦',
+                    icon: Icons.auto_awesome_rounded,
                     accent: true,
                     onPress: state == SessionState.running ? onAsk : null,
                   ),
