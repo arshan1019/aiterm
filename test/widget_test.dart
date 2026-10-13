@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/app/app.dart';
+import 'package:aiterm/app/navigation.dart';
 import 'package:aiterm/app/services.dart';
 import 'package:aiterm/git/git_registry.dart';
 import 'package:aiterm/git/git_runner.dart';
@@ -71,14 +72,19 @@ void main() {
     expect(find.text('terminal'), findsOneWidget);
     expect(find.text('files'), findsOneWidget);
     expect(find.text('settings'), findsOneWidget);
-    expect(find.text('Install Alpine'), findsOneWidget);
+    expect(find.text('Set up aiterm'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
   testWidgets('walks through every screen without framework errors', (tester) async {
     await boot(tester);
 
-    await tester.tap(find.text('Use Android shell instead'));
+    // Android's shell lives in Settings, out of the way of first-run setup.
+    await tester.tap(find.text('settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Use'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('terminal'));
     await tester.pumpAndSettle();
     expect(find.text('shell'), findsOneWidget);
 
@@ -297,7 +303,12 @@ void main() {
   testWidgets('home is Projects; first launch sets up Linux there', (tester) async {
     await boot(tester, home: true);
     expect(find.text('projects'), findsOneWidget);
-    expect(find.text('Install Alpine'), findsOneWidget); // first launch sets up Linux here
+    // First launch: one setup screen, agents picked up front.
+    expect(find.text('Set up aiterm'), findsOneWidget);
+    for (final name in ['Claude Code', 'Gemini CLI', 'Codex CLI']) {
+      expect(find.text(name), findsOneWidget);
+    }
+    expect(find.text('Set up'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
@@ -320,7 +331,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(FloatingActionButton));
+    await tester.tap(find.text('Create your first project'));
     await tester.pumpAndSettle();
     for (final way in ['Empty project', 'From a template', 'Clone a repository', 'Open a folder in Linux']) {
       expect(find.text(way), findsOneWidget);
@@ -356,19 +367,26 @@ void main() {
     expect(find.text('2 changes'), findsOneWidget); // on the card
     await tester.tap(find.text('Weather app'));
     await settleIo(tester);
-    expect(find.text('AGENTS'), findsOneWidget);
+    expect(find.text('AGENT'), findsOneWidget);
+    expect(find.text('Install Claude Code'), findsOneWidget); // no agent yet: one tap to get one
     await tester.tap(find.text('2 changed files to review'));
     await settleIo(tester);
 
     expect(find.text('CHANGES · 2'), findsOneWidget);
     expect(find.text('Publish'), findsOneWidget); // no remote yet
     expect(find.text('README.md'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'First');
+    // No typing on a phone keyboard: Suggest writes the message.
+    await tester.tap(find.text('Suggest'));
     await tester.pump();
+    expect(find.text('Add notes.txt, update README.md'), findsOneWidget);
     await tester.tap(find.text('Commit all'));
     await settleIo(tester);
     expect(git.calls, contains('add -A -- README.md notes.txt'));
-    expect(git.calls, contains('commit -q -m First'));
+    expect(git.calls, contains('commit -q -m Add notes.txt, update README.md'));
+    expect(find.text('Committed'), findsOneWidget); // in place, not a passing snackbar
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.text('Committed'), findsNothing);
 
     // Back in the workspace, Terminal opens a tab in the project.
     await tester.pageBack();
@@ -378,6 +396,19 @@ void main() {
     await settleIo(tester);
     expect(services.navigation.tab.name, 'terminal');
     expect(services.tabs.active.cwd, '/root/app');
+
+    // The tab belongs to the project: its chip, and Android back, go there.
+    await tester.tap(find.byTooltip('Back to project'));
+    await settleIo(tester);
+    expect(services.navigation.tab.name, 'projects');
+    expect(find.text('AGENT'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    services.navigation.open(AppTab.terminal);
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await settleIo(tester);
+    expect(find.text('AGENT'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 

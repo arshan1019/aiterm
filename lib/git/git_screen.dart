@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
@@ -5,6 +6,7 @@ import '../shared/action_sheet.dart';
 import '../shared/format.dart';
 import '../shared/name_dialog.dart';
 import 'diff_screen.dart';
+import 'commit_message.dart';
 import 'git_actions.dart';
 import 'git_parsers.dart';
 import 'git_repo.dart';
@@ -276,11 +278,28 @@ class _RepoView extends StatefulWidget {
 
 class _RepoViewState extends State<_RepoView> {
   final _message = TextEditingController();
+  GitOutcome? _outcome;
+  Timer? _outcomeTimer;
 
   @override
   void dispose() {
     _message.dispose();
+    _outcomeTimer?.cancel();
     super.dispose();
+  }
+
+  /// Runs a git action here; its result shows in a card above the commit
+  /// box. Successes fade after a few seconds, errors stay until dismissed.
+  Future<bool> _run(Future<void> Function() action, {String? done}) {
+    _report(null);
+    return runGit(context, action, repo: repo, done: done, onOutcome: _report);
+  }
+
+  void _report(GitOutcome? o) {
+    if (!mounted) return;
+    _outcomeTimer?.cancel();
+    setState(() => _outcome = o);
+    if (o != null && !o.isError) _outcomeTimer = Timer(const Duration(seconds: 4), () => _report(null));
   }
 
   GitRepo get repo => widget.repo;
@@ -304,7 +323,7 @@ class _RepoViewState extends State<_RepoView> {
         ],
       ),
     );
-    if (ok == true && mounted) await runGit(context, () => repo.discard([change]), repo: repo);
+    if (ok == true && mounted) await _run(() => repo.discard([change]));
   }
 
   void _rowActions(GitChange change, bool staged) {
@@ -324,7 +343,7 @@ class _RepoViewState extends State<_RepoView> {
   }
 
   Future<void> _toggle(GitChange change, bool staged) =>
-      runGit(context, () => staged ? repo.unstage([change.path]) : repo.stage([change.path]), repo: repo);
+      _run(() => staged ? repo.unstage([change.path]) : repo.stage([change.path]));
 
   Future<void> _commit({required bool push}) async {
     final message = _message.text.trim();
@@ -333,14 +352,14 @@ class _RepoViewState extends State<_RepoView> {
     FocusScope.of(context).unfocus();
     // Nothing staged: commit everything, as "Commit all" says.
     if (status.staged.isEmpty) {
-      if (!await runGit(context, () => repo.stage([for (final c in status.unstaged) c.path]), repo: repo)) return;
+      if (!await _run(() => repo.stage([for (final c in status.unstaged) c.path]))) return;
       if (!mounted) return;
     }
-    final committed = await runGit(context, () => repo.commit(message), repo: repo, done: push ? null : 'Committed');
+    final committed = await _run(() => repo.commit(message), done: push ? null : 'Committed');
     if (!committed || !mounted) return;
     _message.clear();
     setState(() {});
-    if (push) await runGit(context, repo.push, repo: repo, done: 'Committed and pushed');
+    if (push) await _run(repo.push, done: 'Committed and pushed');
   }
 
   Future<void> _sync() async {
@@ -348,18 +367,16 @@ class _RepoViewState extends State<_RepoView> {
     if (s == null) return;
     if (repo.remotes?.isEmpty ?? true) return publishToGitHub(context, repo);
     if (s.upstream == null) {
-      await runGit(context, repo.push, repo: repo, done: 'Branch published');
+      await _run(repo.push, done: 'Branch published');
     } else if (s.behind > 0) {
-      if (await runGit(context, repo.pull, repo: repo) && s.ahead > 0 && mounted) {
-        await runGit(context, repo.push, repo: repo, done: 'Synced');
+      if (await _run(repo.pull) && s.ahead > 0 && mounted) {
+        await _run(repo.push, done: 'Synced');
       }
     } else if (s.ahead > 0) {
-      await runGit(context, repo.push, repo: repo, done: 'Pushed');
+      await _run(repo.push, done: 'Pushed');
     } else {
-      await runGit(context, repo.fetch, repo: repo);
-      if (mounted && (repo.status?.behind ?? 0) == 0) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Up to date')));
-      }
+      await _run(repo.fetch);
+      if (mounted && (repo.status?.behind ?? 0) == 0) _report(const GitOutcome('Up to date'));
     }
   }
 
@@ -409,7 +426,7 @@ class _RepoViewState extends State<_RepoView> {
                               label: 'Staged',
                               count: staged.length,
                               action: 'Unstage all',
-                              onAction: () => runGit(context, () => repo.unstage([for (final c in staged) c.path]), repo: repo),
+                              onAction: () => _run(() => repo.unstage([for (final c in staged) c.path])),
                             ),
                             for (final change in staged)
                               _ChangeRow(
@@ -425,7 +442,7 @@ class _RepoViewState extends State<_RepoView> {
                               label: 'Changes',
                               count: unstaged.length,
                               action: 'Stage all',
-                              onAction: () => runGit(context, () => repo.stage([for (final c in unstaged) c.path]), repo: repo),
+                              onAction: () => _run(() => repo.stage([for (final c in unstaged) c.path])),
                             ),
                             for (final change in unstaged)
                               _ChangeRow(
@@ -439,6 +456,15 @@ class _RepoViewState extends State<_RepoView> {
                         ],
                       ),
               ),
+            ),
+            AnimatedSize(
+              duration: Motion.standard,
+              curve: Motion.move,
+              alignment: Alignment.bottomCenter,
+              child: switch (_outcome) {
+                final o? => _OutcomeCard(outcome: o, onDismiss: () => _report(null)),
+                null => const SizedBox(width: double.infinity),
+              },
             ),
             if (!s.isClean) _CommitBar(controller: _message, repo: repo, status: s, onCommit: _commit),
           ],
@@ -618,6 +644,45 @@ class _ChangeRow extends StatelessWidget {
   }
 }
 
+/// A git result kept on screen: "Pushed", or what went wrong and the next
+/// step.
+class _OutcomeCard extends StatelessWidget {
+  const _OutcomeCard({required this.outcome, required this.onDismiss});
+
+  final GitOutcome outcome;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final tint = outcome.isError ? c.danger : c.accent;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: tint.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(outcome.isError ? Icons.error_outline_rounded : Icons.check_circle_rounded, size: 18, color: tint),
+          const SizedBox(width: 10),
+          Expanded(child: Text(outcome.message, style: TextStyle(color: c.text, fontSize: 13, height: 1.35))),
+          if (outcome.action case final action?) TextButton(onPressed: outcome.onAction, child: Text(action)),
+          IconButton(
+            tooltip: 'Dismiss',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
+            onPressed: onDismiss,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CommitBar extends StatelessWidget {
   const _CommitBar({required this.controller, required this.repo, required this.status, required this.onCommit});
 
@@ -653,6 +718,14 @@ class _CommitBar extends StatelessWidget {
                     decoration: InputDecoration(
                       hintText: all ? 'Message for all ${plural(status.unstaged.length, 'change')}' : 'Commit message',
                       isDense: true,
+                      suffixIcon: TextButton.icon(
+                        onPressed: () {
+                          controller.text = suggestCommitMessage(status.changes);
+                          controller.selection = TextSelection.collapsed(offset: controller.text.length);
+                        },
+                        icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+                        label: const Text('Suggest'),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),

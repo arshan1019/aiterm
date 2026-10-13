@@ -49,6 +49,12 @@ class TerminalTabs extends ChangeNotifier {
             cwd: t['cwd'] as String?,
             scrollback: t['scrollback'] as String?,
             ptyId: t['pty'] as int?,
+            project: t['project'] as String?,
+            agent: t['agent'] as String?,
+            launch: (t['launch'] as List?)?.cast<String>() ?? const [],
+            // A fresh shell (the old one is gone) runs what the tab was
+            // opened for; a reattached one never starts, so never reruns.
+            commands: (t['launch'] as List?)?.cast<String>() ?? const [],
           );
         }
         active = saved['active'] as int? ?? 0;
@@ -71,6 +77,9 @@ class TerminalTabs extends ChangeNotifier {
       String? cwd,
       String? scrollback,
       int? ptyId,
+      String? project,
+      String? agent,
+      List<String> launch = const [],
       List<String> commands = const []}) {
     final s = TerminalSession(
       id: _nextId++,
@@ -79,6 +88,9 @@ class TerminalTabs extends ChangeNotifier {
       pinned: pinned,
       restoredScrollback: scrollback == null || scrollback.isEmpty ? null : scrollback,
       savedPtyId: ptyId,
+      project: project,
+      agent: agent,
+      launch: launch,
       startupCommands: commands,
       backend: _backend,
     )..cwd = cwd;
@@ -106,15 +118,22 @@ class TerminalTabs extends ChangeNotifier {
   }
 
   /// A new tab, starting in [cwd] (a guest path) if given and named after it.
-  /// [title] names the tab; [commands] run once its shell starts.
-  TerminalSession open({String? cwd, String? title, List<String> commands = const []}) {
+  /// [title] names the tab; [commands] run once its shell starts (and again
+  /// whenever it gets a fresh shell). [project] and [agent] say what it's for.
+  TerminalSession open({String? cwd, String? title, List<String> commands = const [], String? project, String? agent}) {
     final name = title ?? cwd?.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => '/');
-    final s = _add(name ?? _freshTitle(), cwd: cwd, customTitle: title != null, commands: commands);
+    final s = _add(name ?? _freshTitle(),
+        cwd: cwd, customTitle: title != null, commands: commands, launch: commands, project: project, agent: agent);
     _activeId = s.id;
     _scheduleSave();
     notifyListeners();
     return s;
   }
+
+  /// The tab running [agent] for [project], to go back to instead of
+  /// opening another.
+  TerminalSession? findAgent(String agent, String? project) =>
+      _tabs.where((t) => t.agent == agent && t.project == project).firstOrNull;
 
   void select(TerminalSession s) {
     if (s.id == _activeId) return;
@@ -182,6 +201,9 @@ class TerminalTabs extends ChangeNotifier {
             'cwd': t.cwd,
             'scrollback': t.scrollbackText(),
             'pty': t.ptyId,
+            'project': ?t.project,
+            'agent': ?t.agent,
+            if (t.launch.isNotEmpty) 'launch': t.launch,
           },
       ],
     };

@@ -94,6 +94,9 @@ class TerminalSession {
     this._pinned = false,
     this.restoredScrollback,
     this.savedPtyId,
+    this.project,
+    this.agent,
+    this.launch = const [],
     List<String> startupCommands = const [],
     PtyBackend? backend,
   })  : _backend = backend ?? PtyHost.instance,
@@ -120,6 +123,21 @@ class TerminalSession {
 
   /// Changes worth reviewing (an agent in this tab edited files).
   final review = ValueNotifier<ReviewHint?>(null);
+
+  /// Android killed a process here (exit 137: signal 9), usually the
+  /// background limits keep-alive lifts. Cleared by the next command.
+  final killed = ValueNotifier(false);
+
+  /// The project folder (guest path) this tab was opened for, if any.
+  final String? project;
+
+  /// The agent (catalog id) this tab runs, if any.
+  final String? agent;
+
+  /// What the tab was opened to run (e.g. the agent). Runs again whenever
+  /// the tab gets a fresh shell: after a restart, or when the app comes
+  /// back and the old shell is gone.
+  final List<String> launch;
 
   /// Called when the tab's title or pin changes (the tab strip listens).
   VoidCallback? onMetaChanged;
@@ -241,6 +259,7 @@ class TerminalSession {
     });
     pty.exitCode.then((code) {
       if (_disposed || _pty != pty) return;
+      if (code == _sigkill) killed.value = true;
       terminal.write('\r\n[process exited: $code]\r\n');
       _pty = null;
       _setState(SessionState.exited);
@@ -259,6 +278,8 @@ class TerminalSession {
 
   Future<void> restart(SpecFor spec, {required bool alpine}) async {
     _stopShell();
+    _startup = launch;
+    killed.value = false;
     _setState(SessionState.idle);
     await start(spec, alpine: alpine);
   }
@@ -278,6 +299,7 @@ class TerminalSession {
       // A new command started: earlier errors no longer apply.
       _recent.clear();
       fix.value = null;
+      killed.value = false;
     }
   }
 
@@ -315,7 +337,10 @@ class TerminalSession {
       case ShellNotification n:
         onSignal?.call(NotifySignal(n));
       case final ShellEvent e:
-        if (_commands.onEvent(e) case final done?) onSignal?.call(CommandSignal(done));
+        if (_commands.onEvent(e) case final done?) {
+          if (done.exitCode == _sigkill) killed.value = true;
+          onSignal?.call(CommandSignal(done));
+        }
       case null:
     }
   }
@@ -404,7 +429,11 @@ class TerminalSession {
     state.dispose();
     fix.dispose();
     review.dispose();
+    killed.dispose();
   }
+
+  /// 128 + SIGKILL, as shells and the PTY report a killed process.
+  static const _sigkill = 137;
 }
 
 /// xterm's own mapping misses Ctrl+Space and friends and sends Alt+b as

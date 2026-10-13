@@ -42,6 +42,29 @@ class ProjectStore extends ChangeNotifier {
     return p;
   }
 
+  /// Agent [agentId] was opened in [path]: that folder becomes (or stays)
+  /// the most recent project, remembering the agent. Home and / aren't
+  /// projects (null).
+  Future<Project?> usedAgent(String path, String agentId) async {
+    if (path == '/' || path == '/root') return null;
+    final now = DateTime.now();
+    final existing = byPath(path);
+    if (existing != null) {
+      await _replace(existing, existing.copyWith(lastOpened: now, agentId: agentId));
+      return byPath(path);
+    }
+    final p = Project(
+        id: '${now.microsecondsSinceEpoch}',
+        name: path.split('/').lastWhere((x) => x.isNotEmpty),
+        path: path,
+        createdAt: now,
+        lastOpened: now,
+        agentId: agentId);
+    _projects.insert(0, p);
+    await _save();
+    return p;
+  }
+
   Future<void> opened(Project p) => _replace(p, p.copyWith(lastOpened: DateTime.now()));
 
   Future<void> rename(Project p, String name) => _replace(p, p.copyWith(name: name));

@@ -13,6 +13,8 @@ class Notice extends StatelessWidget {
     this.isError = false,
     required this.action,
     required this.onAction,
+    this.secondary,
+    this.onSecondary,
     this.onDismiss,
   });
 
@@ -22,6 +24,10 @@ class Notice extends StatelessWidget {
   final bool isError;
   final String action;
   final VoidCallback onAction;
+
+  /// A second, lesser action ("Keep alive" next to "Restart").
+  final String? secondary;
+  final VoidCallback? onSecondary;
   final VoidCallback? onDismiss;
 
   @override
@@ -55,6 +61,8 @@ class Notice extends StatelessWidget {
                 ],
               ),
             ),
+            if (secondary != null)
+              TextButton(onPressed: onSecondary, child: Text(secondary!, style: TextStyle(color: c.textMuted))),
             TextButton(onPressed: onAction, child: Text(action)),
             if (onDismiss != null)
               IconButton(

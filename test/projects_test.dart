@@ -21,6 +21,31 @@ void main() {
   ProjectService service(ProjectStore store) => ProjectService(store: store, git: git, hostPath: (p) => p);
 
   group('store', () {
+    test('an agent opened in a folder makes it a recent project and is remembered', () async {
+      final file = '${tmp.path}/projects.json';
+      final store = ProjectStore(file);
+      await store.load();
+      await store.add(name: 'old', path: '/root/old');
+      final p = await store.usedAgent('/root/notes', 'claude');
+      expect(p!.name, 'notes');
+      expect(p.agentId, 'claude');
+      expect(store.projects.first.path, '/root/notes'); // most recent first
+      await store.usedAgent('/root/old', 'codex');
+      final again = ProjectStore(file);
+      await again.load();
+      expect(again.byPath('/root/old')!.agentId, 'codex');
+      expect(again.projects.first.path, '/root/old');
+      expect(again.projects, hasLength(2));
+    });
+
+    test('home and / are not projects', () async {
+      final store = ProjectStore('${tmp.path}/projects.json');
+      await store.load();
+      expect(await store.usedAgent('/root', 'claude'), isNull);
+      expect(await store.usedAgent('/', 'claude'), isNull);
+      expect(store.projects, isEmpty);
+    });
+
     test('projects persist, newest-opened first, one per folder', () async {
       final file = '${tmp.path}/projects.json';
       final store = ProjectStore(file);

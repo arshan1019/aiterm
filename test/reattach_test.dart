@@ -121,8 +121,93 @@ void main() {
     expect(tabs.active, t);
     await t.start(spec, alpine: true);
     expect(backend.started.single.written, ['claude\r']);
-    await t.restart(spec, alpine: true); // not again on restart
-    expect(backend.started.last.written, isEmpty);
+    await t.restart(spec, alpine: true); // a fresh shell runs it again
+    expect(backend.started.last.written, ['claude\r']);
     tabs.dispose();
+  });
+
+  group('agent tabs belong to their project', () {
+    test('project, agent and launch commands persist; a fresh shell runs the agent again', () async {
+      final backend = FakeBackend();
+      final tabs = TerminalTabs(dir.path, backend: backend);
+      await tabs.load();
+      final t = tabs.open(title: 'Claude Code · app', commands: ['claude'], cwd: '/root/app', project: '/root/app', agent: 'claude');
+      expect(t.project, '/root/app');
+      expect(t.agent, 'claude');
+      await tabs.save();
+      tabs.dispose();
+
+      final again = TerminalTabs(dir.path, backend: backend);
+      await again.load();
+      final restored = again.tabs.last;
+      expect(restored.project, '/root/app');
+      expect(restored.agent, 'claude');
+      await restored.start(spec, alpine: true);
+      expect(backend.started.last.written, ['claude\r']);
+      again.dispose();
+    });
+
+    test('a tab still running in the background reattaches without starting the agent twice', () async {
+      final backend = FakeBackend();
+      File('${dir.path}/terminal_tabs.json').writeAsStringSync(jsonEncode({
+        'version': 2,
+        'active': 0,
+        'tabs': [
+          {'title': 'Claude Code · app', 'pty': 7, 'cwd': '/root/app', 'project': '/root/app', 'agent': 'claude', 'launch': ['claude']},
+        ],
+      }));
+      backend.live[7] = (FakePty(7), 'claude is here');
+      final tabs = TerminalTabs(dir.path, backend: backend);
+      await tabs.load();
+      await tabs.reattach();
+      await tabs.active.start(spec, alpine: true); // ignored: already running
+      expect(backend.live[7]!.$1.written, isEmpty);
+      tabs.dispose();
+    });
+
+    test('findAgent returns the tab for the same agent and project only', () async {
+      final tabs = TerminalTabs(dir.path, backend: FakeBackend());
+      await tabs.load();
+      final a = tabs.open(title: 'Claude Code · app', commands: ['claude'], cwd: '/root/app', project: '/root/app', agent: 'claude');
+      tabs.open(title: 'Codex CLI · app', commands: ['codex'], cwd: '/root/app', project: '/root/app', agent: 'codex');
+      tabs.open(cwd: '/root/app');
+      expect(tabs.findAgent('claude', '/root/app'), a);
+      expect(tabs.findAgent('claude', '/root/other'), isNull);
+      expect(tabs.findAgent('gemini', '/root/app'), isNull);
+      tabs.dispose();
+    });
+
+    test('restarting an ended agent tab runs the agent again', () async {
+      final backend = FakeBackend();
+      final tabs = TerminalTabs(dir.path, backend: backend);
+      await tabs.load();
+      final t = tabs.open(title: 'Claude Code', commands: ['claude'], cwd: '/root/app', project: '/root/app', agent: 'claude');
+      await t.start(spec, alpine: true);
+      backend.started.last.exit.complete(0);
+      await Future<void>.delayed(Duration.zero);
+      expect(t.state.value, SessionState.exited);
+      await t.restart(spec, alpine: true);
+      expect(backend.started.last.written, ['claude\r']);
+      tabs.dispose();
+    });
+
+    test('a process killed by Android (signal 9) is flagged, and cleared by the next command', () async {
+      final backend = FakeBackend();
+      final tabs = TerminalTabs(dir.path, backend: backend);
+      await tabs.load();
+      final t = tabs.active;
+      await t.start(spec, alpine: true);
+      final pty = backend.started.last;
+      pty.out.add(Uint8List.fromList(utf8.encode('\x1b]133;A\x07')));
+      t.terminal.textInput('claude\r');
+      pty.out.add(Uint8List.fromList(utf8.encode('Killed\r\n\x1b]133;D;137\x07\x1b]133;A\x07')));
+      expect(t.killed.value, isTrue);
+      t.terminal.textInput('ls\r');
+      expect(t.killed.value, isFalse);
+      pty.exit.complete(137);
+      await Future<void>.delayed(Duration.zero);
+      expect(t.killed.value, isTrue);
+      tabs.dispose();
+    });
   });
 }

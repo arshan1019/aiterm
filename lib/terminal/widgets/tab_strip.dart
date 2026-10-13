@@ -6,10 +6,13 @@ import '../terminal_tabs.dart';
 /// The row of terminal tabs. Tap to switch; tap the active tab or
 /// long-press any tab for pin / rename / close.
 class TabStrip extends StatefulWidget {
-  const TabStrip({super.key, required this.tabs, required this.onMenu});
+  const TabStrip({super.key, required this.tabs, required this.onMenu, this.leading});
 
   final TerminalTabs tabs;
   final ValueChanged<TerminalSession> onMenu;
+
+  /// Shown before the tabs (the active tab's project, linking back to it).
+  final Widget? leading;
 
   static const height = 38.0;
 
@@ -56,6 +59,7 @@ class _TabStripState extends State<TabStrip> {
       decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
       child: Row(
         children: [
+          AnimatedSize(duration: Motion.standard, curve: Motion.move, child: widget.leading ?? const SizedBox.shrink()),
           Expanded(
             child: ListenableBuilder(
               listenable: widget.tabs,

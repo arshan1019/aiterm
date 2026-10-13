@@ -5,6 +5,7 @@ import '../assistant/tool_call.dart';
 import '../agents/agent_installer.dart';
 import '../backup/backup_controller.dart';
 import '../keep_alive/keep_alive_controller.dart';
+import '../onboarding/setup_pipeline.dart';
 import '../linux/linux_environment.dart';
 import '../platform/android_env.dart';
 import '../settings/settings.dart';
@@ -15,6 +16,7 @@ import '../git/git_tools.dart';
 import '../git/github_auth.dart';
 import '../git/pty_process.dart';
 import '../platform/pty.dart';
+import '../projects/project.dart';
 import '../projects/project_service.dart';
 import '../projects/project_store.dart';
 import '../shared/format.dart';
@@ -73,6 +75,13 @@ class AppServices {
       final agent = agents.installed.where((a) => session.title.startsWith(a.name)).firstOrNull;
       if (agent != null) _offerReview(session, agent.name, cwd).ignore();
     };
+    // Back from an agent's tab: the project it works on.
+    navigation.setBackHandler(AppTab.terminal, () {
+      final project = projectOf(tabs.active);
+      if (project == null) return false;
+      navigation.showProject(project.id);
+      return true;
+    });
     ssh.load().ignore();
     if (linux.installed) preview.start().ignore();
     _updatePresence();
@@ -146,13 +155,42 @@ class AppServices {
   late final projects = ProjectStore('${paths.filesDir}/projects.json');
   ProjectService get projectService => ProjectService(store: projects, git: git.runner, hostPath: linux.hostPath);
 
-  /// One-tap AI agents; "Open" starts one in its own terminal tab.
+  /// The project a terminal tab works on, if it's one of the user's.
+  Project? projectOf(TerminalSession tab) => switch (tab.project) {
+        final path? => projects.byPath(path),
+        null => null,
+      };
+
+  /// One-tap AI agents; "Open" goes back to the agent's tab for that
+  /// folder, or starts one. The folder becomes a recent project.
   late final agents = AgentInstaller(
     run: linux.runScriptStreaming,
-    launch: (title, commands, cwd) {
-      tabs.open(title: title, commands: commands, cwd: cwd);
+    launch: (agent, title, commands, cwd) {
+      final existing = tabs.findAgent(agent.id, cwd);
+      if (existing == null) {
+        tabs.open(title: title, commands: commands, cwd: cwd, project: cwd, agent: agent.id);
+      } else {
+        tabs.select(existing);
+        if (existing.state.value == SessionState.exited) {
+          existing.restart(linux.sessionSpec, alpine: !linux.usesAndroidShell).ignore();
+        }
+      }
+      if (cwd != null) projects.usedAgent(cwd, agent.id).ignore();
       navigation.open(AppTab.terminal);
     },
+  );
+
+  /// First run: Linux, git tools and the chosen agents in one go.
+  late final setup = SetupPipeline(
+    installLinux: linux.install,
+    linuxReady: () => linux.installed,
+    installTools: () async => await gitTools.ensure() ? null : gitTools.error ?? 'Couldn\'t install git.',
+    installAgent: (id) async {
+      await agents.install(id);
+      final state = agents.stateOf(id);
+      return state.status == AgentStatus.installed ? null : state.message ?? 'Install failed.';
+    },
+    agentName: (id) => AgentInstaller.recipe(id).name,
   );
 
   /// Loads everything the first frame depends on.

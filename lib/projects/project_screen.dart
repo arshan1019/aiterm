@@ -15,13 +15,17 @@ import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/format.dart';
 import '../shared/name_dialog.dart';
+import '../terminal/terminal_session.dart';
+import 'projects_screen.dart';
 import 'project.dart';
 
 /// Opens [project]'s workspace (and remembers it as most recent).
 Future<void> openProject(BuildContext context, Project project) {
   context.services.projects.opened(project).ignore();
-  return Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProjectScreen(projectId: project.id)));
+  return Navigator.of(context).push(projectRoute(project.id));
 }
+
+Route<void> projectRoute(String id) => MaterialPageRoute<void>(builder: (_) => ProjectScreen(projectId: id));
 
 /// A project's workspace: its agents, git changes, terminal, files and
 /// preview, all starting in the project's folder.
@@ -160,7 +164,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return ListenableBuilder(
-      listenable: Listenable.merge([_s.projects, _s.agents, _s.gitTools, _s.preview, ?_repo]),
+      listenable: Listenable.merge([_s.projects, _s.agents, _s.gitTools, _s.preview, _s.tabs, ?_repo]),
       builder: (context, _) {
         final p = _project;
         if (p == null) return const Scaffold();
@@ -181,9 +185,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
-              _Card(title: 'Agents', children: [
-                for (final agent in agentCatalog) _AgentRow(agent: agent, project: p),
-              ]),
+              _AgentCard(project: p),
               const SizedBox(height: 12),
               _Card(title: 'Changes', children: [_changes(context, p)]),
               const SizedBox(height: 12),
@@ -193,7 +195,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                   title: const Text('Terminal', style: TextStyle(fontSize: 14)),
                   subtitle: Text('A new tab in this folder', style: TextStyle(color: c.textMuted, fontSize: 12)),
                   onTap: () {
-                    _s.tabs.open(cwd: p.path);
+                    _s.tabs.open(cwd: p.path, project: p.path);
                     _s.navigation.open(AppTab.terminal);
                   },
                 ),
@@ -215,6 +217,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                     ListTile(
                       leading: Icon(Icons.wifi_tethering_rounded, color: c.accent, size: 20),
                       title: Text('Preview localhost:$port', style: const TextStyle(fontSize: 14)),
+                      subtitle: Text('Live now', style: TextStyle(color: c.accent, fontSize: 12)),
                       onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PreviewScreen(port: port))),
                     ),
               ]),
@@ -307,47 +310,74 @@ class _Card extends StatelessWidget {
   }
 }
 
-class _AgentRow extends StatelessWidget {
-  const _AgentRow({required this.agent, required this.project});
+/// The project's main action: open (or go back to) its agent. The agent
+/// used here last comes first; the others are one tap further.
+class _AgentCard extends StatelessWidget {
+  const _AgentCard({required this.project});
 
-  final AgentRecipe agent;
   final Project project;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final installer = context.services.agents;
-    final state = installer.stateOf(agent.id);
-    return ListTile(
-      leading: Icon(Icons.auto_awesome_rounded, color: state.status == AgentStatus.installed ? c.accent : c.textMuted, size: 20),
-      title: Text(agent.name, style: const TextStyle(fontSize: 14)),
-      subtitle: Text(
-        switch (state.status) {
-          AgentStatus.installing => '${state.step ?? 'Installing'}…',
-          AgentStatus.failed => state.message ?? 'Install failed',
-          _ => agent.vendor,
-        },
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: state.status == AgentStatus.failed ? c.danger : c.textMuted, fontSize: 12),
+    final s = context.services;
+    final installer = s.agents;
+    final installed = installer.installed;
+    final main = installed.where((a) => a.id == project.agentId).firstOrNull ?? installed.firstOrNull;
+    final others = [for (final a in installed) if (a != main) a];
+    final busy = [for (final a in agentCatalog) if (installer.stateOf(a.id).status == AgentStatus.installing) a];
+    return _Card(title: 'Agent', children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (main == null) ...[
+              Text(
+                busy.isNotEmpty
+                    ? '${busy.first.name}: ${installer.stateOf(busy.first.id).step ?? 'Installing'}…'
+                    : 'Install a coding agent to work on this project with AI.',
+                style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: installer.busy ? null : () => installer.open(agentCatalog.first.id, cwd: project.path),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: Text('Install ${agentCatalog.first.name}'),
+              ),
+              TextButton(onPressed: () => openAgents(context), child: const Text('Other agents')),
+            ] else ...[
+              _mainButton(context, main),
+              if (others.isNotEmpty || installed.length < agentCatalog.length)
+                Wrap(
+                  spacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    for (final a in others)
+                      TextButton(onPressed: () => installer.open(a.id, cwd: project.path), child: Text('Open ${a.name}')),
+                    if (installed.length < agentCatalog.length)
+                      TextButton(
+                        onPressed: () => openAgents(context),
+                        child: Text('More agents', style: TextStyle(color: c.textMuted)),
+                      ),
+                  ],
+                ),
+            ],
+          ],
+        ),
       ),
-      trailing: AnimatedSwitcher(
-        duration: Motion.quick,
-        child: switch (state.status) {
-          AgentStatus.installed => FilledButton(
-              key: const ValueKey('open'),
-              onPressed: () => installer.open(agent.id, cwd: project.path),
-              child: const Text('Open'),
-            ),
-          AgentStatus.installing => const SizedBox(
-              key: ValueKey('busy'), width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-          _ => OutlinedButton(
-              key: const ValueKey('install'),
-              onPressed: installer.busy ? null : () => installer.install(agent.id),
-              child: Text(state.status == AgentStatus.failed ? 'Retry' : 'Install'),
-            ),
-        },
-      ),
+    ]);
+  }
+
+  Widget _mainButton(BuildContext context, AgentRecipe agent) {
+    final s = context.services;
+    final open = s.tabs.findAgent(agent.id, project.path);
+    final running = open != null && open.state.value != SessionState.exited;
+    return FilledButton.icon(
+      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      onPressed: () => s.agents.open(agent.id, cwd: project.path),
+      icon: Icon(running ? Icons.play_arrow_rounded : Icons.auto_awesome_rounded, size: 20),
+      label: Text(running ? 'Back to ${agent.name}' : 'Open ${agent.name}'),
     );
   }
 }

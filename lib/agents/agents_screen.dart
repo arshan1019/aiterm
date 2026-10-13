@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
-import '../terminal/widgets/setup_view.dart';
+import '../onboarding/setup_view.dart';
+import '../projects/projects_screen.dart';
 import 'agent_catalog.dart';
 import 'agent_installer.dart';
 
-/// Home: AI coding agents, installed in one tap and opened into their own
-/// terminal tab, where they handle sign-in. On first launch this is also
-/// where Linux gets set up.
+/// AI coding agents, installed in one tap. Open asks which project to work
+/// on (agents work in projects); the agent's tab handles sign-in.
 class AgentsScreen extends StatelessWidget {
   const AgentsScreen({super.key});
 
@@ -44,7 +44,7 @@ class _AgentList extends StatelessWidget {
           Text('AI coding agents', style: TextStyle(color: c.text, fontSize: 20, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Text(
-            'Install with one tap. Sign in the first time you open one.',
+            'Install with one tap. Sign in the first time you open one, in a project.',
             style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
           ),
           const SizedBox(height: 20),
@@ -145,7 +145,7 @@ class _AgentCard extends StatelessWidget {
       case AgentStatus.installed:
         return FilledButton(
           key: const ValueKey('open'),
-          onPressed: () => installer.open(agent.id),
+          onPressed: () => openAgentInProject(context, agent.id),
           child: const Text('Open'),
         );
       case AgentStatus.installing:

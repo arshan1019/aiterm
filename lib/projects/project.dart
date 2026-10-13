@@ -1,5 +1,5 @@
 class Project {
-  const Project({required this.id, required this.name, required this.path, required this.createdAt, required this.lastOpened});
+  const Project({required this.id, required this.name, required this.path, required this.createdAt, required this.lastOpened, this.agentId});
 
   final String id;
   final String name;
@@ -9,12 +9,16 @@ class Project {
   final DateTime createdAt;
   final DateTime lastOpened;
 
-  Project copyWith({String? name, DateTime? lastOpened}) => Project(
+  /// The agent last opened here; the project's main button opens it.
+  final String? agentId;
+
+  Project copyWith({String? name, DateTime? lastOpened, String? agentId}) => Project(
         id: id,
         name: name ?? this.name,
         path: path,
         createdAt: createdAt,
         lastOpened: lastOpened ?? this.lastOpened,
+        agentId: agentId ?? this.agentId,
       );
 
   Map<String, Object> toJson() => {
@@ -23,6 +27,7 @@ class Project {
         'path': path,
         'created': createdAt.millisecondsSinceEpoch,
         'opened': lastOpened.millisecondsSinceEpoch,
+        'agent': ?agentId,
       };
 
   static Project fromJson(Map<String, dynamic> j) => Project(
@@ -31,5 +36,6 @@ class Project {
         path: j['path'] as String,
         createdAt: DateTime.fromMillisecondsSinceEpoch(j['created'] as int),
         lastOpened: DateTime.fromMillisecondsSinceEpoch(j['opened'] as int),
+        agentId: j['agent'] as String?,
       );
 }

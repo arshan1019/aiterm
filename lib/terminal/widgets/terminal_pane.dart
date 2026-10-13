@@ -5,6 +5,8 @@ import 'package:xterm/xterm.dart';
 import '../../app/services.dart';
 import '../../app/theme.dart';
 import '../../assistant/error_fixes.dart';
+import '../../keep_alive/keep_alive.dart';
+import '../../keep_alive/keep_alive_view.dart';
 import '../../platform/android_env.dart';
 import '../../shared/settled_size.dart';
 import '../terminal_session.dart';
@@ -162,7 +164,7 @@ class _TerminalPaneState extends State<TerminalPane> {
           right: 8,
           top: 8,
           child: ListenableBuilder(
-            listenable: Listenable.merge([_session.state, _session.fix, _session.review]),
+            listenable: Listenable.merge([_session.state, _session.fix, _session.review, _session.killed, context.services.keepAlive]),
             builder: (context, _) => NoticeSlot(child: _notice()),
           ),
         ),
@@ -170,15 +172,36 @@ class _TerminalPaneState extends State<TerminalPane> {
     );
   }
 
+  /// Android killed something here and keep-alive isn't fully set up.
+  bool get _killedByAndroid {
+    final steps = context.services.keepAlive.steps;
+    return _session.killed.value && steps.isNotEmpty && !allDone(steps);
+  }
+
   Widget? _notice() {
     if (_session.state.value == SessionState.exited) {
+      final killed = _killedByAndroid;
       return Notice(
-        key: const ValueKey('exited'),
+        key: ValueKey('exited $killed'),
         icon: Icons.power_settings_new_rounded,
-        title: _session.error ?? 'Session ended',
-        isError: _session.error != null,
+        title: killed ? 'Android stopped this session' : _session.error ?? 'Session ended',
+        isError: killed || _session.error != null,
         action: 'Restart',
         onAction: _restart,
+        secondary: killed ? 'Keep alive' : null,
+        onSecondary: () => showKeepAlive(context),
+      );
+    }
+    if (_killedByAndroid) {
+      return Notice(
+        key: const ValueKey('killed'),
+        icon: Icons.warning_amber_rounded,
+        title: 'Android stopped a process here (signal 9)',
+        detail: 'Let aiterm keep agents running in the background',
+        isError: true,
+        action: 'Fix',
+        onAction: () => showKeepAlive(context),
+        onDismiss: () => _session.killed.value = false,
       );
     }
     final ErrorFix? fix = _session.fix.value;

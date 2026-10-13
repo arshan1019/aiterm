@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../projects/project_screen.dart';
 import 'home_shell.dart';
 import 'services.dart';
 import 'theme.dart';
@@ -10,6 +11,7 @@ class AiTermApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    services.navigation.projectRoute ??= projectRoute;
     return AppScope(
       services: services,
       child: ListenableBuilder(

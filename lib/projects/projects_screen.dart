@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../agents/agent_installer.dart';
 import '../agents/agents_screen.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../git/git_repo.dart';
+import '../preview/preview_screen.dart';
+import '../shared/action_sheet.dart';
 import '../shared/format.dart';
-import '../terminal/widgets/setup_view.dart';
+import '../onboarding/setup_view.dart';
 import 'new_project.dart';
 import 'project.dart';
 import 'project_screen.dart';
@@ -19,10 +22,12 @@ class ProjectsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.services;
     return ListenableBuilder(
-      listenable: s.linux,
+      listenable: Listenable.merge([s.linux, s.setup]),
       builder: (context, _) => AnimatedSwitcher(
         duration: Motion.standard,
-        child: s.linux.installed ? const _Projects(key: ValueKey('projects')) : const SetupView(key: ValueKey('setup')),
+        child: s.linux.installed && !s.setup.active
+            ? const _Projects(key: ValueKey('projects'))
+            : const SetupView(key: ValueKey('setup')),
       ),
     );
   }
@@ -37,7 +42,7 @@ class _Projects extends StatelessWidget {
     final c = context.colors;
     return Scaffold(
       body: ListenableBuilder(
-        listenable: Listenable.merge([s.projects, s.agents]),
+        listenable: Listenable.merge([s.projects, s.agents, s.preview, s.tabs]),
         builder: (context, _) {
           final projects = s.projects.projects;
           return ListView(
@@ -55,6 +60,12 @@ class _Projects extends StatelessWidget {
                   ),
                 ],
               ),
+              // A dev server is up: one tap to see it.
+              for (final port in s.preview.livePorts)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _PreviewChip(port: port),
+                ),
               const SizedBox(height: 12),
               if (s.agents.installed.isEmpty) ...[
                 const _AgentsPrompt(),
@@ -71,12 +82,51 @@ class _Projects extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: ListenableBuilder(
+        listenable: s.projects,
+        builder: (context, _) => s.projects.projects.isEmpty
+            ? const SizedBox.shrink()
+            : FloatingActionButton.extended(
         onPressed: () => showNewProject(context),
         backgroundColor: c.accent,
         foregroundColor: c.bg,
         icon: const Icon(Icons.add_rounded),
         label: const Text('New project'),
+      ),
+      ),
+    );
+  }
+}
+
+/// Opens agent [id] in a project the user picks: agents work in projects.
+void openAgentInProject(BuildContext context, String id) {
+  final s = context.services;
+  final projects = s.projects.projects;
+  if (projects.isEmpty) return showNewProject(context);
+  showActionSheet(context, title: 'Open ${AgentInstaller.recipe(id).name} in', actions: [
+    for (final p in projects.take(6)) SheetAction(Icons.folder_rounded, p.name, () => s.agents.open(id, cwd: p.path)),
+    null,
+    SheetAction(Icons.add_rounded, 'New project', () => showNewProject(context)),
+  ]);
+}
+
+class _PreviewChip extends StatelessWidget {
+  const _PreviewChip({required this.port});
+  final int port;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: c.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: c.border)),
+      child: ListTile(
+        dense: true,
+        leading: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle)),
+        minLeadingWidth: 8,
+        title: Text('localhost:$port is live', style: TextStyle(color: c.text, fontSize: 13)),
+        trailing: Text('Preview', style: TextStyle(color: c.accent, fontSize: 13, fontWeight: FontWeight.w600)),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PreviewScreen(port: port))),
       ),
     );
   }
@@ -145,7 +195,13 @@ class _Empty extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: () => showNewProject(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Create your first project'),
+          ),
+          const SizedBox(height: 4),
           TextButton(onPressed: () => openFolderAsProject(context), child: const Text('Or open a folder you already have')),
         ],
       ),
@@ -212,6 +268,14 @@ class _ProjectCardState extends State<_ProjectCard> {
                     Text(shortPath(p.path),
                         maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.textMuted, fontSize: 12)),
                     const SizedBox(height: 6),
+                    if (_s.tabs.tabs.where((t) => t.project == p.path && t.agent != null).firstOrNull case final tab?) ...[
+                      Row(children: [
+                        Icon(Icons.auto_awesome_rounded, size: 13, color: c.accent),
+                        const SizedBox(width: 4),
+                        Text('${AgentInstaller.recipe(tab.agent!).name} open', style: TextStyle(color: c.text, fontSize: 11)),
+                      ]),
+                      const SizedBox(height: 4),
+                    ],
                     if (_repo case final repo?)
                       ListenableBuilder(listenable: repo, builder: (context, _) => _GitLine(repo: repo, opened: p.lastOpened))
                     else

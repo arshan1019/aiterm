@@ -283,13 +283,37 @@ class _IdentityDialogState extends State<_IdentityDialog> {
   }
 }
 
+/// What came of a git action, for screens that show it in place (a card
+/// that stays until dismissed) instead of a passing snackbar.
+class GitOutcome {
+  const GitOutcome(this.message, {this.isError = false, this.action, this.onAction});
+
+  final String message;
+  final bool isError;
+
+  /// The next step ("Pull", "Details"), if there is one.
+  final String? action;
+  final VoidCallback? onAction;
+}
+
 /// Runs a git [action]; when it fails, offers the fix (set identity, sign
 /// in, install git, pull first) and retries once fixed. True on success.
-Future<bool> runGit(BuildContext context, Future<void> Function() action, {GitRepo? repo, String? done}) async {
+/// The result ([done] on success, the error otherwise) goes to [onOutcome]
+/// if given, else a snackbar.
+Future<bool> runGit(BuildContext context, Future<void> Function() action,
+    {GitRepo? repo, String? done, void Function(GitOutcome outcome)? onOutcome}) async {
   final messenger = ScaffoldMessenger.of(context);
+  void show(GitOutcome o) {
+    if (onOutcome != null) return onOutcome(o);
+    messenger.showSnackBar(SnackBar(
+      content: Text(o.message),
+      action: o.action == null ? null : SnackBarAction(label: o.action!, onPressed: o.onAction ?? () {}),
+    ));
+  }
+
   try {
     await action();
-    if (done != null) messenger.showSnackBar(SnackBar(content: Text(done)));
+    if (done != null) show(GitOutcome(done));
     return true;
   } on GitError catch (e) {
     if (!context.mounted) return false;
@@ -308,22 +332,19 @@ Future<bool> runGit(BuildContext context, Future<void> Function() action, {GitRe
     }
 
     final fixed = await fix();
-    if (fixed && context.mounted) return runGit(context, action, repo: repo, done: done);
+    if (fixed && context.mounted) return runGit(context, action, repo: repo, done: done, onOutcome: onOutcome);
     if (!context.mounted || e.kind == GitErrorKind.identity || e.kind == GitErrorKind.notInstalled) return false;
     if (e.kind == GitErrorKind.auth) return false;
-    messenger.showSnackBar(SnackBar(
-      content: Text(e.message),
-      action: e.kind == GitErrorKind.pullFirst && repo != null
-          ? SnackBarAction(label: 'Pull', onPressed: () {
-              if (context.mounted) runGit(context, repo.pull, repo: repo, done: 'Up to date');
-            })
-          : SnackBarAction(label: 'Details', onPressed: () {
-              if (context.mounted) showGitDetails(context, e.detail);
-            }),
-    ));
+    show(e.kind == GitErrorKind.pullFirst && repo != null
+        ? GitOutcome(e.message, isError: true, action: 'Pull', onAction: () {
+            if (context.mounted) runGit(context, repo.pull, repo: repo, done: 'Up to date', onOutcome: onOutcome);
+          })
+        : GitOutcome(e.message, isError: true, action: 'Details', onAction: () {
+            if (context.mounted) showGitDetails(context, e.detail);
+          }));
     return false;
   } catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text('$e')));
+    show(GitOutcome('$e', isError: true));
     return false;
   }
 }

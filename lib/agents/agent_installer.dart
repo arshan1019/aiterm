@@ -21,9 +21,9 @@ class AgentState {
 /// Runs a script in Linux, streaming output lines; returns the exit status.
 typedef ScriptRunner = Future<int> Function(String script, void Function(String line) onOutput);
 
-/// Opens a terminal tab titled [title], in folder [cwd] (a guest path) if
-/// given, and runs [commands] in it.
-typedef AgentLauncher = void Function(String title, List<String> commands, String? cwd);
+/// Opens (or goes back to) [agent]'s terminal tab titled [title], in folder
+/// [cwd] (a guest path) if given, running [commands].
+typedef AgentLauncher = void Function(AgentRecipe agent, String title, List<String> commands, String? cwd);
 
 /// One-tap install of AI coding agents: dependencies and the agent itself
 /// install in the background with progress; the user only signs in, in the
@@ -122,7 +122,7 @@ class AgentInstaller extends ChangeNotifier {
       }
     }
     final folder = cwd?.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => '/');
-    _launch(folder == null ? agent.name : '${agent.name} · $folder', [agent.command], cwd);
+    _launch(agent, folder == null ? agent.name : '${agent.name} · $folder', [agent.command], cwd);
   }
 
   static String _reason(String log, int code) {

@@ -62,7 +62,7 @@ void main() {
             }
             return code;
           },
-          launch: (title, commands, cwd) => launched.add((title, commands, cwd)),
+          launch: (agent, title, commands, cwd) => launched.add((title, commands, cwd)),
         );
 
     setUp(() {

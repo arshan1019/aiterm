@@ -13,7 +13,7 @@ import '../shared/fade_indexed_stack.dart';
 import '../shared/name_dialog.dart';
 import 'terminal_session.dart';
 import 'widgets/extra_keys_bar.dart';
-import 'widgets/setup_view.dart';
+import '../onboarding/setup_view.dart';
 import 'widgets/tab_strip.dart';
 import 'widgets/terminal_pane.dart';
 
@@ -117,13 +117,20 @@ class _WorkspaceState extends State<_Workspace> {
     return ColoredBox(
       color: context.colors.bg,
       child: ListenableBuilder(
-        listenable: Listenable.merge([tabs, nav]),
+        listenable: Listenable.merge([tabs, nav, _services.projects]),
         builder: (context, _) {
           final active = tabs.active;
           final showing = nav.tab == AppTab.terminal;
           return Column(
             children: [
-              TabStrip(tabs: tabs, onMenu: _tabMenu),
+              TabStrip(
+                tabs: tabs,
+                onMenu: _tabMenu,
+                leading: switch (_services.projectOf(active)) {
+                  final p? => _ProjectChip(key: ValueKey(p.id), name: p.name, onTap: () => nav.showProject(p.id)),
+                  null => null,
+                },
+              ),
               Expanded(
                 child: Stack(
                   children: [
@@ -145,6 +152,49 @@ class _WorkspaceState extends State<_Workspace> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// The active tab's project: tap to go back to it (as Android back does).
+class _ProjectChip extends StatelessWidget {
+  const _ProjectChip({super.key, required this.name, required this.onTap});
+
+  final String name;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Tooltip(
+        message: 'Back to project',
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
+            constraints: const BoxConstraints(maxWidth: 140),
+            decoration: BoxDecoration(
+              color: c.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.chevron_left_rounded, size: 18, color: c.accent),
+                Flexible(
+                  child: Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: c.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

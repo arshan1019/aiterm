@@ -29,6 +29,20 @@ class AppNavigation extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Builds a project's page (set by the app, which knows the screens).
+  Route<void> Function(String projectId)? projectRoute;
+
+  /// Shows project [id]'s page over the Projects tab, so back from it goes
+  /// home: the way back from an agent's tab to the project it works on.
+  void showProject(String id) {
+    _toTabs();
+    if (_tab != AppTab.projects) {
+      _tab = AppTab.projects;
+      notifyListeners();
+    }
+    if (projectRoute case final route?) navigatorKey.currentState?.push(route(id));
+  }
+
   void showFolder(String path) {
     _toTabs();
     pendingFolder = path;
