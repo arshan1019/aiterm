@@ -1,0 +1,465 @@
+[
+ {
+  "name": "install_package",
+  "description": "Install a named program, language or tool, e.g. node, npm, python, git.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "program to install"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "remove_package",
+  "description": "Uninstall a named program or package.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "program to uninstall"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "update_packages",
+  "description": "Update or upgrade all installed packages.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "install_dependencies",
+  "description": "Install the current project's dependencies (npm install). No program name.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "run_script",
+  "description": "Run a project script: dev server, tests, build or start.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "script": {
+     "type": "string",
+     "enum": [
+      "dev",
+      "test",
+      "build",
+      "start"
+     ],
+     "description": "which script"
+    }
+   },
+   "required": [
+    "script"
+   ]
+  }
+ },
+ {
+  "name": "create_folder",
+  "description": "Create a new folder.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "folder name"
+    }
+   }
+  }
+ },
+ {
+  "name": "create_file",
+  "description": "Create a new empty file.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "file name"
+    }
+   }
+  }
+ },
+ {
+  "name": "delete_file",
+  "description": "Delete a named file or folder.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "file or folder to delete"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "move_file",
+  "description": "Move or rename a file or folder.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "source": {
+     "type": "string",
+     "description": "file to move"
+    },
+    "destination": {
+     "type": "string",
+     "description": "new name or folder"
+    }
+   },
+   "required": [
+    "source",
+    "destination"
+   ]
+  }
+ },
+ {
+  "name": "copy_file",
+  "description": "Copy a file or folder.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "source": {
+     "type": "string",
+     "description": "file to copy"
+    },
+    "destination": {
+     "type": "string",
+     "description": "copy name or folder"
+    }
+   },
+   "required": [
+    "source",
+    "destination"
+   ]
+  }
+ },
+ {
+  "name": "show_file",
+  "description": "Print the contents of a file.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "file to show"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "edit_file",
+  "description": "Open a file in a text editor.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "file to edit"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "list_files",
+  "description": "List the files in a folder.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "folder"
+    }
+   }
+  }
+ },
+ {
+  "name": "change_directory",
+  "description": "Go into a folder.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "folder; .. is up, ~ is home"
+    }
+   },
+   "required": [
+    "path"
+   ]
+  }
+ },
+ {
+  "name": "current_folder",
+  "description": "Show the current folder path.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "find_files",
+  "description": "Find files by type or name.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "type": "string",
+     "description": "file type, e.g. python, pdf, images"
+    },
+    "name": {
+     "type": "string",
+     "description": "part of the file name"
+    },
+    "path": {
+     "type": "string",
+     "description": "folder to search"
+    }
+   }
+  }
+ },
+ {
+  "name": "search_text",
+  "description": "Search for text inside files.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "query": {
+     "type": "string",
+     "description": "text to find"
+    },
+    "path": {
+     "type": "string",
+     "description": "folder to search"
+    }
+   },
+   "required": [
+    "query"
+   ]
+  }
+ },
+ {
+  "name": "free_space",
+  "description": "Show free disk space.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "find_big_files",
+  "description": "Show the biggest files and folders.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "folder"
+    }
+   }
+  }
+ },
+ {
+  "name": "show_processes",
+  "description": "Show running programs.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "kill_process",
+  "description": "Stop a running program.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "description": "program to stop"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "git_status",
+  "description": "Show git status: what changed.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "git_commit",
+  "description": "Commit all changes with a message.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "message": {
+     "type": "string",
+     "description": "commit message"
+    }
+   },
+   "required": [
+    "message"
+   ]
+  }
+ },
+ {
+  "name": "git_push",
+  "description": "Push commits to the remote.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "git_clone",
+  "description": "Clone a git repository.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "repository URL"
+    }
+   },
+   "required": [
+    "url"
+   ]
+  }
+ },
+ {
+  "name": "download_file",
+  "description": "Download a file from a URL.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "url": {
+     "type": "string",
+     "description": "file URL"
+    }
+   },
+   "required": [
+    "url"
+   ]
+  }
+ },
+ {
+  "name": "start_claude",
+  "description": "Start Claude Code, the AI coding assistant.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "set_font_size",
+  "description": "Make the terminal text bigger or smaller.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "change": {
+     "type": "string",
+     "enum": [
+      "bigger",
+      "smaller"
+     ],
+     "description": "direction"
+    }
+   },
+   "required": [
+    "change"
+   ]
+  }
+ },
+ {
+  "name": "set_theme",
+  "description": "Switch the app to light or dark theme.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "theme": {
+     "type": "string",
+     "enum": [
+      "light",
+      "dark"
+     ],
+     "description": "theme"
+    }
+   },
+   "required": [
+    "theme"
+   ]
+  }
+ },
+ {
+  "name": "open_tab",
+  "description": "Open an app tab: terminal, files or settings.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "tab": {
+     "type": "string",
+     "enum": [
+      "terminal",
+      "files",
+      "settings"
+     ],
+     "description": "tab"
+    }
+   },
+   "required": [
+    "tab"
+   ]
+  }
+ },
+ {
+  "name": "restart_shell",
+  "description": "Restart the terminal session.",
+  "parameters": {
+   "type": "object",
+   "properties": {}
+  }
+ },
+ {
+  "name": "show_in_files",
+  "description": "Open a folder in the file browser.",
+  "parameters": {
+   "type": "object",
+   "properties": {
+    "path": {
+     "type": "string",
+     "description": "folder"
+    }
+   }
+  }
+ }
+]
