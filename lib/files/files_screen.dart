@@ -662,7 +662,6 @@ class _LocationSwitcher extends StatelessWidget {
         width: double.infinity,
         child: SegmentedButton<LocationKind>(
           showSelectedIcon: false,
-          style: const ButtonStyle(visualDensity: VisualDensity.compact),
           segments: const [
             ButtonSegment(
               value: LocationKind.linux,

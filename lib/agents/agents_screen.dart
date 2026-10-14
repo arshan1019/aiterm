@@ -121,7 +121,7 @@ class _AgentCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(state.message ?? 'Install failed.', style: TextStyle(color: c.danger, fontSize: 12)),
                 TextButton(
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
                   onPressed: () => _details(context, state),
                   child: const Text('Show details'),
                 ),

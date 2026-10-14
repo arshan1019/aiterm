@@ -225,7 +225,6 @@ class _PortAnnouncement extends StatelessWidget {
                           child: const Text('Preview'),
                         ),
                         IconButton(
-                          visualDensity: VisualDensity.compact,
                           icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
                           onPressed: preview.dismiss,
                         ),

@@ -491,10 +491,20 @@ void main() {
     await tester.pumpWidget(AiTermApp(services: services));
     await settleIo(tester);
 
+    // Every finding on every screen, reported together.
+    final findings = <String>[];
     Future<void> check(String screen) async {
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline), reason: '$screen: 48dp targets');
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline), reason: '$screen: labels');
-      await expectLater(tester, meetsGuideline(textContrastGuideline), reason: '$screen: contrast');
+      for (final (name, guideline) in [
+        ('48dp targets', androidTapTargetGuideline),
+        ('labels', labeledTapTargetGuideline),
+        ('contrast', textContrastGuideline),
+      ]) {
+        try {
+          await expectLater(tester, meetsGuideline(guideline));
+        } on TestFailure catch (e) {
+          findings.add('$screen / $name: ${e.message}');
+        }
+      }
     }
 
     await check('Projects');
@@ -511,6 +521,7 @@ void main() {
     await settleIo(tester);
     await check('Settings');
     semantics.dispose();
+    expect(findings, isEmpty, reason: findings.join('\n\n'));
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 

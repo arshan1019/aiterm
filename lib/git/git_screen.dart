@@ -574,7 +574,6 @@ class _GroupHeader extends StatelessWidget {
               style: TextStyle(color: c.textMuted, fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w600)),
           const Spacer(),
           TextButton(
-            style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
             onPressed: onAction,
             child: Text(action, style: const TextStyle(fontSize: 12)),
           ),
@@ -684,7 +683,6 @@ class _OutcomeCard extends StatelessWidget {
           if (outcome.action case final action?) TextButton(onPressed: outcome.onAction, child: Text(action)),
           IconButton(
             tooltip: 'Dismiss',
-            visualDensity: VisualDensity.compact,
             icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
             onPressed: onDismiss,
           ),

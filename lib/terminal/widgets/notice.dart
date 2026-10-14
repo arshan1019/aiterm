@@ -66,7 +66,6 @@ class Notice extends StatelessWidget {
             TextButton(onPressed: onAction, child: Text(action)),
             if (onDismiss != null)
               IconButton(
-                visualDensity: VisualDensity.compact,
                 icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
                 onPressed: onDismiss,
               ),
