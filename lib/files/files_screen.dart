@@ -17,6 +17,8 @@ import 'file_clipboard.dart';
 import 'file_system_service.dart';
 import 'files_browser.dart';
 import 'text_editor_screen.dart';
+import '../editor/editor_screen.dart';
+import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 /// Browse files, open text files, and create, rename, copy or delete
 /// entries. The Files tab (Linux home and the phone's storage), or a
@@ -188,7 +190,10 @@ class _FilesScreenState extends State<FilesScreen> {
     } else if (_browser.fs.looksLikeText(e.name)) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => TextEditorScreen(entry: e, fs: _browser.fs),
+          // The code editor runs in a WebView; without one (tests), plain text.
+          builder: (_) => WebViewPlatform.instance != null
+              ? EditorScreen(entry: e, fs: _browser.fs)
+              : TextEditorScreen(entry: e, fs: _browser.fs),
         ),
       );
     } else {

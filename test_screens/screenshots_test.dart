@@ -206,6 +206,14 @@ void main() {
     s.navigation.open(AppTab.files);
     await settle(tester);
     await shot(tester, '18-files');
+    await tester.tap(find.byIcon(Icons.add_rounded).last);
+    await settle(tester);
+    await shot(tester, '22-files-add-menu');
+    await tester.tapAt(const Offset(20, 300));
+    await settle(tester);
+    await tester.tap(find.text('Phone'));
+    await settle(tester);
+    await shot(tester, '23-phone-choose');
     s.navigation.open(AppTab.projects);
     await settle(tester);
     await tester.tap(find.text('Agents'));

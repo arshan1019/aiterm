@@ -40,6 +40,7 @@ dependencies:
   http: ^1.6.0
   crypto: ^3.0.7
   webview_flutter: ^4.14.1
+  webview_flutter_platform_interface: ^2.15.1
 
 dev_dependencies:
   flutter_test:
@@ -65,6 +66,7 @@ flutter:
 
   assets:
     - assets/needle_tools.json
+    - assets/editor/
 
   fonts:
     - family: JetBrainsMono

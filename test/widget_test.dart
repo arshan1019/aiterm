@@ -466,10 +466,11 @@ void main() {
     await tester.tap(find.text('files'));
     await settleIo(tester);
 
-    // Phone without permission: a clear prompt, not an empty or broken list.
+    // Phone without permission: choose folders or allow all files, side by side.
     await tester.tap(find.text('Phone'));
     await settleIo(tester);
-    expect(find.text('Allow access'), findsOneWidget);
+    expect(find.text('Choose folders'), findsOneWidget);
+    expect(find.text('Allow all files'), findsOneWidget);
     await tester.tap(find.text('Linux'));
     await settleIo(tester);
     expect(find.text('notes.txt'), findsOneWidget);
