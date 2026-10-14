@@ -4,6 +4,7 @@ import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../shared/format.dart';
+import '../git/github_button.dart';
 import 'phone_files.dart';
 
 /// Files shared to aiterm (Share → aiterm in any app): asks which project
@@ -24,6 +25,12 @@ class _ShareReceiverState extends State<ShareReceiver> {
     super.initState();
     _s.phone.shared.addListener(_onShared);
     WidgetsBinding.instance.addPostFrameCallback((_) => _onShared());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheGitHubMarks(context);
   }
 
   @override

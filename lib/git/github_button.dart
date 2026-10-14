@@ -4,6 +4,14 @@ import '../app/theme.dart';
 /// GitHub's button: the official Invertocat (assets/github, from
 /// brand.github.com) in black or white only, on the highest-contrast
 /// surface for the theme, unmodified, as GitHub's logo guidelines ask.
+/// GitHub's marks, decoded at startup so the button never flashes without
+/// its mark (first frame, or switching between light and dark).
+void precacheGitHubMarks(BuildContext context) {
+  for (final mark in const ['assets/github/GitHub_Invertocat_Black.png', 'assets/github/GitHub_Invertocat_White.png']) {
+    precacheImage(AssetImage(mark), context).ignore();
+  }
+}
+
 class GitHubButton extends StatelessWidget {
   const GitHubButton({super.key, required this.label, required this.onPressed});
 
@@ -28,6 +36,7 @@ class GitHubButton extends StatelessWidget {
         width: 20,
         height: 20,
         excludeFromSemantics: true,
+        gaplessPlayback: true,
       ),
       label: Text(label),
     );

@@ -181,8 +181,9 @@ class _BottomActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final signedIn = context.services.github.user != null;
+    // Beside Add project there's room for the mark and one word.
     final github = GitHubButton(
-      label: signedIn ? 'Your repositories' : 'Sign in with GitHub',
+      label: !empty ? 'GitHub' : (signedIn ? 'Your repositories' : 'Sign in with GitHub'),
       onPressed: () => openGitHubRepos(context),
     );
     return SafeArea(
