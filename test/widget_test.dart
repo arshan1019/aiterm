@@ -444,6 +444,7 @@ void main() {
     File('${dir.path}/projects.json').writeAsStringSync(jsonEncode([
       {'id': '1', 'name': 'Weather app', 'path': '/root/app', 'created': now, 'opened': now},
       {'id': '2', 'name': 'Old thing', 'path': '/root/old', 'created': now, 'opened': now - 1000},
+      {'id': '3', 'name': 'On the phone', 'path': '/sdcard/site', 'created': now, 'opened': now - 2000},
     ]));
     messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
     final services = await boot(tester, home: true);
@@ -461,8 +462,16 @@ void main() {
     await settleIo(tester);
     expect(find.text('Forecast'), findsOneWidget);
 
-    // Delete asks first, then removes the project and its folder.
+    // A project already on phone storage isn't offered an export to the phone.
     await tester.tap(find.byTooltip('Project actions').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Rename'), findsOneWidget);
+    expect(find.text('Export to phone'), findsNothing);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    // Delete asks first, then removes the project and its folder.
+    await tester.tap(find.byTooltip('Project actions').at(1));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete project and files'));
     await tester.pumpAndSettle();
@@ -470,7 +479,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
     await settleIo(tester);
     expect(find.text('Old thing'), findsNothing);
-    expect(services.projects.projects.map((p) => p.name), ['Forecast']);
+    expect(services.projects.projects.map((p) => p.name), ['Forecast', 'On the phone']);
     expect(Directory('${dir.path}/alpine/root/old').existsSync(), isFalse);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });

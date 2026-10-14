@@ -21,7 +21,7 @@ void showProjectActions(BuildContext context, Project p, {bool showOpen = true})
       final name = await showNameDialog(context, title: 'Rename project', action: 'Rename', initial: p.name);
       if (name != null) await s.projects.rename(p, name);
     }),
-    SheetAction(Icons.ios_share_rounded, 'Export to phone', () => _export(context, p)),
+    if (!onPhoneStorage(p.path)) SheetAction(Icons.ios_share_rounded, 'Export to phone', () => _export(context, p)),
     null,
     SheetAction(Icons.playlist_remove_rounded, 'Remove from projects', () => _remove(context, p)),
     SheetAction(Icons.delete_outline_rounded, 'Delete project and files', () => _delete(context, p), danger: true),
@@ -83,8 +83,13 @@ Future<void> _delete(BuildContext context, Project p) async {
 
 Future<void> openLinuxFolderAsProject(BuildContext context) async {
   final s = context.services;
+  final messenger = ScaffoldMessenger.of(context);
   final path = await pickLinuxFolder(context, title: 'Open a folder', action: 'Open');
   if (path == null) return;
+  if (onPhoneStorage(path)) {
+    messenger.showSnackBar(const SnackBar(content: Text('That folder is on phone storage. Use Import from phone.')));
+    return;
+  }
   s.showProject(await s.projectService.openExisting(path));
 }
 

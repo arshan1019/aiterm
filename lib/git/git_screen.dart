@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../shared/action_sheet.dart';
@@ -154,11 +155,15 @@ class _RepoMenu extends StatelessWidget {
       icon: const Icon(Icons.more_vert_rounded),
       onPressed: () => showActionSheet(context, title: shortPath(repo.path), actions: [
         SheetAction(Icons.call_split_rounded, 'Branches', () => showBranchSheet(context, repo)),
-        SheetAction(Icons.cloud_download_outlined, 'Fetch', () => runGit(context, repo.fetch, repo: repo, done: 'Fetched')),
+        if (repo.remotes?.isNotEmpty ?? false)
+          SheetAction(Icons.cloud_download_outlined, 'Fetch', () => runGit(context, repo.fetch, repo: repo, done: 'Fetched')),
         if (repo.remotes?.isEmpty ?? false)
           SheetAction(Icons.cloud_upload_outlined, 'Publish to GitHub', () => publishToGitHub(context, repo)),
         null,
-        SheetAction(Icons.terminal_rounded, 'Open terminal here', () => s.tabs.open(cwd: repo.path)),
+        SheetAction(Icons.terminal_rounded, 'Open terminal here', () {
+          s.tabs.open(cwd: repo.path);
+          s.navigation.open(AppTab.terminal);
+        }),
         SheetAction(Icons.folder_open_rounded, 'Show in Files', () => s.navigation.showFolder(repo.path)),
         SheetAction(Icons.badge_outlined, 'Commit name & email', () => askCommitIdentity(context)),
       ]),

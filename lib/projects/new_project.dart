@@ -97,7 +97,8 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
 
   Future<void> _pickParent() async {
     final picked = await pickLinuxFolder(context, title: 'Create in', start: _parent, action: 'Use');
-    if (picked != null) setState(() => _parent = picked);
+    if (picked == null) return;
+    setState(() => onPhoneStorage(picked) ? _error = 'Choose a folder in Linux, not on phone storage.' : _parent = picked);
   }
 
   Future<void> _create() async {

@@ -284,7 +284,7 @@ class _FilesScreenState extends State<FilesScreen> {
       actions: [
         if (folder && !onPhone) ...[
           SheetAction(Icons.terminal_rounded, 'Open terminal here', () => _openTerminalHere(e.path)),
-          if (_project == null)
+          if (_project == null && _inLinux)
             for (final agent in _services.agents.installed)
             SheetAction(
               Icons.auto_awesome_rounded,
@@ -326,7 +326,7 @@ class _FilesScreenState extends State<FilesScreen> {
               browser: _browser,
               agents: _services.agents,
               onOpenTerminal: _openTerminalHere,
-              onOpenAgent: _project == null ? _openInAgent : null,
+              onOpenAgent: _project == null && _inLinux ? _openInAgent : null,
               onGit: _inLinux && _project == null ? _openGit : null,
               onProject: _inLinux && _project == null ? _openAsProject : null,
               phoneChoices: _browser.location.kind == LocationKind.phone && !_phoneAccess,
@@ -365,7 +365,7 @@ class _FilesScreenState extends State<FilesScreen> {
                       ),
                     ),
             ),
-            _PasteBar(clipboard: _clipboard, onPaste: _paste),
+            _PasteBar(clipboard: _clipboard, onPaste: _onPhoneChoicesRoot ? null : _paste),
           ],
         ),
       ),
@@ -728,7 +728,8 @@ class _PasteBar extends StatelessWidget {
   const _PasteBar({required this.clipboard, required this.onPaste});
 
   final FileClipboard clipboard;
-  final VoidCallback onPaste;
+  /// Null where nothing can be pasted (the list of chosen phone folders).
+  final VoidCallback? onPaste;
 
   @override
   Widget build(BuildContext context) {
