@@ -41,6 +41,7 @@ class SettingsScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
+                      tooltip: 'Smaller text',
                       icon: Icon(Icons.remove_rounded, size: 18, color: c.textMuted),
                       onPressed: () => s.settings.stepFontSize(-1),
                     ),
@@ -56,6 +57,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     IconButton(
+                      tooltip: 'Larger text',
                       icon: Icon(Icons.add_rounded, size: 18, color: c.textMuted),
                       onPressed: () => s.settings.stepFontSize(1),
                     ),

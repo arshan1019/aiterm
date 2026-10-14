@@ -608,13 +608,12 @@ class _ListingState extends State<_Listing> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(top: 4, bottom: 96),
               itemCount: entries.length,
-              itemExtent: 52,
+              itemExtent: 60,
               itemBuilder: (context, i) {
                 final e = entries[i];
                 final dir = e.kind == EntryKind.directory;
                 return ListTile(
                   dense: true,
-                  visualDensity: VisualDensity.compact,
                   leading: Icon(
                     dir ? Icons.folder_rounded : Icons.description_outlined,
                     color: dir ? c.accent : c.textMuted,
