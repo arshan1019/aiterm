@@ -571,7 +571,18 @@ void main() {
       await tester.pumpWidget(AiTermApp(services: services));
       await settleIo(tester);
 
-      debugPrint('DIAG tab=${services.navigation.tab} projects=${services.projects.projects.map((p) => p.name)} linux=${services.linux.installed} texts=${find.byType(Text, skipOffstage: false).evaluate().length} onstage=${find.byType(Text).evaluate().map((e) => (e.widget as Text).data).join(" | ")}');
+      for (final e in find.byType(Scaffold, skipOffstage: false).evaluate()) {
+        debugPrint('DIAG scaffold ${e.size}');
+      }
+      for (final e in find.byType(ListView, skipOffstage: false).evaluate()) {
+        debugPrint('DIAG list ${e.size} ${(e.renderObject as RenderBox).localToGlobal(Offset.zero)}');
+      }
+      for (final e in find.byType(NavigationBar, skipOffstage: false).evaluate()) {
+        debugPrint('DIAG nav ${e.size}');
+      }
+      for (final e in find.text('Add project', skipOffstage: false).evaluate()) {
+        debugPrint('DIAG add ${(e.renderObject as RenderBox).localToGlobal(Offset.zero)}');
+      }
       await tester.tap(find.text('Weather app with a long name'));
       await settleIo(tester);
       for (final tab in [WorkspaceTab.changes, WorkspaceTab.files, WorkspaceTab.preview, WorkspaceTab.agent]) {
