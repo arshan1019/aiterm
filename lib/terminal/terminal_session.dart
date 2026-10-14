@@ -11,6 +11,11 @@ import 'shell_integration.dart';
 
 enum SessionState { idle, starting, running, exited }
 
+/// What a tab is doing, at a glance (its dot, its project's card): a
+/// command or agent working, waiting for the user (it rang the bell or sent
+/// a notification), idle at the prompt, or ended.
+enum SessionActivity { idle, working, needsInput, ended }
+
 /// Builds what to run for a tab, starting in [cwd] (a guest path) if given.
 typedef SpecFor = Future<SessionSpec> Function(String? cwd);
 
@@ -105,7 +110,10 @@ class TerminalSession {
     terminal.onResize = (cols, rows, _, _) => _onResize(rows, cols);
     terminal.onTitleChange = _onShellTitle;
     terminal.onPrivateOSC = _onOsc;
-    terminal.onBell = () => onSignal?.call(const BellSignal());
+    terminal.onBell = () {
+      _attention();
+      onSignal?.call(const BellSignal());
+    };
   }
 
   final int id;
@@ -123,6 +131,18 @@ class TerminalSession {
 
   /// Changes worth reviewing (an agent in this tab edited files).
   final review = ValueNotifier<ReviewHint?>(null);
+
+  /// What the tab is doing ([SessionActivity]).
+  final activity = ValueNotifier(SessionActivity.idle);
+
+  /// The user looked at the tab: a "needs input" is acknowledged.
+  void seen() {
+    if (activity.value == SessionActivity.needsInput) activity.value = busy ? SessionActivity.working : SessionActivity.idle;
+  }
+
+  void _attention() {
+    if (state.value != SessionState.exited) activity.value = SessionActivity.needsInput;
+  }
 
   /// Android killed a process here (exit 137: signal 9), usually the
   /// background limits keep-alive lifts. Cleared by the next command.
@@ -248,7 +268,10 @@ class TerminalSession {
 
   /// The tab may be closed while a start is still in flight.
   void _setState(SessionState s) {
-    if (!_disposed) state.value = s;
+    if (_disposed) return;
+    state.value = s;
+    if (s == SessionState.exited) activity.value = SessionActivity.ended;
+    if (s == SessionState.running && activity.value == SessionActivity.ended) activity.value = SessionActivity.idle;
   }
 
   void _connect(PtySession pty) {
@@ -300,8 +323,13 @@ class TerminalSession {
       if (handled) return;
     }
     _pty?.write(data);
+    // Typing answers whatever the program was waiting for.
+    if (activity.value == SessionActivity.needsInput) {
+      activity.value = busy ? SessionActivity.working : SessionActivity.idle;
+    }
     if (data.contains('\r')) {
       _commands.onEnter();
+      if (_commands.busy) activity.value = SessionActivity.working;
       // A new command started: earlier errors no longer apply.
       _recent.clear();
       fix.value = null;
@@ -341,10 +369,12 @@ class TerminalSession {
           onPersistable?.call();
         }
       case ShellNotification n:
+        _attention();
         onSignal?.call(NotifySignal(n));
       case final ShellEvent e:
         if (_commands.onEvent(e) case final done?) {
           if (done.exitCode == _sigkill) killed.value = true;
+          activity.value = SessionActivity.idle;
           onSignal?.call(CommandSignal(done));
         }
       case null:
@@ -436,6 +466,7 @@ class TerminalSession {
     fix.dispose();
     review.dispose();
     killed.dispose();
+    activity.dispose();
   }
 
   /// 128 + SIGKILL, as shells and the PTY report a killed process.

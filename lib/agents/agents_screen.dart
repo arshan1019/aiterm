@@ -126,24 +126,28 @@ class _AgentCard extends StatelessWidget {
     );
   }
 
+  /// Open, Install and Retry share one size, so the column of buttons lines up.
+  static const _actionSize = Size(104, 48);
+
   Widget _action(BuildContext context, AgentState state) {
     switch (state.status) {
       case AgentStatus.installed:
         return FilledButton(
           key: const ValueKey('open'),
+          style: FilledButton.styleFrom(fixedSize: _actionSize),
           onPressed: () => openAgentInProject(context, agent.id),
           child: const Text('Open'),
         );
       case AgentStatus.installing:
-        return const SizedBox(
-          key: ValueKey('busy'),
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2),
+        return SizedBox.fromSize(
+          key: const ValueKey('busy'),
+          size: _actionSize,
+          child: const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
         );
       case AgentStatus.failed:
         return OutlinedButton(
           key: const ValueKey('retry'),
+          style: OutlinedButton.styleFrom(fixedSize: _actionSize),
           onPressed: installer.busy ? null : () => installer.install(agent.id),
           child: const Text('Retry'),
         );
@@ -151,6 +155,7 @@ class _AgentCard extends StatelessWidget {
       case AgentStatus.notInstalled:
         return OutlinedButton(
           key: const ValueKey('install'),
+          style: OutlinedButton.styleFrom(fixedSize: _actionSize),
           onPressed: installer.busy ? null : () => installer.install(agent.id),
           child: const Text('Install'),
         );

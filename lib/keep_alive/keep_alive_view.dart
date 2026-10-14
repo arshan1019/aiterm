@@ -34,7 +34,7 @@ class KeepAliveSteps extends StatelessWidget {
               trailing: AnimatedSwitcher(
                 duration: Motion.standard,
                 child: step.done
-                    ? Icon(Icons.check_circle_rounded, key: const ValueKey('done'), color: c.accent)
+                    ? Icon(Icons.check_circle_rounded, key: const ValueKey('done'), color: c.success)
                     : TextButton(
                         key: const ValueKey('fix'),
                         onPressed: controller.fixing && step.kind == StepKind.childProcesses ? null : () => _fix(step.kind),

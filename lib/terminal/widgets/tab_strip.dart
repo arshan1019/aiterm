@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/theme.dart';
+import '../../platform/haptics.dart';
 import '../terminal_session.dart';
 import '../terminal_tabs.dart';
 
@@ -78,7 +79,10 @@ class _TabStripState extends State<TabStrip> {
                     onTap: () => tabs[i].id == activeId
                         ? widget.onMenu(tabs[i])
                         : widget.tabs.select(tabs[i]),
-                    onLongPress: () => widget.onMenu(tabs[i]),
+                    onLongPress: () {
+                      Haptics.longPress();
+                      widget.onMenu(tabs[i]);
+                    },
                     onClose: () => widget.tabs.close(tabs[i]),
                   ),
                 );
@@ -135,6 +139,21 @@ class _Tab extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Working (accent) or waiting for you (amber); idle shows nothing.
+              if (session.activity.value case SessionActivity.working || SessionActivity.needsInput) ...[
+                Semantics(
+                  label: session.activity.value == SessionActivity.working ? 'Working' : 'Needs input',
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: session.activity.value == SessionActivity.working ? c.accent : c.warning,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
               if (session.pinned) ...[
                 Icon(Icons.push_pin_rounded, size: 12, color: active ? c.accent : c.textMuted),
                 const SizedBox(width: 4),

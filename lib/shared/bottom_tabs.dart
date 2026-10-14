@@ -3,7 +3,7 @@ import '../app/theme.dart';
 
 /// One destination of a [BottomTabs] bar.
 class BottomTab {
-  const BottomTab(this.label, this.icon, this.selectedIcon, {this.badge});
+  const BottomTab(this.label, this.icon, this.selectedIcon, {this.badge, this.badgeColor});
 
   final String label;
   final IconData icon;
@@ -11,6 +11,9 @@ class BottomTab {
 
   /// A count ("3") or a dot (""), shown on the icon; null for none.
   final String? badge;
+
+  /// The badge's color; the accent when null.
+  final Color? badgeColor;
 }
 
 /// Navigation at the bottom, in thumb reach (Material navigation bar,
@@ -38,8 +41,8 @@ class BottomTabs extends StatelessWidget {
         destinations: [
           for (final t in tabs)
             NavigationDestination(
-              icon: _withBadge(t.icon, t.badge, c),
-              selectedIcon: _withBadge(t.selectedIcon, t.badge, c),
+              icon: _withBadge(t.icon, t.badge, t.badgeColor ?? c.accent, c),
+              selectedIcon: _withBadge(t.selectedIcon, t.badge, t.badgeColor ?? c.accent, c),
               label: t.label,
             ),
         ],
@@ -47,11 +50,11 @@ class BottomTabs extends StatelessWidget {
     );
   }
 
-  static Widget _withBadge(IconData icon, String? badge, AppColors c) {
+  static Widget _withBadge(IconData icon, String? badge, Color color, AppColors c) {
     final child = Icon(icon);
     if (badge == null) return child;
     return Badge(
-      backgroundColor: c.accent,
+      backgroundColor: color,
       textColor: c.bg,
       smallSize: 8,
       label: badge.isEmpty ? null : Text(badge),

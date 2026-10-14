@@ -30,6 +30,9 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
   String _filter = '';
   String? _cloning;
 
+  /// Why the last clone failed, until dismissed or another clone starts.
+  String? _failure;
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +54,10 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
   Future<void> _open(GitHubRepo repo) async {
     if (_cloning != null) return;
     if (!await ensureGitTools(context) || !mounted) return;
-    setState(() => _cloning = repo.fullName);
+    setState(() {
+      _cloning = repo.fullName;
+      _failure = null;
+    });
     try {
       _s.showProject(await _s.projectService.addRepository(repo.cloneUrl, name: repo.name));
     } on GitError catch (e) {
@@ -63,8 +69,10 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
 
   void _fail(String message) {
     if (!mounted) return;
-    setState(() => _cloning = null);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    setState(() {
+      _cloning = null;
+      _failure = message;
+    });
   }
 
   @override
@@ -83,6 +91,27 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
               onChanged: (v) => setState(() => _filter = v.trim().toLowerCase()),
             ),
           ),
+          if (_failure case final f?)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+              decoration: BoxDecoration(
+                color: c.danger.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(Radii.large),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline_rounded, size: 18, color: c.danger),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(f, style: TextStyle(color: c.text, fontSize: 13))),
+                  IconButton(
+                    tooltip: 'Dismiss',
+                    icon: Icon(Icons.close_rounded, size: 18, color: c.textMuted),
+                    onPressed: () => setState(() => _failure = null),
+                  ),
+                ],
+              ),
+            ),
           SizedBox(height: 2, child: _cloning != null || (repos == null && _error == null) ? const LinearProgressIndicator(minHeight: 2) : null),
           Expanded(
             child: _error != null

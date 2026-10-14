@@ -9,6 +9,7 @@ import '../git/git_repo.dart';
 import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/format.dart';
+import '../terminal/terminal_session.dart';
 import '../onboarding/setup_view.dart';
 import 'new_project.dart';
 import 'project.dart';
@@ -117,7 +118,7 @@ class _PreviewChip extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
       child: ListTile(
         dense: true,
-        leading: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle)),
+        leading: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.success, shape: BoxShape.circle)),
         minLeadingWidth: 8,
         title: Text('localhost:$port is live', style: TextStyle(color: c.text, fontSize: 13)),
         trailing: Text('Preview', style: TextStyle(color: c.accent, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -317,7 +318,18 @@ class _ProjectCardState extends State<_ProjectCard> {
                       Row(children: [
                         Icon(Icons.auto_awesome_rounded, size: 13, color: c.accent),
                         const SizedBox(width: 4),
-                        Text('${AgentInstaller.recipe(tab.agent!).name} open', style: TextStyle(color: c.text, fontSize: 11)),
+                        Text(
+                          '${AgentInstaller.recipe(tab.agent!).name} · ${switch (tab.activity.value) {
+                            SessionActivity.working => 'working',
+                            SessionActivity.needsInput => 'needs input',
+                            SessionActivity.idle => 'idle',
+                            SessionActivity.ended => 'ended',
+                          }}',
+                          style: TextStyle(
+                            color: tab.activity.value == SessionActivity.needsInput ? c.warning : c.text,
+                            fontSize: 12,
+                          ),
+                        ),
                       ]),
                       const SizedBox(height: 4),
                     ],
@@ -360,7 +372,7 @@ class _GitLine extends StatelessWidget {
         Flexible(child: Text(s.branch ?? 'detached', maxLines: 1, overflow: TextOverflow.ellipsis, style: codeStyle(c.textMuted, size: 12))),
         if (changed > 0) ...[
           const SizedBox(width: 10),
-          Container(width: 6, height: 6, decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle)),
+          Container(width: 6, height: 6, decoration: BoxDecoration(color: c.warning, shape: BoxShape.circle)),
           const SizedBox(width: 4),
           Text(plural(changed, 'change'), style: style),
         ],

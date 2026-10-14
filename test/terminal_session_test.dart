@@ -45,4 +45,28 @@ void main() {
     s.terminal.write('one\r\ntwo\r\n\x1b[31mthree\x1b[0m\r\n');
     expect(s.lastOutputLine(), 'three');
   });
+
+  group('activity: what a tab shows at a glance', () {
+    test('working while a command runs, idle at the prompt', () {
+      expect(s.activity.value, SessionActivity.idle);
+      s.terminal.write('\x1b]133;A\x07');
+      s.terminal.textInput('claude\r');
+      expect(s.activity.value, SessionActivity.working);
+      s.terminal.write('\x1b]133;D;0\x07\x1b]133;A\x07');
+      expect(s.activity.value, SessionActivity.idle);
+    });
+
+    test('a notification or bell means it needs input, until the user answers', () {
+      s.terminal.write('\x1b]133;A\x07');
+      s.terminal.textInput('claude\r');
+      s.terminal.write('\x1b]9;Claude needs your permission\x07');
+      expect(s.activity.value, SessionActivity.needsInput);
+      s.terminal.textInput('y');
+      expect(s.activity.value, SessionActivity.working);
+      s.terminal.write('\x07');
+      expect(s.activity.value, SessionActivity.needsInput);
+      s.seen();
+      expect(s.activity.value, SessionActivity.working);
+    });
+  });
 }

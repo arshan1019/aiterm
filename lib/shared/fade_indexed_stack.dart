@@ -9,13 +9,14 @@ class FadeIndexedStack extends StatefulWidget {
     super.key,
     required this.index,
     required this.children,
-    this.duration = Motion.standard,
+    this.duration,
     this.rise = 0,
   });
 
   final int index;
   final List<Widget> children;
-  final Duration duration;
+  /// Motion.standard when null.
+  final Duration? duration;
 
   /// Pixels the incoming child rises by while fading in.
   final double rise;
@@ -25,7 +26,7 @@ class FadeIndexedStack extends StatefulWidget {
 }
 
 class _FadeIndexedStackState extends State<FadeIndexedStack> with SingleTickerProviderStateMixin {
-  late final _controller = AnimationController(vsync: this, duration: widget.duration, value: 1);
+  late final _controller = AnimationController(vsync: this, duration: widget.duration ?? Motion.standard, value: 1);
   late final _fade = CurvedAnimation(parent: _controller, curve: Motion.enter);
 
   @override

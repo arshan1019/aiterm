@@ -110,6 +110,7 @@ class _EditorScreenState extends State<EditorScreen> {
         'textMuted': hex(c.textMuted),
         'accent': hex(c.accent),
         'danger': hex(c.danger),
+        'warning': hex(c.warning),
       },
       'dark': _s.settings.dark,
       'fontSize': _s.settings.fontSize,

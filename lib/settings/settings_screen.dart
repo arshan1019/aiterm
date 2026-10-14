@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../platform/haptics.dart';
 import '../backup/backup_controller.dart';
 import '../git/git_actions.dart';
 import '../git/github_auth.dart';
@@ -35,7 +36,10 @@ class SettingsScreen extends StatelessWidget {
               SwitchListTile(
                 title: const Text('Dark theme', style: TextStyle(fontSize: 14)),
                 value: s.settings.dark,
-                onChanged: (v) => s.settings.dark = v,
+                onChanged: (v) {
+                  Haptics.toggle(v);
+                  s.settings.dark = v;
+                },
               ),
               ListTile(
                 title: const Text('Terminal text size', style: TextStyle(fontSize: 14)),
@@ -272,7 +276,7 @@ class _SshSection extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+              padding: const EdgeInsets.all(4),
               child: TextButton.icon(
                 onPressed: () => _create(context),
                 icon: const Icon(Icons.add_rounded, size: 18),
@@ -310,7 +314,7 @@ class _BackupSection extends StatelessWidget {
         title: 'Backup',
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            padding: const EdgeInsets.all(4),
             child: Row(
               children: [
                 TextButton.icon(

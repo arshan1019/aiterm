@@ -35,10 +35,11 @@ let pendingText = null;
 const lspHandlers = new Set();
 
 function palette(dark) {
-  // The terminal's ANSI colours, so code looks the same everywhere.
+  // The terminal's ANSI colours (lib/app/theme.dart TerminalPalette, from
+  // the same OKLCH generator), so code looks the same everywhere.
   return dark
-    ? { red: '#E2685A', green: '#6FBF73', yellow: '#D9B35C', blue: '#6C9EE5', magenta: '#B07CD1', cyan: '#5EC4A8' }
-    : { red: '#C0392B', green: '#2E7D4F', yellow: '#9A6B00', blue: '#2F66C0', magenta: '#8E44AD', cyan: '#1F7F68' };
+    ? { red: '#E6867B', green: '#77B870', yellow: '#C2A140', blue: '#6FA7EE', magenta: '#CF88C8', cyan: '#16BBBC' }
+    : { red: '#A04038', green: '#30752A', yellow: '#805E00', blue: '#2863AB', magenta: '#8B4486', cyan: '#00787A' };
 }
 
 function appTheme(c, dark, fontSize) {
@@ -46,7 +47,7 @@ function appTheme(c, dark, fontSize) {
   const ui = EditorView.theme(
     {
       '&': { color: c.text, backgroundColor: c.bg, height: '100%', fontSize: `${fontSize}px` },
-      '.cm-scroller': { fontFamily: 'JetBrainsMono, monospace', lineHeight: '1.5' },
+      '.cm-scroller': { fontFamily: 'JetBrainsMono, monospace', lineHeight: '1.5', fontVariantLigatures: 'none' },
       '.cm-content': { caretColor: c.accent, padding: '8px 0' },
       '.cm-cursor, .cm-dropCursor': { borderLeftColor: c.accent, borderLeftWidth: '2px' },
       '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
@@ -59,7 +60,7 @@ function appTheme(c, dark, fontSize) {
       '.cm-panels': { backgroundColor: c.surface, color: c.text },
       '.cm-panels.cm-panels-top': { borderBottom: `1px solid ${c.border}` },
       '.cm-panels.cm-panels-bottom': { borderTop: `1px solid ${c.border}` },
-      '.cm-panel input, .cm-panel button': { fontFamily: 'inherit', fontSize: '14px' },
+      '.cm-panel input, .cm-panel button': { fontFamily: 'IBMPlexSans, sans-serif', fontSize: '14px' },
       '.cm-textfield': { backgroundColor: c.surfaceAlt, color: c.text, border: 'none', borderRadius: '8px', padding: '6px 8px' },
       '.cm-button': {
         backgroundImage: 'none', backgroundColor: c.surfaceAlt, color: c.text,
@@ -75,9 +76,9 @@ function appTheme(c, dark, fontSize) {
       '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: `${c.accent}33`, color: c.text },
       '.cm-diagnostic': { padding: '6px 10px' },
       '.cm-diagnostic-error': { borderLeft: `3px solid ${c.danger}` },
-      '.cm-diagnostic-warning': { borderLeft: `3px solid ${p.yellow}` },
+      '.cm-diagnostic-warning': { borderLeft: `3px solid ${c.warning || p.yellow}` },
       '.cm-lintRange-error': { backgroundImage: 'none', textDecoration: `underline wavy ${c.danger}`, textUnderlineOffset: '3px' },
-      '.cm-lintRange-warning': { backgroundImage: 'none', textDecoration: `underline wavy ${p.yellow}`, textUnderlineOffset: '3px' },
+      '.cm-lintRange-warning': { backgroundImage: 'none', textDecoration: `underline wavy ${c.warning || p.yellow}`, textUnderlineOffset: '3px' },
       '.cm-lint-marker-error': { content: 'none' },
     },
     { dark },

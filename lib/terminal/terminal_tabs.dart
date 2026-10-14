@@ -141,6 +141,7 @@ class TerminalTabs extends ChangeNotifier {
     s.onPortsMentioned = (ports) => onPortsMentioned?.call(ports);
     s.onSignal = (signal) => onSignal?.call(s, signal);
     s.state.addListener(notifyListeners); // e.g. a shell started or exited
+    s.activity.addListener(notifyListeners); // working / needs input / idle
     _tabs.add(s);
     return s;
   }

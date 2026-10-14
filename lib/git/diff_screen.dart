@@ -66,7 +66,7 @@ class _DiffScreenState extends State<DiffScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
                 child: Text.rich(TextSpan(children: [
-                  TextSpan(text: '+${d.added}', style: TextStyle(color: c.accent, fontWeight: FontWeight.w600)),
+                  TextSpan(text: '+${d.added}', style: TextStyle(color: c.success, fontWeight: FontWeight.w600)),
                   const TextSpan(text: '  '),
                   TextSpan(text: '−${d.removed}', style: TextStyle(color: c.danger, fontWeight: FontWeight.w600)),
                 ]), style: const TextStyle(fontSize: 12)),
@@ -119,8 +119,8 @@ class _Line extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final (Color? bg, String sign, Color signColor) = switch (line.kind) {
-      DiffLineKind.added => (c.accent.withValues(alpha: 0.12), '+', c.accent),
-      DiffLineKind.removed => (c.danger.withValues(alpha: 0.12), '−', c.danger),
+      DiffLineKind.added => (c.diffAdded, '+', c.success),
+      DiffLineKind.removed => (c.diffRemoved, '−', c.danger),
       DiffLineKind.context => (null, ' ', c.textMuted),
     };
     final gutter = codeStyle(c.textMuted, size: 11);

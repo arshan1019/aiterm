@@ -13,6 +13,7 @@ import '../shared/fade_indexed_stack.dart';
 import '../shared/format.dart';
 import '../shared/bottom_tabs.dart';
 import '../terminal/terminal_deck.dart';
+import '../terminal/terminal_session.dart';
 import 'project.dart';
 import 'project_actions.dart';
 import 'projects_screen.dart';
@@ -94,7 +95,10 @@ class _ProjectScreenState extends State<ProjectScreen> {
   List<BottomTab> _tabs() {
     final changed = _repo?.status?.changes.length ?? 0;
     return [
-      const BottomTab('Agent', Icons.auto_awesome_outlined, Icons.auto_awesome_rounded),
+      BottomTab('Agent', Icons.auto_awesome_outlined, Icons.auto_awesome_rounded,
+          // An agent here is waiting for you.
+          badge: _s.tabs.inScope(widget.project.path).any((t) => t.activity.value == SessionActivity.needsInput) ? '' : null,
+          badgeColor: context.colors.warning),
       BottomTab('Changes', Icons.call_split_outlined, Icons.call_split_rounded, badge: changed > 0 ? '$changed' : null),
       const BottomTab('Files', Icons.folder_outlined, Icons.folder_rounded),
       BottomTab('Preview', Icons.wifi_tethering_outlined, Icons.wifi_tethering_rounded,

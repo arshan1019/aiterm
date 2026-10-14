@@ -25,6 +25,16 @@ void main() {
         expect(contrastRatio(c.bg, c.danger), greaterThanOrEqualTo(4.5), reason: 'on danger');
       });
 
+      test('status colors, the selected pill and diff lines are readable', () {
+        for (final bg in [c.bg, c.surface]) {
+          expect(contrastRatio(c.success, bg), greaterThanOrEqualTo(4.5), reason: 'success on $bg');
+          expect(contrastRatio(c.warning, bg), greaterThanOrEqualTo(4.5), reason: 'warning on $bg');
+        }
+        expect(contrastRatio(c.onAccentContainer, c.accentContainer), greaterThanOrEqualTo(4.5), reason: 'nav pill');
+        expect(contrastRatio(c.text, c.diffAdded), greaterThanOrEqualTo(7), reason: 'added line');
+        expect(contrastRatio(c.text, c.diffRemoved), greaterThanOrEqualTo(7), reason: 'removed line');
+      });
+
       test('control outlines (text fields, outlined buttons, checkboxes) stand out 3:1', () {
         for (final bg in [c.bg, c.surface]) {
           expect(contrastRatio(c.outline, bg), greaterThanOrEqualTo(3), reason: 'outline on $bg');
@@ -32,4 +42,13 @@ void main() {
       });
     });
   }
+
+  test('terminal colors are readable on the terminal background, in both themes', () {
+    for (final (bg, t) in [(AppColors.dark.bg, TerminalPalette.dark), (AppColors.light.bg, TerminalPalette.light)]) {
+      for (final color in [t.red, t.green, t.yellow, t.blue, t.magenta, t.cyan, t.brightRed, t.brightGreen, t.brightYellow,
+        t.brightBlue, t.brightMagenta, t.brightCyan]) {
+        expect(contrastRatio(color, bg), greaterThanOrEqualTo(4.5), reason: '$color on $bg');
+      }
+    }
+  });
 }

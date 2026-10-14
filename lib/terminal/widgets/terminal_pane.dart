@@ -59,6 +59,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (widget.visible && !old.visible && MediaQuery.viewInsetsOf(context).bottom > 0) {
       _focus.requestFocus();
     }
+    if (widget.visible) WidgetsBinding.instance.addPostFrameCallback((_) => _session.seen());
   }
 
   @override
@@ -106,7 +107,7 @@ class _TerminalPaneState extends State<TerminalPane> {
   TerminalTheme _themeFor(AppColors c) {
     if (_theme == null || _themeColors != c) {
       _themeColors = c;
-      _theme = _terminalTheme(c);
+      _theme = _terminalTheme(c, TerminalPalette.of(context));
     }
     return _theme!;
   }
@@ -239,26 +240,26 @@ class _TerminalPaneState extends State<TerminalPane> {
   }
 }
 
-TerminalTheme _terminalTheme(AppColors c) => TerminalTheme(
+TerminalTheme _terminalTheme(AppColors c, TerminalPalette t) => TerminalTheme(
   cursor: c.accent,
   selection: c.accent.withValues(alpha: 0.35),
   foreground: c.text,
   background: c.bg,
   black: c.bg,
-  red: const Color(0xFFE2685A),
-  green: const Color(0xFF6FBF73),
-  yellow: const Color(0xFFD9B35C),
-  blue: const Color(0xFF6C9EE5),
-  magenta: const Color(0xFFB07CD1),
-  cyan: const Color(0xFF5EC4A8),
+  red: t.red,
+  green: t.green,
+  yellow: t.yellow,
+  blue: t.blue,
+  magenta: t.magenta,
+  cyan: t.cyan,
   white: c.text,
   brightBlack: c.textMuted,
-  brightRed: const Color(0xFFE2685A),
-  brightGreen: const Color(0xFF6FBF73),
-  brightYellow: const Color(0xFFD9B35C),
-  brightBlue: const Color(0xFF6C9EE5),
-  brightMagenta: const Color(0xFFB07CD1),
-  brightCyan: const Color(0xFF5EC4A8),
+  brightRed: t.brightRed,
+  brightGreen: t.brightGreen,
+  brightYellow: t.brightYellow,
+  brightBlue: t.brightBlue,
+  brightMagenta: t.brightMagenta,
+  brightCyan: t.brightCyan,
   brightWhite: c.text,
   searchHitBackground: c.accent,
   searchHitBackgroundCurrent: c.accent,

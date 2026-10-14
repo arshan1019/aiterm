@@ -9,6 +9,7 @@ import '../app/theme.dart';
 import '../agents/agent_installer.dart';
 import '../phone/phone_files.dart';
 import '../platform/android_env.dart';
+import '../platform/haptics.dart';
 import '../git/git_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/form.dart';
@@ -145,8 +146,12 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
+  /// Why the last paste failed, shown in the paste bar until the next try.
+  String? _pasteError;
+
   Future<void> _paste() async {
     final messenger = ScaffoldMessenger.of(context);
+    setState(() => _pasteError = null);
     try {
       final done = await _clipboard.paste(_browser.current);
       await _browser.refresh();
@@ -155,7 +160,9 @@ class _FilesScreenState extends State<FilesScreen> {
         SnackBar(content: Text(done.length == 1 ? 'Pasted 1 item' : 'Pasted ${done.length} items')),
       );
     } on FileSystemException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) setState(() => _pasteError = e.message);
+    } on PlatformException catch (e) {
+      if (mounted) setState(() => _pasteError = e.message ?? 'Couldn\'t paste');
     }
   }
 
@@ -365,7 +372,7 @@ class _FilesScreenState extends State<FilesScreen> {
                       ),
                     ),
             ),
-            _PasteBar(clipboard: _clipboard, onPaste: _onPhoneChoicesRoot ? null : _paste),
+            _PasteBar(clipboard: _clipboard, onPaste: _onPhoneChoicesRoot ? null : _paste, error: _pasteError),
           ],
         ),
       ),
@@ -633,7 +640,10 @@ class _ListingState extends State<_Listing> {
                     onPressed: () => widget.onActions(e),
                   ),
                   onTap: () => widget.onOpen(e),
-                  onLongPress: () => widget.onActions(e),
+                  onLongPress: () {
+                    Haptics.longPress();
+                    widget.onActions(e);
+                  },
                 );
               },
             ),
@@ -725,11 +735,14 @@ class _PhoneAccessPrompt extends StatelessWidget {
 /// Shown while something is copied or cut; stays across folders and
 /// locations so it can be pasted anywhere.
 class _PasteBar extends StatelessWidget {
-  const _PasteBar({required this.clipboard, required this.onPaste});
+  const _PasteBar({required this.clipboard, required this.onPaste, this.error});
 
   final FileClipboard clipboard;
   /// Null where nothing can be pasted (the list of chosen phone folders).
   final VoidCallback? onPaste;
+
+  /// Why the last paste failed.
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
@@ -747,7 +760,16 @@ class _PasteBar extends StatelessWidget {
                   top: false,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
-                    child: Row(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (error case final e?)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(e, style: TextStyle(color: c.danger, fontSize: 13)),
+                          ),
+                        Row(
                       children: [
                         Icon(
                           clipboard.mode == ClipMode.cut ? Icons.content_cut_rounded : Icons.copy_rounded,
@@ -769,6 +791,8 @@ class _PasteBar extends StatelessWidget {
                           child: Text('Cancel', style: TextStyle(color: c.textMuted)),
                         ),
                         FilledButton(onPressed: onPaste, child: const Text('Paste here')),
+                      ],
+                    ),
                       ],
                     ),
                   ),

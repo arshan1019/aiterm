@@ -28,6 +28,11 @@ class AiTermApp extends StatelessWidget {
           themeAnimationDuration: Motion.standard,
           themeAnimationCurve: Motion.move,
           home: const ShareReceiver(child: HomeShell()),
+          // Follow the system's "Remove animations" setting.
+          builder: (context, child) {
+            Motion.reduced = MediaQuery.disableAnimationsOf(context);
+            return child!;
+          },
         ),
       ),
     );

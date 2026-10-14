@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
 
-/// A deliberately small, neutral palette: one accent, two surfaces, text.
-/// Every screen draws from these tokens via `context.colors`.
+/// The palette (docs/DESIGN.md, "Color"), generated in OKLCH from three
+/// inputs: the accent hue (teal, 172°), neutrals tinted toward it (190°,
+/// chroma ≤ 0.012) and the contrast level. Every token has one job; the
+/// accent is rationed to the primary action, focus, the cursor and
+/// selection, the selected navigation item and a working agent. Success is
+/// its own green, never the accent. Contrast is enforced by
+/// test/contrast_test.dart.
 ///
 /// As a [ThemeExtension] it interpolates, so switching light/dark
 /// cross-fades every color instead of snapping.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
+  /// The app background and the terminal.
   final Color bg;
+
+  /// One tone step up: grouped rows, cards.
   final Color surface;
+
+  /// Another step: input fills, blocks, pressed rows.
   final Color surfaceAlt;
-  /// Decorative edges: cards, dividers.
+
+  /// Decorative edges: dividers, hairlines.
   final Color border;
 
   /// Edges that identify a control (text fields, outlined buttons,
@@ -19,7 +30,19 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color text;
   final Color textMuted;
   final Color accent;
+
+  /// Selected pills (the navigation indicator) and what's on them.
+  final Color accentContainer;
+  final Color onAccentContainer;
   final Color danger;
+
+  /// Done, added lines, a clean tree: never the accent.
+  final Color success;
+  final Color warning;
+
+  /// Diff line backgrounds.
+  final Color diffAdded;
+  final Color diffRemoved;
 
   const AppColors({
     required this.bg,
@@ -30,31 +53,50 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.text,
     required this.textMuted,
     required this.accent,
+    required this.accentContainer,
+    required this.onAccentContainer,
     required this.danger,
+    required this.success,
+    required this.warning,
+    required this.diffAdded,
+    required this.diffRemoved,
   });
 
+  /// "Phosphor graphite": a near-black tinted toward the accent.
   static const dark = AppColors(
-    bg: Color(0xFF0E0F12),
-    surface: Color(0xFF17181C),
-    surfaceAlt: Color(0xFF1F2125),
-    border: Color(0xFF2A2C31),
-    outline: Color(0xFF6A6E77),
-    text: Color(0xFFE6E7EA),
-    textMuted: Color(0xFF8A8D96),
-    accent: Color(0xFF5EC4A8),
-    danger: Color(0xFFE2685A),
+    bg: Color(0xFF0B0F0F),
+    surface: Color(0xFF111616),
+    surfaceAlt: Color(0xFF171C1C),
+    border: Color(0xFF282F2F),
+    outline: Color(0xFF6D7776),
+    text: Color(0xFFE6EBEA),
+    textMuted: Color(0xFF9EA7A6),
+    accent: Color(0xFF5CC8A9),
+    accentContainer: Color(0xFF12352B),
+    onAccentContainer: Color(0xFF9AE3CB),
+    danger: Color(0xFFED756A),
+    success: Color(0xFF7BC772),
+    warning: Color(0xFFEEB154),
+    diffAdded: Color(0xFF182917),
+    diffRemoved: Color(0xFF391917),
   );
 
   static const light = AppColors(
-    bg: Color(0xFFF7F7F8),
+    bg: Color(0xFFF7FAF9),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFEFEFF1),
-    border: Color(0xFFDDDEE1),
-    outline: Color(0xFF868A93),
-    text: Color(0xFF17181C),
-    textMuted: Color(0xFF64676F),
-    accent: Color(0xFF1F7A64),
-    danger: Color(0xFFC0392B),
+    surfaceAlt: Color(0xFFF0F3F3),
+    border: Color(0xFFDEE3E3),
+    outline: Color(0xFF7E8988),
+    text: Color(0xFF181E1E),
+    textMuted: Color(0xFF5C6665),
+    accent: Color(0xFF08745D),
+    accentContainer: Color(0xFFD2F0E5),
+    onAccentContainer: Color(0xFF033D2F),
+    danger: Color(0xFFBA3630),
+    success: Color(0xFF2E7C35),
+    warning: Color(0xFFA46311),
+    diffAdded: Color(0xFFDFF6DE),
+    diffRemoved: Color(0xFFFCEAE8),
   );
 
   @override
@@ -73,34 +115,102 @@ class AppColors extends ThemeExtension<AppColors> {
       text: l(text, other.text),
       textMuted: l(textMuted, other.textMuted),
       accent: l(accent, other.accent),
+      accentContainer: l(accentContainer, other.accentContainer),
+      onAccentContainer: l(onAccentContainer, other.onAccentContainer),
       danger: l(danger, other.danger),
+      success: l(success, other.success),
+      warning: l(warning, other.warning),
+      diffAdded: l(diffAdded, other.diffAdded),
+      diffRemoved: l(diffRemoved, other.diffRemoved),
     );
   }
 
-  @override
-  bool operator ==(Object other) =>
-      other is AppColors &&
-      other.bg == bg &&
-      other.surface == surface &&
-      other.surfaceAlt == surfaceAlt &&
-      other.border == border &&
-      other.outline == outline &&
-      other.text == text &&
-      other.textMuted == textMuted &&
-      other.accent == accent &&
-      other.danger == danger;
+  List<Color> get _all => [
+        bg, surface, surfaceAlt, border, outline, text, textMuted, accent, accentContainer, onAccentContainer, danger,
+        success, warning, diffAdded, diffRemoved,
+      ];
 
   @override
-  int get hashCode => Object.hash(bg, surface, surfaceAlt, border, outline, text, textMuted, accent, danger);
+  bool operator ==(Object other) {
+    if (other is! AppColors) return false;
+    final a = _all, b = other._all;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(_all);
+}
+
+/// The terminal's ANSI colors, from the same OKLCH generator (normal at
+/// L 72%, bright at L 84% in dark; L 50% / 42% in light), all ≥ 5:1 on bg,
+/// so the terminal doesn't look pasted into the app.
+class TerminalPalette {
+  const TerminalPalette({
+    required this.red,
+    required this.green,
+    required this.yellow,
+    required this.blue,
+    required this.magenta,
+    required this.cyan,
+    required this.brightRed,
+    required this.brightGreen,
+    required this.brightYellow,
+    required this.brightBlue,
+    required this.brightMagenta,
+    required this.brightCyan,
+  });
+
+  final Color red, green, yellow, blue, magenta, cyan;
+  final Color brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan;
+
+  static const dark = TerminalPalette(
+    red: Color(0xFFE6867B),
+    green: Color(0xFF77B870),
+    yellow: Color(0xFFC2A140),
+    blue: Color(0xFF6FA7EE),
+    magenta: Color(0xFFCF88C8),
+    cyan: Color(0xFF16BBBC),
+    brightRed: Color(0xFFFFB4AB),
+    brightGreen: Color(0xFFA9DAA4),
+    brightYellow: Color(0xFFE1C885),
+    brightBlue: Color(0xFFA3CEFF),
+    brightMagenta: Color(0xFFEDB6E7),
+    brightCyan: Color(0xFF7FDDDD),
+  );
+
+  static const light = TerminalPalette(
+    red: Color(0xFFA04038),
+    green: Color(0xFF30752A),
+    yellow: Color(0xFF805E00),
+    blue: Color(0xFF2863AB),
+    magenta: Color(0xFF8B4486),
+    cyan: Color(0xFF00787A),
+    brightRed: Color(0xFF822C27),
+    brightGreen: Color(0xFF1D5C17),
+    brightYellow: Color(0xFF664800),
+    brightBlue: Color(0xFF154D8C),
+    brightMagenta: Color(0xFF70306C),
+    brightCyan: Color(0xFF005F61),
+  );
+
+  static TerminalPalette of(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? dark : light;
 }
 
 /// Shared animation timing, so every transition in the app feels related.
+/// With the system's "Remove animations" setting on ([reduced], from
+/// MediaQuery.disableAnimations), the app's own transitions are instant.
 abstract final class Motion {
+  static bool reduced = false;
+
   /// State changes on a control (pressed, toggled, selected).
-  static const quick = Duration(milliseconds: 120);
+  static Duration get quick => reduced ? Duration.zero : const Duration(milliseconds: 120);
 
   /// Things appearing, moving or switching.
-  static const standard = Duration(milliseconds: 220);
+  static Duration get standard => reduced ? Duration.zero : const Duration(milliseconds: 220);
 
   static const enter = Curves.easeOutCubic;
   static const exit = Curves.easeInCubic;
@@ -287,9 +397,9 @@ ThemeData buildTheme({required bool dark}) {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: c.bg,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: c.accent.withValues(alpha: 0.18),
+      indicatorColor: c.accentContainer,
       iconTheme: WidgetStateProperty.resolveWith(
-        (s) => IconThemeData(color: s.contains(WidgetState.selected) ? c.accent : c.textMuted, size: 24),
+        (s) => IconThemeData(color: s.contains(WidgetState.selected) ? c.onAccentContainer : c.textMuted, size: 24),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (s) => _textTheme(c).labelMedium!.copyWith(

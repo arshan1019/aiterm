@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../platform/haptics.dart';
 import '../shared/action_sheet.dart';
 import '../shared/format.dart';
 import '../shared/name_dialog.dart';
@@ -35,6 +36,9 @@ class _GitScreenState extends State<GitScreen> {
   _Load _load = _Load.loading;
   GitRepo? _repo;
 
+  /// Why starting to track failed, shown under its button until retried.
+  String? _initError;
+
   @override
   void initState() {
     super.initState();
@@ -64,9 +68,10 @@ class _GitScreenState extends State<GitScreen> {
   }
 
   Future<void> _init() async {
+    setState(() => _initError = null);
     final r = await _s.git.runner.run(widget.folder, ['init', '-q']);
     if (!r.ok) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mapGitError(r).message)));
+      if (mounted) setState(() => _initError = mapGitError(r).message);
       return;
     }
     _s.git.forget(widget.folder);
@@ -82,16 +87,15 @@ class _GitScreenState extends State<GitScreen> {
       _Load.noTools => _Message(
           icon: Icons.download_rounded,
           title: 'Git isn\'t set up yet',
-          text: 'Install git and GitHub\'s CLI in Linux to track changes and sync. One tap, once.',
           action: 'Install git',
           onAction: _installTools,
         ),
       _Load.notRepo => _Message(
           icon: Icons.history_rounded,
           title: 'Not tracked by git',
-          text: 'Start tracking this folder to see changes, commit them and sync with GitHub.',
           action: 'Start tracking',
           onAction: _init,
+          error: _initError,
         ),
       _Load.ready => _RepoView(repo: repo!),
     };
@@ -114,11 +118,14 @@ class _GitScreenState extends State<GitScreen> {
 }
 
 class _Message extends StatelessWidget {
-  const _Message({required this.icon, required this.title, required this.text, required this.action, required this.onAction});
+  const _Message({required this.icon, required this.title, required this.action, required this.onAction, this.error});
 
   final IconData icon;
-  final String title, text, action;
+  final String title, action;
   final VoidCallback onAction;
+
+  /// Why the action failed last time, under its button.
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
@@ -129,13 +136,15 @@ class _Message extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 40, color: c.accent),
+            Icon(icon, size: 40, color: c.textMuted),
             const SizedBox(height: 12),
-            Text(title, style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Text(text, textAlign: TextAlign.center, style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4)),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
             FilledButton(onPressed: onAction, child: Text(action)),
+            if (error case final e?) ...[
+              const SizedBox(height: 12),
+              Text(e, textAlign: TextAlign.center, style: TextStyle(color: c.danger, fontSize: 13)),
+            ],
           ],
         ),
       ),
@@ -313,6 +322,7 @@ class _RepoViewState extends State<_RepoView> {
     if (!mounted) return;
     _outcomeTimer?.cancel();
     setState(() => _outcome = o);
+    if (o != null) o.isError ? Haptics.reject() : Haptics.confirm();
     if (o != null && !o.isError) _outcomeTimer = Timer(const Duration(seconds: 4), () => _report(null));
   }
 
@@ -352,8 +362,10 @@ class _RepoViewState extends State<_RepoView> {
     ]);
   }
 
-  Future<void> _toggle(GitChange change, bool staged) =>
-      _run(() => staged ? repo.unstage([change.path]) : repo.stage([change.path]));
+  Future<void> _toggle(GitChange change, bool staged) {
+    Haptics.toggle(!staged);
+    return _run(() => staged ? repo.unstage([change.path]) : repo.stage([change.path]));
+  }
 
   Future<void> _commit({required bool push}) async {
     final message = _message.text.trim();
@@ -544,7 +556,7 @@ class _Clean extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 100, 28, 28),
       child: Column(
         children: [
-          Icon(Icons.check_circle_outline_rounded, size: 40, color: c.accent),
+          Icon(Icons.check_circle_outline_rounded, size: 40, color: c.success),
           const SizedBox(height: 12),
           Text('No changes', style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
@@ -589,8 +601,8 @@ class _GroupHeader extends StatelessWidget {
 
 /// M, A, D… with a colour: added green, deleted red, the rest neutral.
 (String, Color) changeBadge(GitChangeKind kind, AppColors c) => switch (kind) {
-      GitChangeKind.added => ('A', c.accent),
-      GitChangeKind.untracked => ('U', c.accent),
+      GitChangeKind.added => ('A', c.success),
+      GitChangeKind.untracked => ('U', c.success),
       GitChangeKind.deleted => ('D', c.danger),
       GitChangeKind.renamed => ('R', c.text),
       GitChangeKind.copied => ('C', c.text),
@@ -667,7 +679,7 @@ class _OutcomeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final tint = outcome.isError ? c.danger : c.accent;
+    final tint = outcome.isError ? c.danger : c.success;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),

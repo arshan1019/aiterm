@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.SystemClock
 import android.provider.Settings
+import android.view.HapticFeedbackConstants
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -50,6 +51,27 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "aiterm/needle",
         ).setMethodCallHandler(NeedlePlugin())
+
+        // Haptics with Android's own feedback constants (they follow the
+        // system's touch-feedback setting), newer ones falling back.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/haptics").setMethodCallHandler { call, result ->
+            val sdk = Build.VERSION.SDK_INT
+            val constant = when (call.method) {
+                "confirm" -> if (sdk >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
+                "reject" -> if (sdk >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
+                "toggleOn" -> if (sdk >= 34) HapticFeedbackConstants.TOGGLE_ON else HapticFeedbackConstants.CLOCK_TICK
+                "toggleOff" -> if (sdk >= 34) HapticFeedbackConstants.TOGGLE_OFF else HapticFeedbackConstants.CLOCK_TICK
+                "tick" -> if (sdk >= 34) HapticFeedbackConstants.SEGMENT_TICK else HapticFeedbackConstants.CLOCK_TICK
+                "longPress" -> HapticFeedbackConstants.LONG_PRESS
+                else -> null
+            }
+            if (constant == null) {
+                result.notImplemented()
+            } else {
+                window.decorView.performHapticFeedback(constant)
+                result.success(null)
+            }
+        }
 
         val keepAliveChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/keepalive")
         keepAlive = KeepAlivePlugin(this, keepAliveChannel).also { keepAliveChannel.setMethodCallHandler(it) }

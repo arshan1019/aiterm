@@ -117,7 +117,7 @@ class _SetupViewState extends State<SetupView> {
                 children: [
                   if (s.github.user case final user?)
                     ListTile(
-                      leading: Icon(Icons.check_circle_rounded, color: c.accent),
+                      leading: Icon(Icons.check_circle_rounded, color: c.success),
                       title: Text('Signed in as ${user.login}', style: const TextStyle(fontSize: 14)),
                     )
                   else
@@ -154,7 +154,7 @@ class _StepRow extends StatelessWidget {
                 height: 20,
                 child: switch (step.state) {
                   SetupState.running => const Padding(padding: EdgeInsets.all(2), child: CircularProgressIndicator(strokeWidth: 2)),
-                  SetupState.done => Icon(Icons.check_circle_rounded, size: 20, color: c.accent),
+                  SetupState.done => Icon(Icons.check_circle_rounded, size: 20, color: c.success),
                   SetupState.failed => Icon(Icons.error_outline_rounded, size: 20, color: c.danger),
                   SetupState.waiting => Icon(Icons.circle_outlined, size: 20, color: c.border),
                 },
