@@ -60,6 +60,10 @@ class SettingsScreen extends StatelessWidget {
                 _Switch('Wallpaper colors', s.settings.wallpaperColors, (v) => s.settings.wallpaperColors = v),
               _Switch('High contrast', s.settings.highContrast, (v) => s.settings.highContrast = v),
               _Switch('Compact lists', s.settings.compact, (v) => s.settings.compact = v),
+              _Switch('Haptic feedback', s.settings.haptics, (v) {
+                s.settings.haptics = v;
+                Haptics.enabled = v;
+              }),
             ],
           ),
           const SizedBox(height: 20),
@@ -172,9 +176,12 @@ class _Switch extends StatelessWidget {
   Widget build(BuildContext context) => SwitchListTile(
         title: Text(title, style: const TextStyle(fontSize: 14)),
         value: value,
+        // On: the change first (so Haptic feedback clicks as it turns on);
+        // off: the click first (so it clicks as it turns off).
         onChanged: (v) {
+          if (v) onChanged(v);
           Haptics.toggle(v);
-          onChanged(v);
+          if (!v) onChanged(v);
         },
       );
 }

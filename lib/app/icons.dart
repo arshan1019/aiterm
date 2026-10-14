@@ -8,6 +8,7 @@ abstract final class AppIcons {
   static const addCircle = IconData(0xe990, fontFamily: 'MaterialSymbols');
   static const agent = IconData(0xf5d0, fontFamily: 'MaterialSymbols');
   static const arrowBack = IconData(0xe5c4, fontFamily: 'MaterialSymbols', matchTextDirection: true);
+  static const arrowDownward = IconData(0xe5db, fontFamily: 'MaterialSymbols');
   static const arrowForward = IconData(0xe5c8, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const arrowUpward = IconData(0xe5d8, fontFamily: 'MaterialSymbols');
   static const article = IconData(0xef42, fontFamily: 'MaterialSymbols');

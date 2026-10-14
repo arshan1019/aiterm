@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../projects/project_screen.dart';
 import '../phone/share_receiver.dart';
 import '../settings/settings.dart';
+import '../platform/haptics.dart';
 import 'home_shell.dart';
 import 'services.dart';
 import 'theme.dart';
@@ -38,6 +39,7 @@ class AiTermApp extends StatelessWidget {
           // Follow the system's "Remove animations" setting.
           builder: (context, child) {
             Motion.reduced = MediaQuery.disableAnimationsOf(context);
+            Haptics.enabled = services.settings.haptics;
             return child!;
           },
         ),

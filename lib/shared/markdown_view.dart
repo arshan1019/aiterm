@@ -40,6 +40,17 @@ final _item = RegExp(r'^(\s*)([-*+]|\d+[.)])\s+(.*)$');
 final _heading = RegExp(r'^(#{1,6})\s+(.*)$');
 final _fence = RegExp(r'^\s*(```|~~~)\s*([\w+-]*)');
 
+final _parsed = <String, List<MdBlock>>{};
+
+/// [parseMarkdown], remembered for the last few sources: a streaming chat
+/// rebuilds every frame, but only the reply being written changes.
+List<MdBlock> parsedMarkdown(String source) {
+  final hit = _parsed.remove(source);
+  if (hit != null) return _parsed[source] = hit;
+  if (_parsed.length >= 64) _parsed.remove(_parsed.keys.first);
+  return _parsed[source] = parseMarkdown(source);
+}
+
 /// Splits Markdown into blocks: fenced code, headings, list items, quotes
 /// and paragraphs. An unclosed fence (still streaming) runs to the end.
 List<MdBlock> parseMarkdown(String source) {
@@ -127,7 +138,7 @@ class MarkdownView extends StatelessWidget {
     final theme = Theme.of(context).textTheme;
     final body = theme.bodyLarge!.copyWith(color: color ?? c.text);
     Widget rich(String text, TextStyle style) => Text.rich(TextSpan(style: style, children: markdownSpans(text, c, base: style)));
-    final blocks = parseMarkdown(source);
+    final blocks = parsedMarkdown(source);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

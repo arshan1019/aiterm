@@ -19,6 +19,7 @@ void main() {
     expect([s.wallpaperColors, s.blackTerminal, s.darkTerminal, s.compact, s.highContrast, s.blocks, s.showThinking],
         everyElement(isFalse));
     expect(s.blocksFor('claude'), isFalse); // agents keep their own UI by default
+    expect(s.haptics, isTrue);
   });
 
   test('the old dark switch carries over as a theme choice', () async {

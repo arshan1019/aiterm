@@ -22,6 +22,7 @@ class Settings extends ChangeNotifier {
   bool _darkTerminal = false;
   bool _compact = false;
   bool _highContrast = false;
+  bool _haptics = true;
   bool _blocks = false;
   Set<String> _blocksOff = {};
   bool _showThinking = false;
@@ -45,6 +46,9 @@ class Settings extends ChangeNotifier {
 
   /// Text and status colors at 7:1, outlines at 4.5:1, edged groups.
   bool get highContrast => _highContrast;
+
+  /// Vibration on taps and results (the system's setting also applies).
+  bool get haptics => _haptics;
 
   /// Agents open as blocks (their structured output, over ACP) instead of
   /// their own terminal UI. Off: the agents' UI, as they ship it.
@@ -81,6 +85,7 @@ class Settings extends ChangeNotifier {
       s._darkTerminal = j['darkTerminal'] as bool? ?? false;
       s._compact = j['compact'] as bool? ?? false;
       s._highContrast = j['highContrast'] as bool? ?? false;
+      s._haptics = j['haptics'] as bool? ?? true;
       s._blocks = j['blocks'] as bool? ?? false;
       s._blocksOff = {...?(j['blocksOff'] as List?)?.whereType<String>()};
       s._showThinking = j['showThinking'] as bool? ?? false;
@@ -126,6 +131,12 @@ class Settings extends ChangeNotifier {
   set highContrast(bool v) {
     if (v == _highContrast) return;
     _highContrast = v;
+    _changed();
+  }
+
+  set haptics(bool v) {
+    if (v == _haptics) return;
+    _haptics = v;
     _changed();
   }
 
@@ -182,6 +193,7 @@ class Settings extends ChangeNotifier {
       'darkTerminal': _darkTerminal,
       'compact': _compact,
       'highContrast': _highContrast,
+      'haptics': _haptics,
       'blocks': _blocks,
       'blocksOff': _blocksOff.toList(),
       'showThinking': _showThinking,

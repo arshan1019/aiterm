@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_thinking_orbs/flutter_thinking_orbs.dart';
+
 import '../../app/icons.dart';
 import '../../app/services.dart';
 import '../../app/theme.dart';
@@ -11,6 +13,7 @@ import '../../shared/markdown_view.dart';
 import '../../shared/sheet.dart';
 import '../acp/agent_chat.dart';
 import '../acp/attachments.dart';
+
 import 'dart:io';
 
 /// An agent as blocks: each message, tool call and plan is its own block,
@@ -40,15 +43,25 @@ class BlocksView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: chat,
-      builder: (context, _) => Column(
-        children: [
-          _ChatBar(chat: chat, chats: chats, onSelect: onSelect, onNew: onNew, onTerminal: onTerminal, onClose: onClose),
-          Expanded(child: _body(context)),
-          if (chat.permissions.firstOrNull case final request?) _PermissionCard(chat: chat, request: request),
-          _Composer(key: ValueKey(chat), chat: chat),
-        ],
+    return _ChatHaptics(
+      chat: chat,
+      child: ListenableBuilder(
+        listenable: chat,
+        builder: (context, _) => Column(
+          children: [
+            _ChatBar(
+              chat: chat,
+              chats: chats,
+              onSelect: onSelect,
+              onNew: onNew,
+              onTerminal: onTerminal,
+              onClose: onClose,
+            ),
+            Expanded(child: _body(context)),
+            if (chat.permissions.firstOrNull case final request?) _PermissionCard(chat: chat, request: request),
+            _Composer(key: ValueKey(chat), chat: chat),
+          ],
+        ),
       ),
     );
   }
@@ -59,37 +72,55 @@ class BlocksView extends StatelessWidget {
       // Only an install is worth a wait screen; starting happens behind a
       // usable chat (a message typed meanwhile goes out when it's up).
       case ChatState.preparing when chat.detail != null && chat.entries.isEmpty:
-        return _Centered(children: [
-          const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)),
-          const SizedBox(height: 16),
-          Text('Setting up ${chat.name}', style: Theme.of(context).textTheme.titleSmall),
-          if (chat.detail case final d?) ...[
-            const SizedBox(height: 8),
-            Text(d, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: codeStyle(c.textMuted, size: 12)),
+        return _Centered(
+          children: [
+            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5)),
+            const SizedBox(height: 16),
+            Text('Setting up ${chat.name}', style: Theme.of(context).textTheme.titleSmall),
+            if (chat.detail case final d?) ...[
+              const SizedBox(height: 8),
+              Text(
+                d,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: codeStyle(c.textMuted, size: 12),
+              ),
+            ],
           ],
-        ]);
+        );
       case ChatState.signedOut:
-        return _Centered(children: [
-          Icon(AppIcons.login, size: 32, color: c.textMuted),
-          const SizedBox(height: 12),
-          Text('Sign in to ${chat.name}', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 20),
-          FilledButton(onPressed: () => onTerminal(chat), child: const Text('Sign in')),
-          TextButton(onPressed: chat.start, child: const Text('Try again')),
-        ]);
-      case ChatState.failed when chat.entries.isEmpty:
-        return _Centered(children: [
-          Icon(AppIcons.error, fill: 1, size: 32, color: c.danger),
-          const SizedBox(height: 12),
-          Text('${chat.name} didn\'t start', style: Theme.of(context).textTheme.titleMedium),
-          if (chat.detail case final d?) ...[
-            const SizedBox(height: 8),
-            Text(d, maxLines: 4, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: codeStyle(c.danger, size: 12)),
+        return _Centered(
+          children: [
+            Icon(AppIcons.login, size: 32, color: c.textMuted),
+            const SizedBox(height: 12),
+            Text('Sign in to ${chat.name}', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 20),
+            FilledButton(onPressed: () => onTerminal(chat), child: const Text('Sign in')),
+            TextButton(onPressed: chat.start, child: const Text('Try again')),
           ],
-          const SizedBox(height: 20),
-          FilledButton(onPressed: chat.start, child: const Text('Try again')),
-          TextButton(onPressed: () => onTerminal(chat), child: const Text('Open in terminal')),
-        ]);
+        );
+      case ChatState.failed when chat.entries.isEmpty:
+        return _Centered(
+          children: [
+            Icon(AppIcons.error, fill: 1, size: 32, color: c.danger),
+            const SizedBox(height: 12),
+            Text('${chat.name} didn\'t start', style: Theme.of(context).textTheme.titleMedium),
+            if (chat.detail case final d?) ...[
+              const SizedBox(height: 8),
+              Text(
+                d,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: codeStyle(c.danger, size: 12),
+              ),
+            ],
+            const SizedBox(height: 20),
+            FilledButton(onPressed: chat.start, child: const Text('Try again')),
+            TextButton(onPressed: () => onTerminal(chat), child: const Text('Open in terminal')),
+          ],
+        );
       default:
         return _Entries(chat: chat);
     }
@@ -102,11 +133,11 @@ class _Centered extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: children),
-        ),
-      );
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
+    ),
+  );
 }
 
 /// The agent (or a chip per agent), its mode, and the chat's menu.
@@ -128,14 +159,18 @@ class _ChatBar extends StatelessWidget {
   final ValueChanged<AgentChat> onClose;
 
   void _menu(BuildContext context) {
-    showActionSheet(context, title: chat.name, actions: [
-      for (final o in chat.options)
-        if (o.id != 'mode') SheetAction(AppIcons.tune, '${o.name}: ${o.valueName}', () => _choose(context, chat, o)),
-      SheetAction(AppIcons.add, 'New chat', chat.restart),
-      SheetAction(AppIcons.terminal, 'Open in terminal', () => onTerminal(chat)),
-      null,
-      SheetAction(AppIcons.close, 'Close', () => onClose(chat)),
-    ]);
+    showActionSheet(
+      context,
+      title: chat.name,
+      actions: [
+        for (final o in chat.options)
+          if (o.id != 'mode') SheetAction(AppIcons.tune, '${o.name}: ${o.valueName}', () => _choose(context, chat, o)),
+        SheetAction(AppIcons.add, 'New chat', chat.restart),
+        SheetAction(AppIcons.terminal, 'Open in terminal', () => onTerminal(chat)),
+        null,
+        SheetAction(AppIcons.close, 'Close', () => onClose(chat)),
+      ],
+    );
   }
 
   @override
@@ -145,7 +180,9 @@ class _ChatBar extends StatelessWidget {
     return Container(
       height: 52,
       padding: const EdgeInsets.only(left: 8, right: 4),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: c.border, width: 0.5))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.border, width: 0.5)),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -172,7 +209,11 @@ class _ChatBar extends StatelessWidget {
                     child: Row(
                       children: [
                         Flexible(
-                          child: Text(chat.name, style: Theme.of(context).textTheme.titleSmall, overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            chat.name,
+                            style: Theme.of(context).textTheme.titleSmall,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         // Starting: the chat is already usable meanwhile.
                         if (chat.state == ChatState.starting || chat.state == ChatState.preparing) ...[
@@ -222,48 +263,173 @@ void _choose(BuildContext context, AgentChat chat, ChatOption option) {
 }
 
 /// The conversation, newest at the bottom (and kept in view).
-class _Entries extends StatelessWidget {
+///
+/// Smooth while the agent streams: replies parse once per change, each
+/// block paints on its own layer, and when the user has scrolled up to
+/// read, growth below is offset so what they're reading stays put. The
+/// arrow glides back to the latest.
+class _Entries extends StatefulWidget {
   const _Entries({required this.chat});
   final AgentChat chat;
 
   @override
+  State<_Entries> createState() => _EntriesState();
+}
+
+class _EntriesState extends State<_Entries> {
+  final _scroll = ScrollController();
+
+  /// Laid-out heights by row id, and last frame's (to measure growth).
+  final _heights = <Object, double>{};
+  var _before = <Object, double>{};
+  var _order = <Object>[];
+  var _away = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final away = _scroll.hasClients && _scroll.position.pixels > 320;
+      if (away != _away) setState(() => _away = away);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Keeps the rows on screen still when rows below them (the newest)
+  /// grow or arrive while the user reads further up.
+  void _hold(List<Object> ids) {
+    final old = _order, before = _before;
+    _order = ids;
+    _before = Map.of(_heights);
+    if (!_scroll.hasClients || old.isEmpty) return;
+    final position = _scroll.position;
+    if (position.pixels <= 1) return; // at the latest: follow it
+    final anchor = old.where((id) => id != 'working' && ids.contains(id)).firstOrNull;
+    if (anchor == null) return;
+    double? below(List<Object> order, Map<Object, double> heights) {
+      var sum = 0.0;
+      for (final id in order) {
+        final h = heights[id];
+        if (h == null) return null;
+        sum += h;
+        if (id == anchor) return sum;
+      }
+      return null;
+    }
+
+    final was = below(old, before), now = below(ids, _heights);
+    if (was == null || now == null || (now - was).abs() < 0.5) return;
+    position.jumpTo((position.pixels + now - was).clamp(0.0, position.maxScrollExtent + (now - was).abs()));
+  }
+
+  void _latest() {
+    Haptics.tick();
+    _scroll.animateTo(0, duration: Motion.standard * 2, curve: Motion.enter);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final chat = widget.chat;
     final thinking = context.services.settings.showThinking;
-    final shown = [for (final e in chat.entries) if (e is! ThoughtEntry || thinking) e];
+    final shown = [
+      for (final e in chat.entries)
+        if (e is! ThoughtEntry || thinking) e,
+    ];
     final working = chat.busy && chat.permissions.isEmpty;
     final items = [if (working) null, ...shown.reversed];
+    final ids = [for (final e in items) e?.id ?? 'working'];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _hold(ids);
+    });
     if (items.isEmpty) {
       return Center(child: Icon(AppIcons.agent, size: 40, color: context.colors.border));
     }
-    return SelectionArea(
-      child: ListView.builder(
-        reverse: true,
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        itemCount: items.length,
-        // Rows keep their identity as new blocks arrive below them.
-        findChildIndexCallback: (key) {
-          final id = (key as ValueKey).value;
-          final i = items.indexWhere((e) => (e?.id ?? 'working') == id);
-          return i < 0 ? null : i;
-        },
-        itemBuilder: (context, i) {
-          final e = items[i];
-          return Padding(
-            key: e == null ? const ValueKey('working') : ValueKey(e.id),
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: switch (e) {
-              null => _Working(chat: chat),
-              UserEntry() => _UserBlock(entry: e),
-              MessageEntry() => MarkdownView(e.text.toString()),
-              ThoughtEntry() => _ThoughtBlock(entry: e),
-              ToolEntry() => _ToolBlock(entry: e),
-              PlanEntry() => _PlanBlock(entry: e),
-              NoticeEntry() => _NoticeBlock(entry: e),
+    return Stack(
+      children: [
+        SelectionArea(
+          child: ListView.builder(
+            controller: _scroll,
+            reverse: true,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            itemCount: items.length,
+            // Rows keep their identity as new blocks arrive below them.
+            findChildIndexCallback: (key) {
+              final i = ids.indexOf((key as ValueKey).value as Object);
+              return i < 0 ? null : i;
             },
-          );
-        },
-      ),
+            itemBuilder: (context, i) {
+              final e = items[i];
+              final id = ids[i];
+              return _Measured(
+                key: ValueKey(id),
+                onHeight: (h) => _heights[id] = h,
+                child: RepaintBoundary(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: switch (e) {
+                      null => _Working(chat: chat),
+                      UserEntry() => _UserBlock(entry: e),
+                      MessageEntry() => MarkdownView(e.text.toString()),
+                      ThoughtEntry() => _ThoughtBlock(entry: e),
+                      ToolEntry() => _ToolBlock(entry: e),
+                      PlanEntry() => _PlanBlock(entry: e),
+                      NoticeEntry() => _NoticeBlock(entry: e),
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: 12,
+          child: AnimatedScale(
+            scale: _away ? 1 : 0,
+            duration: Motion.quick,
+            curve: Motion.enter,
+            child: IconButton.filledTonal(
+              tooltip: 'Latest',
+              style: IconButton.styleFrom(
+                backgroundColor: context.colors.surfaceAlt,
+                foregroundColor: context.colors.text,
+                side: BorderSide(color: context.colors.border),
+              ),
+              onPressed: _away ? _latest : null,
+              icon: const Icon(AppIcons.arrowDownward),
+            ),
+          ),
+        ),
+      ],
     );
+  }
+}
+
+/// Reports its child's laid-out height (no rebuilds).
+class _Measured extends SingleChildRenderObjectWidget {
+  const _Measured({super.key, required this.onHeight, super.child});
+  final ValueChanged<double> onHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMeasured(onHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMeasured renderObject) => renderObject.onHeight = onHeight;
+}
+
+class _RenderMeasured extends RenderProxyBox {
+  _RenderMeasured(this.onHeight);
+  ValueChanged<double> onHeight;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    onHeight(size.height);
   }
 }
 
@@ -274,15 +440,15 @@ class _Working extends StatelessWidget {
   final AgentChat chat;
 
   (OrbState, String) _activity() => switch (chat.entries.lastOrNull) {
-        ToolEntry(kind: ToolKind.search) => (OrbState.searching, 'Searching'),
-        ToolEntry(kind: ToolKind.read || ToolKind.fetch) => (OrbState.searching, 'Reading'),
-        ToolEntry(kind: ToolKind.edit || ToolKind.delete || ToolKind.move) => (OrbState.composing, 'Editing'),
-        ToolEntry(kind: ToolKind.execute) => (OrbState.working, 'Running'),
-        ToolEntry() => (OrbState.working, 'Working'),
-        MessageEntry() => (OrbState.composing, 'Writing'),
-        PlanEntry() => (OrbState.shaping, 'Planning'),
-        _ => (OrbState.solving, 'Thinking'),
-      };
+    ToolEntry(kind: ToolKind.search) => (OrbState.searching, 'Searching'),
+    ToolEntry(kind: ToolKind.read || ToolKind.fetch) => (OrbState.searching, 'Reading'),
+    ToolEntry(kind: ToolKind.edit || ToolKind.delete || ToolKind.move) => (OrbState.composing, 'Editing'),
+    ToolEntry(kind: ToolKind.execute) => (OrbState.working, 'Running'),
+    ToolEntry() => (OrbState.working, 'Working'),
+    MessageEntry() => (OrbState.composing, 'Writing'),
+    PlanEntry() => (OrbState.shaping, 'Planning'),
+    _ => (OrbState.solving, 'Thinking'),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -358,7 +524,12 @@ class _BlockState extends State<_Block> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
-            onTap: body == null ? null : () => setState(() => widget.entry.open = !_open),
+            onTap: body == null
+                ? null
+                : () {
+                    Haptics.tick();
+                    setState(() => widget.entry.open = !_open);
+                  },
             onLongPress: widget.onLongPress == null
                 ? null
                 : () {
@@ -405,9 +576,9 @@ class _StatusGlyph extends StatelessWidget {
       height: 18,
       child: switch (status) {
         ToolStatus.running => Padding(
-            padding: const EdgeInsets.all(2),
-            child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
-          ),
+          padding: const EdgeInsets.all(2),
+          child: CircularProgressIndicator(strokeWidth: 2, color: c.accent),
+        ),
         ToolStatus.pending => Icon(AppIcons.circle, size: 18, color: c.textMuted),
         ToolStatus.done => Icon(AppIcons.checkCircle, fill: 1, size: 18, color: c.success),
         ToolStatus.failed => Icon(AppIcons.error, fill: 1, size: 18, color: c.danger),
@@ -417,37 +588,44 @@ class _StatusGlyph extends StatelessWidget {
 }
 
 IconData _kindIcon(ToolKind kind) => switch (kind) {
-      ToolKind.read => AppIcons.article,
-      ToolKind.edit => AppIcons.edit,
-      ToolKind.delete => AppIcons.delete,
-      ToolKind.move => AppIcons.fileMove,
-      ToolKind.search => AppIcons.search,
-      ToolKind.execute => AppIcons.terminal,
-      ToolKind.think => AppIcons.thinking,
-      ToolKind.fetch => AppIcons.language,
-      ToolKind.other => AppIcons.build,
-    };
+  ToolKind.read => AppIcons.article,
+  ToolKind.edit => AppIcons.edit,
+  ToolKind.delete => AppIcons.delete,
+  ToolKind.move => AppIcons.fileMove,
+  ToolKind.search => AppIcons.search,
+  ToolKind.execute => AppIcons.terminal,
+  ToolKind.think => AppIcons.thinking,
+  ToolKind.fetch => AppIcons.language,
+  ToolKind.other => AppIcons.build,
+};
 
 class _ToolBlock extends StatelessWidget {
   const _ToolBlock({required this.entry});
   final ToolEntry entry;
 
   void _actions(BuildContext context) {
-    final output = [for (final c in entry.content) if (c is ToolText) c.text].join('\n');
-    showActionSheet(context, title: entry.title, actions: [
-      if (entry.command case final cmd?) SheetAction(AppIcons.copy, 'Copy command', () => Clipboard.setData(ClipboardData(text: cmd))),
-      if (output.isNotEmpty) SheetAction(AppIcons.copy, 'Copy output', () => Clipboard.setData(ClipboardData(text: output))),
-      if (entry.paths.isNotEmpty)
-        SheetAction(AppIcons.copy, 'Copy path', () => Clipboard.setData(ClipboardData(text: entry.paths.join('\n')))),
-    ]);
+    final output = [
+      for (final c in entry.content)
+        if (c is ToolText) c.text,
+    ].join('\n');
+    showActionSheet(
+      context,
+      title: entry.title,
+      actions: [
+        if (entry.command case final cmd?)
+          SheetAction(AppIcons.copy, 'Copy command', () => Clipboard.setData(ClipboardData(text: cmd))),
+        if (output.isNotEmpty)
+          SheetAction(AppIcons.copy, 'Copy output', () => Clipboard.setData(ClipboardData(text: output))),
+        if (entry.paths.isNotEmpty)
+          SheetAction(AppIcons.copy, 'Copy path', () => Clipboard.setData(ClipboardData(text: entry.paths.join('\n')))),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final diffs = [
-      for (final d in entry.content.whereType<ToolDiff>()) (d, lineDiff(d.oldText, d.newText)),
-    ];
+    final diffs = [for (final d in entry.content.whereType<ToolDiff>()) (d, lineDiff(d.oldText, d.newText))];
     var added = 0, removed = 0;
     for (final (_, lines) in diffs) {
       final (a, r) = diffCounts(lines);
@@ -527,16 +705,26 @@ class _DiffBox extends StatelessWidget {
                           child: Text('⋯', style: codeStyle(c.textMuted, size: 12)),
                         )
                       : Container(
-                          color: switch (l.op) { '+' => c.diffAdded, '-' => c.diffRemoved, _ => c.surfaceAlt },
+                          color: switch (l.op) {
+                            '+' => c.diffAdded,
+                            '-' => c.diffRemoved,
+                            _ => c.surfaceAlt,
+                          },
                           padding: const EdgeInsets.only(right: 12),
                           child: Text.rich(
-                            TextSpan(children: [
-                              TextSpan(
-                                text: ' ${l.op} ',
-                                style: codeStyle(switch (l.op) { '+' => c.success, '-' => c.danger, _ => c.textMuted }, size: 12),
-                              ),
-                              TextSpan(text: l.text, style: codeStyle(c.text, size: 12)),
-                            ]),
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: ' ${l.op} ',
+                                  style: codeStyle(switch (l.op) {
+                                    '+' => c.success,
+                                    '-' => c.danger,
+                                    _ => c.textMuted,
+                                  }, size: 12),
+                                ),
+                                TextSpan(text: l.text, style: codeStyle(c.text, size: 12)),
+                              ],
+                            ),
                           ),
                         ),
                 if (hunks.length > shown.length)
@@ -610,16 +798,22 @@ class _PlanBlock extends StatelessWidget {
                       // The current step: a still dot (agents may leave a
                       // step open when the turn ends).
                       PlanStatus.running => SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: Center(child: Icon(AppIcons.circle, fill: 1, size: 10, color: c.accent)),
-                        ),
+                        width: 18,
+                        height: 18,
+                        child: Center(child: Icon(AppIcons.circle, fill: 1, size: 10, color: c.accent)),
+                      ),
                     },
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(text,
-                        style: TextStyle(color: status == PlanStatus.done ? c.textMuted : c.text, fontSize: 14, height: 20 / 14)),
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        color: status == PlanStatus.done ? c.textMuted : c.text,
+                        fontSize: 14,
+                        height: 20 / 14,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -643,7 +837,9 @@ class _NoticeBlock extends StatelessWidget {
       children: [
         Icon(entry.error ? AppIcons.error : AppIcons.stop, size: 16, color: color),
         const SizedBox(width: 8),
-        Expanded(child: Text(entry.text, style: TextStyle(color: color, fontSize: 13))),
+        Expanded(
+          child: Text(entry.text, style: TextStyle(color: color, fontSize: 13)),
+        ),
       ],
     );
   }
@@ -725,6 +921,8 @@ class _Composer extends StatefulWidget {
 
 class _ComposerState extends State<_Composer> {
   final _text = TextEditingController();
+  final _focus = FocusNode();
+  bool get _focused => _focus.hasFocus;
   final _files = <ChatAttachment>[];
   var _picking = false;
 
@@ -732,7 +930,10 @@ class _ComposerState extends State<_Composer> {
     setState(() => _picking = true);
     try {
       final picked = await pickAttachments(context.services);
-      if (mounted) setState(() => _files.addAll(picked));
+      if (mounted && picked.isNotEmpty) {
+        Haptics.tick();
+        setState(() => _files.addAll(picked));
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Couldn\'t attach: $e')));
     } finally {
@@ -744,10 +945,12 @@ class _ComposerState extends State<_Composer> {
   void initState() {
     super.initState();
     _text.addListener(() => setState(() {}));
+    _focus.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
+    _focus.dispose();
     _text.dispose();
     super.dispose();
   }
@@ -768,96 +971,139 @@ class _ComposerState extends State<_Composer> {
     final chat = widget.chat;
     final ready = chat.accepting;
     final typed = _text.text;
+    final canSend = ready && (typed.trim().isNotEmpty || _files.isNotEmpty);
     final matches = typed.startsWith('/') && !typed.contains(' ')
-        ? [for (final cmd in chat.commands) if ('/${cmd.$1}'.startsWith(typed)) cmd].take(5).toList()
+        ? [
+            for (final cmd in chat.commands)
+              if ('/${cmd.$1}'.startsWith(typed)) cmd,
+          ].take(5).toList()
         : const <(String, String)>[];
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: c.bg,
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (name, description) in matches)
-              ListTile(
-                dense: true,
-                title: Text('/$name', style: codeStyle(c.text)),
-                subtitle: description.isEmpty ? null : Text(description, maxLines: 1, overflow: TextOverflow.ellipsis),
-                onTap: () {
-                  _text.text = '/$name ';
-                  _text.selection = TextSelection.collapsed(offset: _text.text.length);
-                },
-              ),
-            if (_files.isNotEmpty)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final f in _files)
-                        _AttachmentChip(attachment: f, onRemove: () => setState(() => _files.remove(f))),
-                    ],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // The agent's commands for what's typed after "/".
+              if (matches.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: c.surface,
+                    shape: cardShape(c),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        for (final (name, description) in matches)
+                          ListTile(
+                            title: Text('/$name', style: codeStyle(c.text)),
+                            subtitle: description.isEmpty
+                                ? null
+                                : Text(description, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () {
+                              Haptics.tick();
+                              _text.text = '/$name ';
+                              _text.selection = TextSelection.collapsed(offset: _text.text.length);
+                            },
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 6, 8, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    tooltip: 'Attach',
-                    onPressed: ready && !_picking ? _attach : null,
-                    icon: _picking
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(AppIcons.attach),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _text,
-                      enabled: ready,
-                      minLines: 1,
-                      maxLines: 6,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Message ${chat.name}',
-                        // One line is as tall as the buttons beside it.
-                        constraints: const BoxConstraints(minHeight: 48),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              // One container: attachments, the growing text, attach and
+              // send inside it (the pattern of Messages, Gemini, Claude).
+              AnimatedContainer(
+                duration: Motion.quick,
+                decoration: BoxDecoration(
+                  color: c.surfaceAlt,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: _focused ? c.outline : c.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_files.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final f in _files)
+                              _AttachmentChip(attachment: f, onRemove: () => setState(() => _files.remove(f))),
+                          ],
+                        ),
                       ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          tooltip: 'Attach',
+                          onPressed: ready && !_picking ? _attach : null,
+                          icon: _picking
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : Icon(AppIcons.attach, color: c.textMuted),
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _text,
+                            focusNode: _focus,
+                            enabled: ready,
+                            minLines: 1,
+                            maxLines: 6,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                            decoration: InputDecoration(
+                              hintText: 'Message ${chat.name}',
+                              filled: false,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: chat.busy
+                              ? IconButton(
+                                  tooltip: 'Stop',
+                                  style: _roundButton(background: c.text, foreground: c.bg, c: c),
+                                  onPressed: () {
+                                    Haptics.tick();
+                                    chat.cancel();
+                                  },
+                                  icon: const Icon(AppIcons.stop, fill: 1, size: 20),
+                                )
+                              : IconButton(
+                                  tooltip: 'Send',
+                                  // Mint either way: the bright accent on dark,
+                                  // the tonal pair on light.
+                                  style: dark
+                                      ? _roundButton(background: c.accent, foreground: c.bg, c: c)
+                                      : _roundButton(
+                                          background: c.accentContainer,
+                                          foreground: c.onAccentContainer,
+                                          c: c,
+                                        ),
+                                  onPressed: canSend ? _send : null,
+                                  icon: const Icon(AppIcons.arrowUpward, size: 22),
+                                ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (chat.busy)
-                    IconButton.filled(
-                      tooltip: 'Stop',
-                      style: _roundButton(background: c.surfaceAlt, foreground: c.text, c: c),
-                      onPressed: chat.cancel,
-                      icon: const Icon(AppIcons.stop, fill: 1, size: 22),
-                    )
-                  else
-                    IconButton.filled(
-                      tooltip: 'Send',
-                      // Mint either way: the bright accent on dark, the tonal
-                      // pair on light (the dark accent read as a black blob).
-                      style: Theme.of(context).brightness == Brightness.dark
-                          ? _roundButton(background: c.accent, foreground: c.bg, c: c)
-                          : _roundButton(background: c.accentContainer, foreground: c.onAccentContainer, c: c),
-                      onPressed: ready && (typed.trim().isNotEmpty || _files.isNotEmpty) ? _send : null,
-                      // Material's send arrow sits low-left in its box; nudged
-                      // to its optical center.
-                      icon: const Padding(
-                        padding: EdgeInsets.only(left: 2),
-                        child: Icon(AppIcons.send, fill: 1, size: 22),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -878,8 +1124,14 @@ class _AttachmentChip extends StatelessWidget {
     final image = attachment.isImage
         ? ClipRRect(
             borderRadius: BorderRadius.circular(Radii.medium),
-            child: Image.file(file, width: 56, height: 56, fit: BoxFit.cover, cacheWidth: 168,
-                errorBuilder: (_, _, _) => Icon(AppIcons.description, color: c.textMuted)),
+            child: Image.file(
+              file,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              cacheWidth: 168,
+              errorBuilder: (_, _, _) => Icon(AppIcons.description, color: c.textMuted),
+            ),
           )
         : null;
     return Semantics(
@@ -901,7 +1153,12 @@ class _AttachmentChip extends StatelessWidget {
               const SizedBox(width: 6),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 180),
-                child: Text(attachment.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: codeStyle(c.text, size: 12)),
+                child: Text(
+                  attachment.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: codeStyle(c.text, size: 12),
+                ),
               ),
             ],
             if (onRemove != null)
@@ -917,13 +1174,89 @@ class _AttachmentChip extends StatelessWidget {
   }
 }
 
-/// Send and Stop: 48dp circles; disabled stays legible (muted on a tone).
+/// Send and Stop: 40dp circles inside the box, 48dp to touch; disabled
+/// stays legible (muted on a tone).
 ButtonStyle _roundButton({required Color background, required Color foreground, required AppColors c}) =>
     IconButton.styleFrom(
-      fixedSize: const Size(48, 48),
-      minimumSize: const Size(48, 48),
+      fixedSize: const Size(40, 40),
+      minimumSize: const Size(40, 40),
+      tapTargetSize: MaterialTapTargetSize.padded,
       backgroundColor: background,
       foregroundColor: foreground,
-      disabledBackgroundColor: c.surfaceAlt,
+      disabledBackgroundColor: c.border,
       disabledForegroundColor: c.textMuted,
     );
+
+/// The chat's moments felt, on the frame they show and only while the chat
+/// is on screen with the app in front: a click asking for an answer, a
+/// confirm when a turn finishes, a reject when it fails.
+class _ChatHaptics extends StatefulWidget {
+  const _ChatHaptics({required this.chat, required this.child});
+  final AgentChat chat;
+  final Widget child;
+
+  @override
+  State<_ChatHaptics> createState() => _ChatHapticsState();
+}
+
+class _ChatHapticsState extends State<_ChatHaptics> {
+  late var _asks = widget.chat.permissions.length;
+  late var _busy = widget.chat.busy;
+  late var _failed = widget.chat.state == ChatState.failed;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.chat.addListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(_ChatHaptics old) {
+    super.didUpdateWidget(old);
+    if (old.chat != widget.chat) {
+      old.chat.removeListener(_changed);
+      widget.chat.addListener(_changed);
+      _asks = widget.chat.permissions.length;
+      _busy = widget.chat.busy;
+      _failed = widget.chat.state == ChatState.failed;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.chat.removeListener(_changed);
+    super.dispose();
+  }
+
+  bool get _seen =>
+      mounted &&
+      TickerMode.valuesOf(context).enabled &&
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  void _changed() {
+    final chat = widget.chat;
+    final asks = chat.permissions.length, busy = chat.busy, failed = chat.state == ChatState.failed;
+    final seen = _seen;
+    if (seen) {
+      if (asks > _asks) {
+        Haptics.attention();
+      } else if (failed && !_failed) {
+        Haptics.reject();
+      } else if (_busy && !busy) {
+        final last = chat.entries.lastOrNull;
+        // Stop was the user's own tap (it clicked already).
+        if (last is NoticeEntry && last.error) {
+          Haptics.reject();
+        } else if (!(last is NoticeEntry && last.text == 'Stopped.')) {
+          Haptics.confirm();
+        }
+      }
+    }
+    _asks = asks;
+    _busy = busy;
+    _failed = failed;
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
