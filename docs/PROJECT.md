@@ -176,6 +176,8 @@ On the Android side, `MainActivity.kt` registers the channels: pty, phone files,
 
 ## Not done yet
 
+Tracked with context in [TODO.md](../TODO.md); the performance plan is in [PERFORMANCE.md](PERFORMANCE.md).
+
 - **Blocks for plain shell commands** (OSC 133 command marks).
 - **ACP with Codex and Gemini,** tested live on a device.
 - **M3 Expressive components,** once Flutter ships them.
