@@ -571,7 +571,10 @@ void main() {
       await tester.pumpWidget(AiTermApp(services: services));
       await settleIo(tester);
 
-      await tester.tap(find.text('Weather app with a long name'));
+      // At 200% the card can sit below the agents prompt.
+      final card = find.text('Weather app with a long name');
+      await tester.scrollUntilVisible(card, 200, scrollable: find.byType(Scrollable).first);
+      await tester.tap(card);
       await settleIo(tester);
       for (final tab in [WorkspaceTab.changes, WorkspaceTab.files, WorkspaceTab.preview, WorkspaceTab.agent]) {
         services.navigation.openWorkspaceTab(tab);
