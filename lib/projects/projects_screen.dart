@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../agents/agent_installer.dart';
+import '../git/github_button.dart';
+import '../git/github_repos_screen.dart';
 import '../agents/agents_screen.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
@@ -47,7 +49,7 @@ class _Projects extends StatelessWidget {
         builder: (context, _) {
           final projects = s.projects.projects;
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
               Row(
                 children: [
@@ -83,17 +85,9 @@ class _Projects extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: ListenableBuilder(
-        listenable: s.projects,
-        builder: (context, _) => s.projects.projects.isEmpty
-            ? const SizedBox.shrink()
-            : FloatingActionButton.extended(
-        onPressed: () => showAddProject(context),
-        backgroundColor: c.accent,
-        foregroundColor: c.bg,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add project'),
-      ),
+      bottomNavigationBar: ListenableBuilder(
+        listenable: Listenable.merge([s.projects, s.github]),
+        builder: (context, _) => _BottomActions(empty: s.projects.projects.isEmpty),
       ),
     );
   }
@@ -171,6 +165,47 @@ class _AgentsPrompt extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The screen's actions, at the bottom in thumb reach: Add project (the
+/// empty state lists those ways itself) and GitHub: sign in, then pick a
+/// repository to work on.
+class _BottomActions extends StatelessWidget {
+  const _BottomActions({required this.empty});
+  final bool empty;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final signedIn = context.services.github.user != null;
+    final github = GitHubButton(
+      label: signedIn ? 'Your repositories' : 'Sign in with GitHub',
+      onPressed: () => openGitHubRepos(context),
+    );
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        decoration: BoxDecoration(color: c.bg, border: Border(top: BorderSide(color: c.border, width: 0.5))),
+        child: empty
+            ? github
+            : Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                      onPressed: () => showAddProject(context),
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: const Text('Add project'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: github),
+                ],
+              ),
       ),
     );
   }

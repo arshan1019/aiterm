@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/git/github_auth.dart';
 import 'package:aiterm/git/git_runner.dart';
 
-/// gh running on a PTY, scripted: what it prints, what we type back.
+/// gh's login, scripted: what it prints (and anything typed back).
 class FakeGh implements InteractiveProcess {
   final _out = StreamController<String>();
   final typed = <String>[];
@@ -27,11 +27,14 @@ class FakeGh implements InteractiveProcess {
 
 void main() {
   group('gh output', () {
-    test('device code, prompts and success are recognised', () {
-      expect(deviceCodeIn('! First copy your one-time code: 4E5C-1A2B\r\n'), '4E5C-1A2B');
+    // Verbatim output of `gh auth login --web` (gh 2.63) without a terminal.
+    const ghOutput = '\n! First copy your one-time code: D00B-2297\n'
+        'Open this URL to continue in your web browser: https://github.com/login/device\n';
+
+    test('device code, page and success are recognised', () {
+      expect(deviceCodeIn(ghOutput), 'D00B-2297');
+      expect(deviceUrlIn(ghOutput), 'https://github.com/login/device');
       expect(deviceCodeIn('nothing here'), isNull);
-      expect(ghPromptIn('? Authenticate Git with your GitHub credentials? (Y/n) '), GhPrompt.authenticateGit);
-      expect(ghPromptIn('Press Enter to open https://github.com/login/device in your browser... '), GhPrompt.pressEnter);
       expect(loggedInAs('✓ Logged in as octocat\r\n'), 'octocat');
     });
 
@@ -62,19 +65,19 @@ void main() {
       );
     });
 
-    test('code shown, prompts answered, git set up, account read', () async {
-      final states = <GitHubAuthState>[];
-      auth.addListener(() => states.add(auth.state));
+    test('code and page shown with nothing to answer; git set up; account read', () async {
       final done = auth.signIn();
       await pumpEventQueue();
-      gh.say('? Authenticate Git with your GitHub credentials? (Y/n) ');
+      expect(auth.state, isA<SigningIn>());
+      // The code may arrive split across reads.
+      gh.say('\n! First copy your one-time co');
+      gh.say('de: D00B-2297\nOpen this URL to continue in your web browser: https://github.com/login/device\n');
       await pumpEventQueue();
-      expect(gh.typed, ['Y\r']);
-      gh.say('\r\n! First copy your one-time code: 4E5C-1A2B\r\nPress Enter to open https://github.com/login/device in your browser... ');
-      await pumpEventQueue();
-      expect(auth.state, isA<AwaitingCode>().having((s) => s.code, 'code', '4E5C-1A2B'));
-      expect(gh.typed.last, '\r');
-      gh.say('\r\n✓ Authentication complete.\r\n✓ Logged in as octocat\r\n');
+      expect(auth.state, isA<AwaitingCode>()
+          .having((s) => s.code, 'code', 'D00B-2297')
+          .having((s) => s.url, 'url', 'https://github.com/login/device'));
+      expect(gh.typed, isEmpty); // no prompts without a terminal
+      gh.say('✓ Authentication complete.\n✓ Logged in as octocat\n');
       gh.finish(0);
       await done;
       expect(auth.state, isA<SignedIn>().having((s) => s.user.login, 'login', 'octocat'));

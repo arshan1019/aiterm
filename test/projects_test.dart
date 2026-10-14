@@ -116,6 +116,44 @@ void main() {
       expect(p.name, 'cloned');
     });
 
+    test('a repository from GitHub: cloned once into the projects folder, then just opened', () async {
+      final origin = '${tmp.path}/origin';
+      Directory(origin).createSync();
+      await git.run(origin, ['init', '-q', '-b', 'main']);
+      File('$origin/README.md').writeAsStringSync('hi');
+      await git.run(origin, ['add', '-A']);
+      await git.run(origin, ['commit', '-qm', 'i']);
+      final s = service(store);
+      final parent = '${tmp.path}/projects';
+
+      final p = await s.addRepository(origin, name: 'rocket', parent: parent);
+      expect(p.path, '$parent/rocket');
+      expect(File('$parent/rocket/README.md').readAsStringSync(), 'hi');
+
+      // Again: the same project, no second clone.
+      final again = await s.addRepository(origin, name: 'rocket', parent: parent);
+      expect(again.id, p.id);
+      expect(store.projects.where((x) => x.name == 'rocket'), hasLength(1));
+    });
+
+    test('a repository whose folder name is taken by something else gets the next free name', () async {
+      final origin = '${tmp.path}/origin2';
+      Directory(origin).createSync();
+      await git.run(origin, ['init', '-q', '-b', 'main']);
+      File('$origin/a.txt').writeAsStringSync('a');
+      await git.run(origin, ['add', '-A']);
+      await git.run(origin, ['commit', '-qm', 'i']);
+      final parent = '${tmp.path}/projects2';
+      File('$parent/site/notes.txt')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('mine');
+
+      final p = await service(store).addRepository(origin, name: 'site', parent: parent);
+      expect(p.path, '$parent/site-2');
+      expect(File('$parent/site/notes.txt').readAsStringSync(), 'mine'); // untouched
+      expect(File('$parent/site-2/a.txt').existsSync(), isTrue);
+    });
+
     test('open existing folder; offers git init when it is not a repo', () async {
       Directory('${tmp.path}/plain').createSync();
       final s = service(store);

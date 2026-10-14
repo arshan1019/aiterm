@@ -6,7 +6,7 @@ import 'git_runner.dart';
 /// Runs `gh` with [ghArgs] (and optional stdin) inside Linux.
 typedef GhRunner = Future<GitResult> Function(List<String> ghArgs, {String? stdin});
 
-/// A process on a PTY the app talks to (gh's interactive login).
+/// A process the app reads (gh's login).
 abstract interface class InteractiveProcess {
   Stream<String> get output;
   void write(String text);
@@ -76,19 +76,14 @@ class SignInFailed extends GitHubAuthState {
   final String message;
 }
 
-enum GhPrompt { authenticateGit, pressEnter }
-
 final _code = RegExp(r'one-time code:\s*([A-Z0-9]{4}-[A-Z0-9]{4})');
+final _url = RegExp(r'(https://\S+/login/device)\b');
 final _ansi = RegExp(r'\x1b\[[0-9;?]*[ -/]*[@-~]');
 
 String? deviceCodeIn(String text) => _code.firstMatch(text.replaceAll(_ansi, ''))?.group(1);
 
-GhPrompt? ghPromptIn(String text) {
-  final t = text.replaceAll(_ansi, '');
-  if (t.contains('Authenticate Git with your GitHub credentials')) return GhPrompt.authenticateGit;
-  if (t.contains('Press Enter to open')) return GhPrompt.pressEnter;
-  return null;
-}
+/// The page gh asks the user to open (GitHub's device activation page).
+String? deviceUrlIn(String text) => _url.firstMatch(text.replaceAll(_ansi, ''))?.group(1);
 
 String? loggedInAs(String text) => RegExp(r'Logged in as (\S+)').firstMatch(text.replaceAll(_ansi, ''))?.group(1);
 
@@ -97,9 +92,11 @@ String? loggedInAs(String text) => RegExp(r'Logged in as (\S+)').firstMatch(text
 (String, String) identityFor(GitHubUser u) =>
     (u.name ?? u.login, u.email ?? '${u.id}+${u.login}@users.noreply.github.com');
 
-/// "Sign in to GitHub" with GitHub's official CLI: its device-code login
-/// (the app shows the code and opens the page), then `gh auth setup-git`
-/// so git uses the same credentials over HTTPS.
+/// "Sign in with GitHub" through GitHub's official CLI and its device flow
+/// (docs.github.com: Authorizing OAuth apps, device flow): gh prints a
+/// one-time code, the app shows it and opens github.com/login/device, gh
+/// polls until the user approves; then `gh auth setup-git` so git uses the
+/// same credentials over HTTPS.
 class GitHubAuth extends ChangeNotifier {
   GitHubAuth({required this._startLogin, required this._run});
 
@@ -137,18 +134,11 @@ class GitHubAuth extends ChangeNotifier {
     final log = StringBuffer();
     try {
       final gh = _login = await _startLogin();
-      final answered = <GhPrompt>{};
       final sub = gh.output.listen((chunk) {
         log.write(chunk);
         final text = log.toString();
         final code = deviceCodeIn(text);
-        if (code != null && state is! AwaitingCode) _set(AwaitingCode(code, deviceUrl));
-        for (final prompt in GhPrompt.values) {
-          if (!answered.contains(prompt) && ghPromptIn(chunk) == prompt) {
-            answered.add(prompt);
-            gh.write(prompt == GhPrompt.authenticateGit ? 'Y\r' : '\r');
-          }
-        }
+        if (code != null && state is! AwaitingCode) _set(AwaitingCode(code, deviceUrlIn(text) ?? deviceUrl));
       });
       final code = await gh.exitCode;
       await sub.cancel();

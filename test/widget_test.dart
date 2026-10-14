@@ -48,12 +48,16 @@ void main() {
   Finder navTab(String label) => find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
 
   /// Starts the app; [home] false switches to the terminal tab, which most
-  /// tests drive (agents is the home tab).
+  /// tests drive (skipping first-run setup when Linux isn't installed).
   Future<AppServices> boot(WidgetTester tester, {bool home = false}) async {
     final services = (await tester.runAsync(AppServices.load))!;
     await tester.pumpWidget(AiTermApp(services: services));
     await tester.pumpAndSettle();
     if (!home) {
+      if (find.text('Skip').evaluate().isNotEmpty) {
+        await tester.tap(find.text('Skip'));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(navTab('Terminal'));
       await tester.pumpAndSettle();
     }
@@ -71,26 +75,29 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('first launch shows the tabs and Linux setup', (tester) async {
-    await boot(tester);
-    expect(navTab('Terminal'), findsOneWidget);
-    expect(navTab('Files'), findsOneWidget);
-    expect(navTab('Settings'), findsOneWidget);
+  testWidgets('first launch is one setup screen, without tabs; Skip opens the app', (tester) async {
+    await boot(tester, home: true);
     expect(find.text('Set up aiterm'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing); // setup appears once, not per tab
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    for (final t in ['Projects', 'Terminal', 'Files', 'Settings']) {
+      expect(navTab(t), findsOneWidget);
+    }
+    // Without Linux, setup is offered where it's needed: Projects (not Terminal).
+    expect(find.text('Set up aiterm'), findsOneWidget);
+    expect(find.text('Skip'), findsNothing);
+    await tester.tap(navTab('Terminal'));
+    await tester.pumpAndSettle();
+    expect(find.text('Set up aiterm'), findsNothing);
+    expect(find.text('shell'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
   testWidgets('walks through every screen without framework errors', (tester) async {
     await boot(tester);
 
-    // Android's shell lives in Settings, out of the way of first-run setup.
-    await tester.tap(navTab('Settings'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Use'));
-    await tester.pumpAndSettle();
-    await tester.tap(navTab('Terminal'));
-    await tester.pumpAndSettle();
-    expect(find.text('shell'), findsOneWidget);
+    expect(find.text('shell'), findsOneWidget); // skipped setup: Android's shell
 
     // New terminal tab, switch back, open its menu and close it.
     await tester.tap(find.byTooltip('New tab'));
@@ -281,12 +288,6 @@ void main() {
 
   testWidgets('switching tabs or screens does not pop the keyboard up', (tester) async {
     await boot(tester);
-    await tester.tap(navTab('Settings'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Use'));
-    await tester.pumpAndSettle();
-    await tester.tap(navTab('Terminal'));
-    await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isFalse, reason: 'not on first show');
 
     await tester.tap(find.byTooltip('New tab'));
@@ -308,9 +309,8 @@ void main() {
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
-  testWidgets('home is Projects; first launch sets up Linux there', (tester) async {
+  testWidgets('first launch: agents picked up front on the setup screen', (tester) async {
     await boot(tester, home: true);
-    expect(navTab('Projects'), findsOneWidget);
     // First launch: one setup screen, agents picked up front.
     expect(find.text('Set up aiterm'), findsOneWidget);
     for (final name in ['Claude Code', 'Gemini CLI', 'Codex CLI']) {

@@ -158,7 +158,20 @@ class _SignInSheetState extends State<_SignInSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Sign in to GitHub', style: TextStyle(color: c.text, fontSize: 17, fontWeight: FontWeight.w600)),
+                  Row(
+                    children: [
+                      Image.asset(
+                        Theme.of(context).brightness == Brightness.dark
+                            ? 'assets/github/GitHub_Invertocat_White.png'
+                            : 'assets/github/GitHub_Invertocat_Black.png',
+                        width: 24,
+                        height: 24,
+                        excludeFromSemantics: true,
+                      ),
+                      const SizedBox(width: 12),
+                      Text('Sign in with GitHub', style: TextStyle(color: c.text, fontSize: 17, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   ...switch (state) {
                     AwaitingCode() => [

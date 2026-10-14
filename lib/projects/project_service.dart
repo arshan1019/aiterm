@@ -69,6 +69,29 @@ class ProjectService {
     return store.add(name: name ?? path.split('/').last, path: path);
   }
 
+  /// A repository (from the GitHub list): its project if it's already
+  /// here, else cloned into [parent]/[name] (or [name]-2… when that folder
+  /// holds something else) and added.
+  Future<Project> addRepository(String url, {required String name, String parent = projectsFolder}) async {
+    final base = '$parent/${folderNameFor(name)}';
+    var path = base;
+    for (var n = 2;; n++) {
+      if (store.byPath(path) case final existing?) return existing;
+      if (!await _occupied(path)) break;
+      path = '$base-$n';
+    }
+    return clone(url, path: path, name: name);
+  }
+
+  /// The project [addRepository] made for a repository named [name], if any.
+  Project? repositoryProject(String name, {String parent = projectsFolder}) =>
+      store.byPath('$parent/${folderNameFor(name)}');
+
+  Future<bool> _occupied(String path) async {
+    final dir = Directory(hostPath(path));
+    return await dir.exists() && !await dir.list().isEmpty;
+  }
+
   /// Makes an existing folder a project (git or not). On phone storage,
   /// which keeps no file modes, git is told not to track them (as git does
   /// itself for repos it creates there).

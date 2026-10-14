@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../files/files_screen.dart';
+import '../onboarding/setup_view.dart';
 import '../projects/projects_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shared/fade_indexed_stack.dart';
@@ -20,6 +21,28 @@ class HomeShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.services;
+    // First launch: setup alone, full screen (Apple HIG: onboarding is
+    // quick and skippable; the app's tabs come after). Skipping uses
+    // Android's shell; Projects then offers setup where Linux is needed.
+    return ListenableBuilder(
+      listenable: Listenable.merge([s.linux, s.setup]),
+      builder: (context, _) {
+        final onboarding = (!s.linux.installed && !s.linux.usesAndroidShell) || s.setup.active;
+        return AnimatedSwitcher(
+          duration: Motion.standard,
+          child: onboarding
+              ? Scaffold(
+                  key: const ValueKey('onboarding'),
+                  body: SafeArea(child: SetupView(onSkip: s.linux.installed ? null : s.linux.useAndroidShell)),
+                )
+              : _shell(context),
+        );
+      },
+    );
+  }
+
+  Widget _shell(BuildContext context) {
     final c = context.colors;
     final nav = context.services.navigation;
     final dark = Theme.of(context).brightness == Brightness.dark;

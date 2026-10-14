@@ -67,6 +67,7 @@ flutter:
   assets:
     - assets/needle_tools.json
     - assets/editor/
+    - assets/github/
 
   fonts:
     - family: JetBrainsMono

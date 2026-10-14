@@ -5,6 +5,7 @@ import '../app/theme.dart';
 import '../backup/backup_controller.dart';
 import '../git/git_actions.dart';
 import '../git/github_auth.dart';
+import '../git/github_button.dart';
 import '../projects/projects_screen.dart';
 import '../keep_alive/keep_alive_view.dart';
 import '../keep_alive/keep_alive_controller.dart';
@@ -79,13 +80,6 @@ class SettingsScreen extends StatelessWidget {
                   LinuxStatus.missing => 'Not installed yet. Set it up from Projects.',
                 }, style: TextStyle(color: c.textMuted, fontSize: 12)),
               ),
-              if (s.linux.status == LinuxStatus.missing && !s.linux.usesAndroidShell)
-                ListTile(
-                  title: const Text("Use Android's shell", style: TextStyle(fontSize: 14)),
-                  subtitle: Text('A plain terminal without Linux. Agents and git need Linux.',
-                      style: TextStyle(color: c.textMuted, fontSize: 12)),
-                  trailing: TextButton(onPressed: s.linux.useAndroidShell, child: const Text('Use')),
-                ),
               ListTile(
                 title: const Text('AI agents', style: TextStyle(fontSize: 14)),
                 trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
@@ -192,9 +186,9 @@ class _GitHubSection extends StatelessWidget {
           title: 'GitHub',
           children: [
             if (user == null)
-              ListTile(
-                title: const Text('Sign in to GitHub', style: TextStyle(fontSize: 14)),
-                trailing: TextButton(onPressed: () => signInToGitHub(context), child: const Text('Sign in')),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: GitHubButton(label: 'Sign in with GitHub', onPressed: () => signInToGitHub(context)),
               )
             else ...[
               ListTile(

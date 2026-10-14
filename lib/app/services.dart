@@ -15,7 +15,7 @@ import '../git/git_registry.dart';
 import '../git/git_runner.dart';
 import '../git/git_tools.dart';
 import '../git/github_auth.dart';
-import '../git/pty_process.dart';
+import '../git/linux_process.dart';
 import '../platform/pty.dart';
 import '../projects/project.dart';
 import '../projects/project_service.dart';
@@ -181,7 +181,9 @@ class AppServices {
   late GitRegistry git = GitRegistry(LinuxGitRunner(linux.runCommandLine));
   late GitTools gitTools = GitTools(run: linux.runScriptStreaming);
   late GitHubAuth github = GitHubAuth(
-    startLogin: () => PtyProcess.start(linux, 'BROWSER=true exec gh auth login -h github.com -p https --web -s admin:public_key'),
+    // No terminal: gh prints the code and URL and waits, no prompts.
+    startLogin: () => LinuxProcess.start(
+        linux, 'BROWSER=true exec gh auth login --hostname github.com --git-protocol https --web --scopes admin:public_key </dev/null'),
     run: (args, {stdin}) =>
         linux.runCommandLine('exec gh ${args.map(shellQuote).join(' ')}', env: gitEnvironment, stdin: stdin),
   );

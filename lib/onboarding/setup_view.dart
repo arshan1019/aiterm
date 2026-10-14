@@ -3,6 +3,7 @@ import '../agents/agent_catalog.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../git/git_actions.dart';
+import '../git/github_button.dart';
 import '../keep_alive/keep_alive.dart';
 import '../keep_alive/keep_alive_view.dart';
 import 'setup_pipeline.dart';
@@ -11,7 +12,10 @@ import 'setup_pipeline.dart';
 /// Linux, git and the agents install back to back. What's worth doing
 /// meanwhile (keep-alive, GitHub sign-in) is offered under the progress.
 class SetupView extends StatefulWidget {
-  const SetupView({super.key});
+  const SetupView({super.key, this.onSkip});
+
+  /// First launch: continue without Linux (Android's shell).
+  final VoidCallback? onSkip;
 
   @override
   State<SetupView> createState() => _SetupViewState();
@@ -41,7 +45,12 @@ class _SetupViewState extends State<SetupView> {
   List<Widget> _intro(BuildContext context) {
     final c = context.colors;
     return [
-      Text('Set up aiterm', style: TextStyle(color: c.text, fontSize: 20, fontWeight: FontWeight.w600)),
+      Row(
+        children: [
+          Expanded(child: Text('Set up aiterm', style: TextStyle(color: c.text, fontSize: 20, fontWeight: FontWeight.w600))),
+          if (widget.onSkip case final skip?) TextButton(onPressed: skip, child: Text('Skip', style: TextStyle(color: c.textMuted))),
+        ],
+      ),
       const SizedBox(height: 20),
       _Card(
         title: 'Agents',
@@ -103,9 +112,9 @@ class _SetupViewState extends State<SetupView> {
                       title: Text('Signed in as ${user.login}', style: const TextStyle(fontSize: 14)),
                     )
                   else
-                    ListTile(
-                      title: const Text('Sign in to GitHub', style: TextStyle(fontSize: 14)),
-                      trailing: TextButton(onPressed: () => signInToGitHub(context), child: const Text('Sign in')),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: GitHubButton(label: 'Sign in with GitHub', onPressed: () => signInToGitHub(context)),
                     ),
                 ],
               ),
