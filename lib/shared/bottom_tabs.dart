@@ -33,9 +33,6 @@ class BottomTabs extends StatelessWidget {
         selectedIndex: selected,
         onDestinationSelected: onSelect,
         height: 64,
-        backgroundColor: c.bg,
-        surfaceTintColor: Colors.transparent,
-        indicatorColor: c.accent.withValues(alpha: 0.18),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         animationDuration: Motion.standard,
         destinations: [

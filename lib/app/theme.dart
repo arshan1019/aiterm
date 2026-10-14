@@ -234,6 +234,24 @@ ThemeData buildTheme({required bool dark}) {
       highlightElevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
+    // Bottom navigation: the selected destination in the accent (icon on a
+    // tinted pill, bold label), the rest muted; both pass contrast.
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: c.bg,
+      surfaceTintColor: Colors.transparent,
+      indicatorColor: c.accent.withValues(alpha: 0.18),
+      iconTheme: WidgetStateProperty.resolveWith(
+        (s) => IconThemeData(color: s.contains(WidgetState.selected) ? c.accent : c.textMuted, size: 24),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (s) => TextStyle(
+          fontFamily: 'JetBrainsMono',
+          fontSize: 12,
+          color: s.contains(WidgetState.selected) ? c.text : c.textMuted,
+          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w400,
+        ),
+      ),
+    ),
     checkboxTheme: CheckboxThemeData(
       side: BorderSide(color: c.outline, width: 1.5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
