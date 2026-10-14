@@ -188,6 +188,12 @@ class _BottomActions extends StatelessWidget {
       label: !empty ? 'GitHub' : (signedIn ? 'Your repositories' : 'Sign in with GitHub'),
       onPressed: () => openGitHubRepos(context),
     );
+    final add = FilledButton.icon(
+      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      onPressed: () => showAddProject(context),
+      icon: const Icon(AppIcons.add, size: 20),
+      label: const Text('Add project'),
+    );
     return SafeArea(
       top: false,
       child: Container(
@@ -195,20 +201,19 @@ class _BottomActions extends StatelessWidget {
         decoration: BoxDecoration(color: c.bg, border: Border(top: BorderSide(color: c.border, width: 0.5))),
         child: empty
             ? github
-            : Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                      onPressed: () => showAddProject(context),
-                      icon: const Icon(AppIcons.add, size: 20),
-                      label: const Text('Add project'),
-                    ),
+            // Side by side; stacked once large text would wrap the labels.
+            : MediaQuery.textScalerOf(context).scale(14) > 21
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [add, const SizedBox(height: 10), github],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: add),
+                      const SizedBox(width: 10),
+                      Expanded(child: github),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(child: github),
-                ],
-              ),
       ),
     );
   }

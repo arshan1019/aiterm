@@ -38,6 +38,7 @@ void main() {
     await (FontLoader('MaterialIcons')
           ..addFont(bytes('$flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf')))
         .load();
+    await (FontLoader('MaterialSymbols')..addFont(bytes('assets/fonts/MaterialSymbolsOutlined.ttf'))).load();
   });
 
   setUp(() {

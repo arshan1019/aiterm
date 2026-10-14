@@ -97,7 +97,7 @@ void main() {
   });
 
   testWidgets('walks through every screen without framework errors', (tester) async {
-    await boot(tester);
+    final services = await boot(tester);
 
     expect(find.text('shell'), findsOneWidget); // skipped setup: Android's shell
 
@@ -116,8 +116,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(navTab('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
+    expect(services.settings.theme, ThemeChoice.dark);
+    await tester.tap(find.text('Compact lists'));
+    await tester.pumpAndSettle();
+    expect(services.settings.compact, isTrue);
     await tester.tap(navTab('Terminal'));
     await tester.pumpAndSettle();
 
@@ -482,6 +486,10 @@ void main() {
     await settleIo(tester);
     expect(find.text('Old thing'), findsNothing);
     expect(services.projects.projects.map((p) => p.name), ['Forecast', 'On the phone']);
+    // The folder goes after the project leaves the list (real IO).
+    for (var i = 0; i < 40 && Directory('${dir.path}/alpine/root/old').existsSync(); i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    }
     expect(Directory('${dir.path}/alpine/root/old').existsSync(), isFalse);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
@@ -563,6 +571,7 @@ void main() {
       await tester.pumpWidget(AiTermApp(services: services));
       await settleIo(tester);
 
+      debugPrint('DIAG tab=${services.navigation.tab} projects=${services.projects.projects.map((p) => p.name)} linux=${services.linux.installed} texts=${find.byType(Text, skipOffstage: false).evaluate().length} onstage=${find.byType(Text).evaluate().map((e) => (e.widget as Text).data).join(" | ")}');
       await tester.tap(find.text('Weather app with a long name'));
       await settleIo(tester);
       for (final tab in [WorkspaceTab.changes, WorkspaceTab.files, WorkspaceTab.preview, WorkspaceTab.agent]) {
