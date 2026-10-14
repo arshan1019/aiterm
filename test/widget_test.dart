@@ -751,13 +751,13 @@ void main() {
     expect(services.settings.blocks, isFalse);
     services.navigation.open(AppTab.settings);
     await tester.pumpAndSettle();
-    expect(find.text('Agent settings'), findsOneWidget);
-    await tester.ensureVisible(find.text('Blocks'));
+    await tester.scrollUntilVisible(find.text('Agent settings'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(find.text('Blocks'), 200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.text('Blocks'));
     await tester.pumpAndSettle();
     expect(services.settings.blocks, isTrue);
     expect(find.text('Show thinking'), findsOneWidget);
-    await tester.ensureVisible(find.text('High contrast'));
+    await tester.scrollUntilVisible(find.text('High contrast'), -200, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.text('High contrast'));
     await tester.pumpAndSettle();
     expect(services.settings.highContrast, isTrue);

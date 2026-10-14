@@ -545,11 +545,17 @@ class _PlanBlock extends StatelessWidget {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(top: 1),
-                    child: _StatusGlyph(switch (status) {
-                      PlanStatus.done => ToolStatus.done,
-                      PlanStatus.running => ToolStatus.running,
-                      PlanStatus.pending => ToolStatus.pending,
-                    }),
+                    child: switch (status) {
+                      PlanStatus.done => const _StatusGlyph(ToolStatus.done),
+                      PlanStatus.pending => const _StatusGlyph(ToolStatus.pending),
+                      // The current step: a still dot (agents may leave a
+                      // step open when the turn ends).
+                      PlanStatus.running => SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: Center(child: Icon(AppIcons.circle, fill: 1, size: 10, color: c.accent)),
+                        ),
+                    },
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -724,9 +730,13 @@ class _ComposerState extends State<_Composer> {
                   ),
                   const SizedBox(width: 8),
                   if (chat.busy)
-                    IconButton.filledTonal(
+                    IconButton.filled(
                       tooltip: 'Stop',
-                      style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        backgroundColor: c.surfaceAlt,
+                        foregroundColor: c.text,
+                      ),
                       onPressed: chat.cancel,
                       icon: const Icon(AppIcons.stop, fill: 1),
                     )
