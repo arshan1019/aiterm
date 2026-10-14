@@ -370,7 +370,9 @@ class _FilesScreenState extends State<FilesScreen> {
         ),
       ),
       // Nothing can be created among the chosen folders themselves.
-      floatingActionButton: _onPhoneChoicesRoot ? null : PopupMenuButton<String>(
+      floatingActionButton: ListenableBuilder(
+        listenable: _browser,
+        builder: (context, _) => _onPhoneChoicesRoot ? const SizedBox.shrink() : PopupMenuButton<String>(
         onSelected: _add,
         offset: const Offset(0, -110),
         itemBuilder: (context) => [
@@ -388,6 +390,7 @@ class _FilesScreenState extends State<FilesScreen> {
           decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(16)),
           child: Icon(Icons.add_rounded, color: c.bg),
         ),
+      ),
       ),
     );
   }

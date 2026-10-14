@@ -154,6 +154,8 @@ ThemeData buildTheme({required bool dark}) {
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: c.surface,
+      elevation: 3,
+      shadowColor: Colors.black26,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: c.border)),
     ),
     snackBarTheme: SnackBarThemeData(
