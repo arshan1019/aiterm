@@ -56,6 +56,19 @@ jobs:
           echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/aiterm.keystore"
           echo "AITERM_KEYSTORE=$RUNNER_TEMP/aiterm.keystore" >> "$GITHUB_ENV"
 
+      # The NDK Flutter pins, installed up front with retries: the runner
+      # image may not carry it, and a corrupt download once failed a build.
+      - name: Android NDK
+        run: |
+          NDK=$(grep -oE 'ndkVersion[^"]*"[0-9.]+"' "$FLUTTER_ROOT/packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt" | grep -oE '[0-9][0-9.]+' | head -1)
+          echo "NDK $NDK"
+          for i in 1 2 3; do
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK" > /dev/null && exit 0
+            rm -rf "$ANDROID_HOME/ndk/$NDK"
+            sleep 15
+          done
+          exit 1
+
       # arm64 covers virtually every phone in use; building one ABI instead
       # of all of them is what keeps this fast.
       - run: flutter build apk --debug --target-platform android-arm64 --build-number=${{ github.run_number }}
