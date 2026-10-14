@@ -229,11 +229,18 @@ class _ChatBar extends StatelessWidget {
                     ),
                   ),
           ),
+          // The mode gives way first on a narrow screen (its label truncates).
           if (mode != null)
-            TextButton.icon(
-              onPressed: () => _choose(context, chat, mode),
-              icon: const Icon(AppIcons.tune, size: 18),
-              label: Text(mode.valueName),
+            Flexible(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 150),
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  onPressed: () => _choose(context, chat, mode),
+                  icon: const Icon(AppIcons.tune, size: 18),
+                  label: Text(mode.valueName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ),
             ),
           IconButton(
             tooltip: 'History',
