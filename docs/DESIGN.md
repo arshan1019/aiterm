@@ -229,7 +229,15 @@ Write in sentence case everywhere: "New session", "Clone repo". Fluent and Googl
 - **Icons (P2-12):** Material Symbols Outlined is subset to the app's icons by `tool/icons/generate.py`, which writes `assets/fonts/MaterialSymbolsOutlined.ttf` (about 100 KB, all four axes) and `lib/app/icons.dart`. To add an icon, list it in `tool/icons/icons.txt` and run the script; the full package would ship 30 MB of fonts in debug builds, which don't tree-shake. Fill is reserved for state: the selected tab (animated), success checks, a pinned tab and folders. Agents use `robot_2`, never a sparkle.
 - **Options (P2-13):** Theme (System, Light or Dark; System is the default), Wallpaper colors (Android 12+; the wallpaper hue at the teal's tones, so contrast holds for every hue), Compact lists (48/64dp rows; hit areas stay at 48dp), and for the terminal Always dark and Black background. M3 Expressive components wait for Flutter.
 - **Tests (P2-14):** Contrast tests cover both themes, wallpaper accents across every 15° of hue, and the black terminal. Widget tests lay out the main screens at 200% text on a 360dp phone, in dark and in light with compact lists, and fail on any overflow. These tests are layout checks, not pixel goldens: CI is the only runner, so goldens would mostly catch rendering noise.
-- **Open:** P1-7 (blocks) needs its own plan, because agents draw their own TUIs. The high-contrast variant from "Color" is not built yet.
+- **High contrast:** a switch in Appearance. Text and status colors reach 7:1 (AAA), control outlines 4.5:1, and groups and cards get a visible edge. Wallpaper accents use higher-contrast tones too. `test/contrast_test.dart` enforces all of it.
+- **Blocks (P1-7):** optional, and off by default: the agents' own terminal UIs stay the default. Settings has an Agent settings group with Blocks, a switch per agent, and Show thinking.
+  - **Protocol:** blocks use the [Agent Client Protocol](https://agentclientprotocol.com) rather than scraping terminal output. Gemini CLI speaks it natively (`gemini --acp`). Claude Code and Codex use the official adapters (`@agentclientprotocol/claude-agent-acp`, `@agentclientprotocol/codex-acp`), installed on first use with `--omit=optional` and pointed at the agents already installed (`CLAUDE_CODE_EXECUTABLE`, `CODEX_PATH`). That keeps one copy of each agent and one sign-in.
+  - **Client:** `lib/agents/acp/` holds the client: JSON-RPC over newline-delimited stdio. It claims no file or terminal capability, so agents use their own tools.
+  - **What renders:** messages (Markdown), thinking, tool calls (status glyph, kind icon, mono command or path, diffs with + and − marks), plans, and permission requests pinned above the message box.
+  - **Controls:** the agent's mode sits in the chat bar, and its model is in the menu; the last choice of each is remembered per agent. "/" lists the agent's commands.
+  - **Sessions:** sessions resume after a restart when the agent supports `session/load`.
+  - **Workspace:** when a project has both blocks and terminals, the Agent tab switches between them, and both stay running. Sign-in still happens in the agent's own UI ("Sign in" opens it).
+- **Open:** blocks for plain shell commands (OSC 133 marks) are not built.
 
 ## Conclusion
 
