@@ -10,6 +10,7 @@ import '../terminal/terminal_screen.dart';
 import 'navigation.dart';
 import 'services.dart';
 import 'theme.dart';
+import 'icons.dart';
 
 /// The top-level layout: the four screens, with their tabs at the bottom.
 /// All screens stay mounted, so terminals keep running and Files keeps its
@@ -61,10 +62,10 @@ class HomeShell extends StatelessWidget {
             listenable: nav,
             builder: (context, _) => BottomTabs(
               tabs: const [
-                BottomTab('Projects', Icons.folder_special_outlined, Icons.folder_special_rounded),
-                BottomTab('Terminal', Icons.terminal_outlined, Icons.terminal_rounded),
-                BottomTab('Files', Icons.folder_outlined, Icons.folder_rounded),
-                BottomTab('Settings', Icons.settings_outlined, Icons.settings_rounded),
+                BottomTab('Projects', AppIcons.project),
+                BottomTab('Terminal', AppIcons.terminal),
+                BottomTab('Files', AppIcons.folder),
+                BottomTab('Settings', AppIcons.settings),
               ],
               selected: nav.tab.index,
               onSelect: (i) => nav.open(AppTab.values[i]),

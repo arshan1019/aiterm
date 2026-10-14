@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
+import '../app/icons.dart';
 
 /// Shows [child] in the app's bottom sheet frame ([AppSheet]).
 Future<T?> showAppSheet<T>(
@@ -72,7 +73,7 @@ class AppSheet extends StatelessWidget {
                       if (closable)
                         IconButton(
                           tooltip: 'Close',
-                          icon: Icon(Icons.close_rounded, color: c.textMuted),
+                          icon: Icon(AppIcons.close, color: c.textMuted),
                           onPressed: () => Navigator.maybePop(context),
                         ),
                     ],

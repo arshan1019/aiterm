@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/app/app.dart';
+import 'package:aiterm/app/icons.dart';
+import 'package:aiterm/settings/settings.dart';
 import 'package:aiterm/app/navigation.dart';
 import 'package:aiterm/app/services.dart';
 import 'package:aiterm/git/git_registry.dart';
@@ -122,7 +124,7 @@ void main() {
     // Close the unpinned tab via its close button.
     await tester.tap(find.text('shell 2'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.close_rounded).first);
+    await tester.tap(find.byIcon(AppIcons.close).first);
     await tester.pumpAndSettle();
     expect(find.text('shell 2'), findsNothing);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
@@ -173,7 +175,7 @@ void main() {
     // Assistant sheet opens and closes.
     services.tabs.active.state.value = SessionState.running;
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.auto_awesome_rounded).last);
+    await tester.tap(find.byIcon(AppIcons.agent).last);
     await tester.pumpAndSettle();
     expect(find.text('What do you want to do?'), findsOneWidget);
     await tester.tapAt(const Offset(10, 10));
@@ -185,7 +187,7 @@ void main() {
     await tester.tap(find.text('proj'));
     await settleIo(tester);
     expect(find.text('Empty folder'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.tap(find.byIcon(AppIcons.arrowBack));
     await settleIo(tester);
     await tester.tap(find.text('notes.txt'));
     await settleIo(tester);
@@ -194,9 +196,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // Theme switch with everything mounted.
-    services.settings.dark = false;
+    services.settings.theme = ThemeChoice.light;
     await tester.pumpAndSettle();
-    services.settings.dark = true;
+    services.settings.theme = ThemeChoice.dark;
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
@@ -245,7 +247,7 @@ void main() {
     // Files: new folder via the dialog.
     await tester.tap(navTab('Files'));
     await settleIo(tester);
-    await tester.tap(find.byIcon(Icons.add_rounded).last);
+    await tester.tap(find.byIcon(AppIcons.add).last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('New folder'));
     await tester.pumpAndSettle();
@@ -533,6 +535,51 @@ void main() {
     expect(findings, isEmpty, reason: findings.join('\n\n'));
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
+
+  // Survive 200% text (One UI, HIG): any overflow on a phone-sized screen
+  // is reported as an error and fails the test.
+  for (final (look, theme, compact) in [('dark', ThemeChoice.dark, false), ('light, compact', ThemeChoice.light, true)]) {
+    testWidgets('main screens lay out at 200% text on a phone ($look)', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2340);
+      tester.view.devicePixelRatio = 3;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      Directory('${dir.path}/alpine/root/app/lib').createSync(recursive: true);
+      File('${dir.path}/alpine/root/app/a_long_file_name_for_the_list.dart').writeAsStringSync('void main() {}');
+      File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
+      final now = DateTime.now().millisecondsSinceEpoch;
+      File('${dir.path}/projects.json').writeAsStringSync(jsonEncode([
+        {'id': '1', 'name': 'Weather app with a long name', 'path': '/root/app', 'created': now, 'opened': now},
+      ]));
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+      final services = (await tester.runAsync(AppServices.load))!;
+      services.settings
+        ..theme = theme
+        ..compact = compact;
+      services.gitTools = GitTools(run: (script, onLine) async => 0);
+      await services.gitTools.refresh();
+      services.git = GitRegistry(_FakeGit());
+      await tester.pumpWidget(AiTermApp(services: services));
+      await settleIo(tester);
+
+      await tester.tap(find.text('Weather app with a long name'));
+      await settleIo(tester);
+      for (final tab in [WorkspaceTab.changes, WorkspaceTab.files, WorkspaceTab.preview, WorkspaceTab.agent]) {
+        services.navigation.openWorkspaceTab(tab);
+        await settleIo(tester);
+      }
+      await tester.pageBack();
+      await settleIo(tester);
+      for (final tab in [AppTab.terminal, AppTab.files, AppTab.settings]) {
+        services.navigation.open(tab);
+        await settleIo(tester);
+      }
+      await tester.drag(find.byType(ListView).first, const Offset(0, -3000));
+      await settleIo(tester);
+      await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+    });
+  }
 
   testWidgets('a folder that is not a repo offers to start tracking it', (tester) async {
     File('${dir.path}/alpine/.aiterm-installed')

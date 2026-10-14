@@ -17,6 +17,7 @@ import '../terminal/terminal_session.dart';
 import 'project.dart';
 import 'project_actions.dart';
 import 'projects_screen.dart';
+import '../app/icons.dart';
 
 /// Opens [project]'s workspace over Projects (and remembers it as most
 /// recent).
@@ -81,27 +82,27 @@ class _ProjectScreenState extends State<ProjectScreen> {
     final installed = _s.agents.installed;
     showActionSheet(context, title: 'New in ${p.name}', actions: [
       for (final a in installed)
-        SheetAction(Icons.auto_awesome_rounded, _s.tabs.findAgent(a.id, p.path) == null ? a.name : 'Back to ${a.name}',
+        SheetAction(AppIcons.agent, _s.tabs.findAgent(a.id, p.path) == null ? a.name : 'Back to ${a.name}',
             () => _s.agents.open(a.id, cwd: p.path),
             accent: true),
       if (installed.isEmpty)
-        SheetAction(Icons.auto_awesome_rounded, 'Install ${agentCatalog.first.name}',
+        SheetAction(AppIcons.agent, 'Install ${agentCatalog.first.name}',
             () => _s.agents.open(agentCatalog.first.id, cwd: p.path),
             accent: true),
-      SheetAction(Icons.terminal_rounded, 'Terminal', () => _s.tabs.open(cwd: p.path, project: p.path)),
+      SheetAction(AppIcons.terminal, 'Terminal', () => _s.tabs.open(cwd: p.path, project: p.path)),
     ]);
   }
 
   List<BottomTab> _tabs() {
     final changed = _repo?.status?.changes.length ?? 0;
     return [
-      BottomTab('Agent', Icons.auto_awesome_outlined, Icons.auto_awesome_rounded,
+      BottomTab('Agent', AppIcons.agent,
           // An agent here is waiting for you.
           badge: _s.tabs.inScope(widget.project.path).any((t) => t.activity.value == SessionActivity.needsInput) ? '' : null,
           badgeColor: context.colors.warning),
-      BottomTab('Changes', Icons.call_split_outlined, Icons.call_split_rounded, badge: changed > 0 ? '$changed' : null),
-      const BottomTab('Files', Icons.folder_outlined, Icons.folder_rounded),
-      BottomTab('Preview', Icons.wifi_tethering_outlined, Icons.wifi_tethering_rounded,
+      BottomTab('Changes', AppIcons.branch, badge: changed > 0 ? '$changed' : null),
+      const BottomTab('Files', AppIcons.folder),
+      BottomTab('Preview', AppIcons.wifiTethering,
           badge: _s.preview.livePorts.isEmpty ? null : ''),
     ];
   }
@@ -156,7 +157,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 ],
               ),
               actions: [
-                IconButton(tooltip: 'Project actions', icon: const Icon(Icons.more_vert_rounded), onPressed: () => showProjectActions(context, p, showOpen: false)),
+                IconButton(tooltip: 'Project actions', icon: const Icon(AppIcons.moreVert), onPressed: () => showProjectActions(context, p, showOpen: false)),
               ],
             ),
             bottomNavigationBar: BottomTabs(
@@ -200,7 +201,7 @@ class _AgentLauncher extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
           children: [
-            Icon(Icons.auto_awesome_rounded, size: 36, color: c.accent),
+            Icon(AppIcons.agent, size: 36, color: c.accent),
             const SizedBox(height: 20),
             // Only state is worth words here: an install in progress.
             if (busy.isNotEmpty) ...[
@@ -215,7 +216,7 @@ class _AgentLauncher extends StatelessWidget {
               FilledButton.icon(
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                 onPressed: installer.busy ? null : () => installer.open(agentCatalog.first.id, cwd: project.path),
-                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                icon: const Icon(AppIcons.agent, size: 18),
                 label: Text('Install ${agentCatalog.first.name}'),
               ),
               TextButton(onPressed: () => openAgents(context), child: const Text('Other agents')),
@@ -223,7 +224,7 @@ class _AgentLauncher extends StatelessWidget {
               FilledButton.icon(
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                 onPressed: () => installer.open(main.id, cwd: project.path),
-                icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+                icon: const Icon(AppIcons.agent, size: 20),
                 label: Text('Open ${main.name}'),
               ),
               const SizedBox(height: 4),
@@ -244,7 +245,7 @@ class _AgentLauncher extends StatelessWidget {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: onTerminal,
-              icon: const Icon(Icons.terminal_rounded, size: 18),
+              icon: const Icon(AppIcons.terminal, size: 18),
               label: const Text('Terminal'),
             ),
           ],
@@ -277,7 +278,7 @@ class _PreviewTabState extends State<_PreviewTab> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.wifi_tethering_rounded, size: 40, color: c.textMuted),
+              Icon(AppIcons.wifiTethering, size: 40, color: c.textMuted),
               const SizedBox(height: 12),
               Text('No server running', style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),

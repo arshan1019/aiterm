@@ -6,6 +6,7 @@ import '../app/services.dart';
 import '../app/theme.dart';
 import '../platform/android_env.dart';
 import 'preview_controller.dart';
+import '../app/icons.dart';
 
 /// An in-app browser for a dev server running in Linux. A page, or a
 /// project's Preview tab ([embedded]: a slim bar instead of an app bar;
@@ -88,11 +89,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     style: TextStyle(color: c.textMuted, fontSize: 12),
                   ),
                 ),
-                IconButton(tooltip: 'Reload', iconSize: 18, icon: const Icon(Icons.refresh_rounded), onPressed: _web.reload),
+                IconButton(tooltip: 'Reload', iconSize: 18, icon: const Icon(AppIcons.refresh), onPressed: _web.reload),
                 IconButton(
                     tooltip: 'Open in browser',
                     iconSize: 18,
-                    icon: const Icon(Icons.open_in_new_rounded),
+                    icon: const Icon(AppIcons.openInNew),
                     onPressed: _openExternally),
               ],
             ),
@@ -127,8 +128,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
             ],
           ),
           actions: [
-            IconButton(tooltip: 'Reload', icon: const Icon(Icons.refresh_rounded), onPressed: _web.reload),
-            IconButton(tooltip: 'Open in browser', icon: const Icon(Icons.open_in_new_rounded), onPressed: _openExternally),
+            IconButton(tooltip: 'Reload', icon: const Icon(AppIcons.refresh), onPressed: _web.reload),
+            IconButton(tooltip: 'Open in browser', icon: const Icon(AppIcons.openInNew), onPressed: _openExternally),
           ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(2),

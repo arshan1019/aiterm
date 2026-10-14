@@ -73,6 +73,17 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        // The wallpaper's accent (Android 12+ dynamic color), for "Wallpaper colors".
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/colors").setMethodCallHandler { call, result ->
+            if (call.method != "accent") {
+                result.notImplemented()
+            } else if (Build.VERSION.SDK_INT >= 31) {
+                result.success(getColor(android.R.color.system_accent1_500))
+            } else {
+                result.success(null)
+            }
+        }
+
         val keepAliveChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/keepalive")
         keepAlive = KeepAlivePlugin(this, keepAliveChannel).also { keepAliveChannel.setMethodCallHandler(it) }
 

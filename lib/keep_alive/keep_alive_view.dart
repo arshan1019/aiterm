@@ -4,6 +4,7 @@ import '../app/theme.dart';
 import '../shared/sheet.dart';
 import 'keep_alive.dart';
 import 'keep_alive_controller.dart';
+import '../app/icons.dart';
 
 /// The keep-alive checklist: each step with its Allow / Fix button, and
 /// the Wireless debugging walkthrough when fixing the child process limit.
@@ -34,7 +35,7 @@ class KeepAliveSteps extends StatelessWidget {
               trailing: AnimatedSwitcher(
                 duration: Motion.standard,
                 child: step.done
-                    ? Icon(Icons.check_circle_rounded, key: const ValueKey('done'), color: c.success)
+                    ? Icon(AppIcons.checkCircle, fill: 1, key: const ValueKey('done'), color: c.success)
                     : TextButton(
                         key: const ValueKey('fix'),
                         onPressed: controller.fixing && step.kind == StepKind.childProcesses ? null : () => _fix(step.kind),

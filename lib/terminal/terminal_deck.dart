@@ -14,7 +14,9 @@ import '../shared/sheet.dart';
 import 'terminal_session.dart';
 import 'widgets/extra_keys_bar.dart';
 import 'widgets/tab_strip.dart';
+import 'widgets/terminal_colors.dart';
 import 'widgets/terminal_pane.dart';
+import '../app/icons.dart';
 
 /// One scope's terminals: the Terminal tab's ([project] null) or a
 /// project's, in its workspace. Tab strip, the selected tab's terminal,
@@ -104,16 +106,12 @@ class _TerminalDeckState extends State<TerminalDeck> {
       context,
       title: session.title,
       actions: [
-        SheetAction(
-          session.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-          session.pinned ? 'Unpin' : 'Pin',
-          () => tabs.togglePin(session),
-        ),
-        SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () => _rename(session)),
+        SheetAction(AppIcons.pushPin, session.pinned ? 'Unpin' : 'Pin', () => tabs.togglePin(session)),
+        SheetAction(AppIcons.rename, 'Rename', () => _rename(session)),
         if (session.cwd case final cwd? when !_services.linux.usesAndroidShell)
-          SheetAction(Icons.call_split_rounded, 'Git changes here', () => _gitHere(cwd)),
-        if (hasOthers) SheetAction(Icons.tab_unselected_rounded, 'Close other tabs', () => tabs.closeOthers(session)),
-        if (!session.pinned) SheetAction(Icons.close_rounded, 'Close', () => tabs.close(session), danger: true),
+          SheetAction(AppIcons.branch, 'Git changes here', () => _gitHere(cwd)),
+        if (hasOthers) SheetAction(AppIcons.tabClose, 'Close other tabs', () => tabs.closeOthers(session)),
+        if (!session.pinned) SheetAction(AppIcons.close, 'Close', () => tabs.close(session), danger: true),
       ],
     );
   }
@@ -126,48 +124,52 @@ class _TerminalDeckState extends State<TerminalDeck> {
   @override
   Widget build(BuildContext context) {
     final tabs = _services.tabs;
-    return ColoredBox(
-      color: context.colors.bg,
-      child: ListenableBuilder(
-        listenable: tabs,
-        builder: (context, _) {
-          final scoped = tabs.inScope(widget.project);
-          final active = tabs.activeIn(widget.project);
-          if (active == null) return const SizedBox.expand();
-          return Column(
-            children: [
-              TabStrip(tabs: tabs, scope: widget.project, onMenu: _tabMenu, onNew: widget.onNew),
-              Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: FadeIndexedStack(
-                        index: scoped.indexOf(active),
-                        duration: Motion.quick,
-                        children: [
-                          for (final s in scoped)
-                            TerminalPane(
-                              key: ValueKey(s.id),
-                              session: s,
-                              visible: widget.showing && s.id == active.id,
-                              onReview: _review,
-                            ),
-                        ],
-                      ),
+    return TerminalColors(
+      child: Builder(
+        builder: (context) => ColoredBox(
+          color: context.colors.bg,
+          child: ListenableBuilder(
+            listenable: tabs,
+            builder: (context, _) {
+              final scoped = tabs.inScope(widget.project);
+              final active = tabs.activeIn(widget.project);
+              if (active == null) return const SizedBox.expand();
+              return Column(
+                children: [
+                  TabStrip(tabs: tabs, scope: widget.project, onMenu: _tabMenu, onNew: widget.onNew),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: FadeIndexedStack(
+                            index: scoped.indexOf(active),
+                            duration: Motion.quick,
+                            children: [
+                              for (final s in scoped)
+                                TerminalPane(
+                                  key: ValueKey(s.id),
+                                  session: s,
+                                  visible: widget.showing && s.id == active.id,
+                                  onReview: _review,
+                                ),
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          left: 8,
+                          right: 8,
+                          bottom: 8,
+                          child: _PortAnnouncement(preview: _services.preview, onPreview: _preview),
+                        ),
+                      ],
                     ),
-                    Positioned(
-                      left: 8,
-                      right: 8,
-                      bottom: 8,
-                      child: _PortAnnouncement(preview: _services.preview, onPreview: _preview),
-                    ),
-                  ],
-                ),
-              ),
-              ExtraKeysBar(key: ValueKey(active.id), session: active, onAsk: () => _openAsk(active)),
-            ],
-          );
-        },
+                  ),
+                  ExtraKeysBar(key: ValueKey(active.id), session: active, onAsk: () => _openAsk(active)),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -213,7 +215,7 @@ class _PortAnnouncement extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
                     child: Row(
                       children: [
-                        Icon(Icons.wifi_tethering_rounded, size: 16, color: c.accent),
+                        Icon(AppIcons.wifiTethering, size: 16, color: c.accent),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text('localhost:$port is live', style: TextStyle(color: c.text, fontSize: 12)),
@@ -226,7 +228,7 @@ class _PortAnnouncement extends StatelessWidget {
                           child: const Text('Preview'),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
+                          icon: Icon(AppIcons.close, size: 16, color: c.textMuted),
                           onPressed: preview.dismiss,
                         ),
                       ],

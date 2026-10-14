@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/theme.dart';
+import '../../app/icons.dart';
 
 /// A one-line card pinned to the top of the terminal: a suggested fix, or
 /// "session ended". It floats over the terminal instead of taking rows
@@ -66,7 +67,7 @@ class Notice extends StatelessWidget {
             TextButton(onPressed: onAction, child: Text(action)),
             if (onDismiss != null)
               IconButton(
-                icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
+                icon: Icon(AppIcons.close, size: 16, color: c.textMuted),
                 onPressed: onDismiss,
               ),
           ],

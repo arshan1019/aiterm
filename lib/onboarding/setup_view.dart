@@ -8,6 +8,7 @@ import '../keep_alive/keep_alive.dart';
 import '../keep_alive/keep_alive_view.dart';
 import '../shared/group.dart';
 import 'setup_pipeline.dart';
+import '../app/icons.dart';
 
 /// First run, as one screen and one wait: pick agents, tap Set up, and
 /// Linux, git and the agents install back to back. What's worth doing
@@ -117,7 +118,7 @@ class _SetupViewState extends State<SetupView> {
                 children: [
                   if (s.github.user case final user?)
                     ListTile(
-                      leading: Icon(Icons.check_circle_rounded, color: c.success),
+                      leading: Icon(AppIcons.checkCircle, fill: 1, color: c.success),
                       title: Text('Signed in as ${user.login}', style: const TextStyle(fontSize: 14)),
                     )
                   else
@@ -154,9 +155,9 @@ class _StepRow extends StatelessWidget {
                 height: 20,
                 child: switch (step.state) {
                   SetupState.running => const Padding(padding: EdgeInsets.all(2), child: CircularProgressIndicator(strokeWidth: 2)),
-                  SetupState.done => Icon(Icons.check_circle_rounded, size: 20, color: c.success),
-                  SetupState.failed => Icon(Icons.error_outline_rounded, size: 20, color: c.danger),
-                  SetupState.waiting => Icon(Icons.circle_outlined, size: 20, color: c.border),
+                  SetupState.done => Icon(AppIcons.checkCircle, fill: 1, size: 20, color: c.success),
+                  SetupState.failed => Icon(AppIcons.error, size: 20, color: c.danger),
+                  SetupState.waiting => Icon(AppIcons.circle, size: 20, color: c.border),
                 },
               ),
               const SizedBox(width: 12),

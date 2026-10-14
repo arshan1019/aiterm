@@ -13,6 +13,7 @@ import 'project_actions.dart';
 import 'project_service.dart';
 import 'project_store.dart';
 import 'templates.dart';
+import '../app/icons.dart';
 
 enum NewProjectKind { create, clone }
 
@@ -20,10 +21,10 @@ enum NewProjectKind { create, clone }
 /// Open): one level, one verb each, the same list in the empty state and
 /// behind the Add project button.
 List<(IconData, String, void Function(BuildContext))> get addProjectActions => [
-      (Icons.create_new_folder_outlined, 'New project', (c) => _push(c, NewProjectKind.create)),
-      (Icons.cloud_download_outlined, 'Clone repository', (c) => _push(c, NewProjectKind.clone)),
-      (Icons.smartphone_rounded, 'Import from phone', importProjectFromPhone),
-      (Icons.folder_open_rounded, 'Open Linux folder', openLinuxFolderAsProject),
+      (AppIcons.folderNew, 'New project', (c) => _push(c, NewProjectKind.create)),
+      (AppIcons.cloudDownload, 'Clone repository', (c) => _push(c, NewProjectKind.clone)),
+      (AppIcons.smartphone, 'Import from phone', importProjectFromPhone),
+      (AppIcons.folderOpen, 'Open Linux folder', openLinuxFolderAsProject),
     ];
 
 void _push(BuildContext context, NewProjectKind kind) =>
@@ -239,7 +240,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
       return OutlinedButton.icon(
         style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         onPressed: _signIn,
-        icon: const Icon(Icons.login_rounded, size: 18),
+        icon: const Icon(AppIcons.login, size: 18),
         label: const Text('Sign in to list your repositories'),
       );
     }
@@ -253,13 +254,13 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
         _label(context, 'Your repositories'),
         if (repos.length > 8)
           TextField(
-            decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded, size: 18), isDense: true),
+            decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(AppIcons.search, size: 18), isDense: true),
             onChanged: (v) => setState(() => _filter = v.trim().toLowerCase()),
           ),
         for (final r in shown.take(50))
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(r.private ? Icons.lock_outline_rounded : Icons.book_outlined, size: 18, color: c.textMuted),
+            leading: Icon(r.private ? AppIcons.lock : AppIcons.book, size: 18, color: c.textMuted),
             title: Text(r.fullName, style: const TextStyle(fontSize: 14)),
             subtitle: Text(
               [?r.description, timeAgo(r.updatedAt)].join(' · '),

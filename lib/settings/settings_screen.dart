@@ -14,9 +14,11 @@ import '../linux/linux_environment.dart';
 import '../shared/name_dialog.dart';
 import '../shared/form.dart';
 import '../shared/group.dart';
+import 'settings.dart';
 import '../ssh/ssh_keys.dart';
 
 import 'package:flutter/services.dart';
+import '../app/icons.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -26,29 +28,50 @@ class SettingsScreen extends StatelessWidget {
     final s = context.services;
     final c = context.colors;
     return ListenableBuilder(
-      listenable: Listenable.merge([s.settings, s.linux]),
+      listenable: Listenable.merge([s.settings, s.linux, s.systemAccent]),
       builder: (context, _) => ListView(
         padding: const EdgeInsets.all(16),
         children: [
           _Section(
             title: 'Appearance',
             children: [
-              SwitchListTile(
-                title: const Text('Dark theme', style: TextStyle(fontSize: 14)),
-                value: s.settings.dark,
-                onChanged: (v) {
-                  Haptics.toggle(v);
-                  s.settings.dark = v;
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<ThemeChoice>(
+                    showSelectedIcon: false,
+                    segments: const [
+                      ButtonSegment(value: ThemeChoice.system, label: Text('System')),
+                      ButtonSegment(value: ThemeChoice.light, label: Text('Light')),
+                      ButtonSegment(value: ThemeChoice.dark, label: Text('Dark')),
+                    ],
+                    selected: {s.settings.theme},
+                    onSelectionChanged: (v) {
+                      Haptics.tick();
+                      s.settings.theme = v.first;
+                    },
+                  ),
+                ),
               ),
+              // Android 12+ only: older phones have no wallpaper colors.
+              if (s.systemAccent.value != null)
+                _Switch('Wallpaper colors', s.settings.wallpaperColors, (v) => s.settings.wallpaperColors = v),
+              _Switch('Compact lists', s.settings.compact, (v) => s.settings.compact = v),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _Section(
+            title: 'Terminal',
+            children: [
               ListTile(
-                title: const Text('Terminal text size', style: TextStyle(fontSize: 14)),
+                title: const Text('Text size', style: TextStyle(fontSize: 14)),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
                       tooltip: 'Smaller text',
-                      icon: Icon(Icons.remove_rounded, size: 18, color: c.textMuted),
+                      icon: Icon(AppIcons.remove, size: 18, color: c.textMuted),
                       onPressed: () => s.settings.stepFontSize(-1),
                     ),
                     SizedBox(
@@ -64,12 +87,15 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: 'Larger text',
-                      icon: Icon(Icons.add_rounded, size: 18, color: c.textMuted),
+                      icon: Icon(AppIcons.add, size: 18, color: c.textMuted),
                       onPressed: () => s.settings.stepFontSize(1),
                     ),
                   ],
                 ),
               ),
+              if (s.settings.theme != ThemeChoice.dark)
+                _Switch('Always dark', s.settings.darkTerminal, (v) => s.settings.darkTerminal = v),
+              _Switch('Black background', s.settings.blackTerminal, (v) => s.settings.blackTerminal = v),
             ],
           ),
           const SizedBox(height: 20),
@@ -87,7 +113,7 @@ class SettingsScreen extends StatelessWidget {
               ),
               ListTile(
                 title: const Text('AI agents', style: TextStyle(fontSize: 14)),
-                trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+                trailing: Icon(AppIcons.chevronRight, color: c.textMuted),
                 onTap: () => openAgents(context),
               ),
             ],
@@ -116,6 +142,25 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// An on/off setting, with the toggle's haptic.
+class _Switch extends StatelessWidget {
+  const _Switch(this.title, this.value, this.onChanged);
+
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => SwitchListTile(
+        title: Text(title, style: const TextStyle(fontSize: 14)),
+        value: value,
+        onChanged: (v) {
+          Haptics.toggle(v);
+          onChanged(v);
+        },
+      );
 }
 
 /// A settings group (the shared [Group]).
@@ -181,7 +226,7 @@ class _GitHubSection extends StatelessWidget {
             ],
             ListTile(
               title: const Text('Commit name & email', style: TextStyle(fontSize: 14)),
-              trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
+              trailing: Icon(AppIcons.chevronRight, color: c.textMuted),
               onTap: () => _identity(context),
             ),
           ],
@@ -252,17 +297,17 @@ class _SshSection extends StatelessWidget {
                   if (github.user != null)
                     IconButton(
                       tooltip: 'Add to GitHub',
-                      icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                      icon: const Icon(AppIcons.cloudUpload, size: 18),
                       onPressed: () => _addToGitHub(context, key),
                     ),
                   IconButton(
                     tooltip: 'Copy public key',
-                    icon: const Icon(Icons.copy_rounded, size: 18),
+                    icon: const Icon(AppIcons.copy, size: 18),
                     onPressed: () => _copy(context, key),
                   ),
                   IconButton(
                     tooltip: 'Delete',
-                    icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.danger),
+                    icon: Icon(AppIcons.delete, size: 18, color: c.danger),
                     onPressed: () => _delete(context, key),
                   ),
                 ],
@@ -279,7 +324,7 @@ class _SshSection extends StatelessWidget {
               padding: const EdgeInsets.all(4),
               child: TextButton.icon(
                 onPressed: () => _create(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
+                icon: const Icon(AppIcons.add, size: 18),
                 label: const Text('New key'),
               ),
             ),
@@ -319,12 +364,12 @@ class _BackupSection extends StatelessWidget {
               children: [
                 TextButton.icon(
                   onPressed: backup.busy || !linuxInstalled ? null : backup.backup,
-                  icon: const Icon(Icons.save_alt_rounded, size: 18),
+                  icon: const Icon(AppIcons.save, size: 18),
                   label: const Text('Back up'),
                 ),
                 TextButton.icon(
                   onPressed: backup.busy ? null : () => _restore(context),
-                  icon: const Icon(Icons.settings_backup_restore_rounded, size: 18),
+                  icon: const Icon(AppIcons.restore, size: 18),
                   label: const Text('Restore'),
                 ),
                 if (backup.busy) ...[

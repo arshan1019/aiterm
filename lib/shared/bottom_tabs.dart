@@ -3,11 +3,12 @@ import '../app/theme.dart';
 
 /// One destination of a [BottomTabs] bar.
 class BottomTab {
-  const BottomTab(this.label, this.icon, this.selectedIcon, {this.badge, this.badgeColor});
+  const BottomTab(this.label, this.icon, {this.badge, this.badgeColor});
 
   final String label;
+
+  /// Outlined; filled while selected.
   final IconData icon;
-  final IconData selectedIcon;
 
   /// A count ("3") or a dot (""), shown on the icon; null for none.
   final String? badge;
@@ -39,10 +40,9 @@ class BottomTabs extends StatelessWidget {
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         animationDuration: Motion.standard,
         destinations: [
-          for (final t in tabs)
+          for (final (i, t) in tabs.indexed)
             NavigationDestination(
-              icon: _withBadge(t.icon, t.badge, t.badgeColor ?? c.accent, c),
-              selectedIcon: _withBadge(t.selectedIcon, t.badge, t.badgeColor ?? c.accent, c),
+              icon: _withBadge(_FillIcon(t.icon, filled: i == selected), t.badge, t.badgeColor ?? c.accent, c),
               label: t.label,
             ),
         ],
@@ -50,8 +50,7 @@ class BottomTabs extends StatelessWidget {
     );
   }
 
-  static Widget _withBadge(IconData icon, String? badge, Color color, AppColors c) {
-    final child = Icon(icon);
+  static Widget _withBadge(Widget child, String? badge, Color color, AppColors c) {
     if (badge == null) return child;
     return Badge(
       backgroundColor: color,
@@ -62,4 +61,20 @@ class BottomTabs extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// An icon whose fill animates in when it becomes selected.
+class _FillIcon extends StatelessWidget {
+  const _FillIcon(this.icon, {required this.filled});
+
+  final IconData icon;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween(end: filled ? 1 : 0),
+        duration: Motion.standard,
+        curve: Motion.move,
+        builder: (context, fill, _) => Icon(icon, fill: fill),
+      );
 }

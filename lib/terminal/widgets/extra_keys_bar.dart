@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
 import '../../app/theme.dart';
 import '../terminal_session.dart';
+import '../../app/icons.dart';
 
 /// Keys a phone keyboard lacks: two rows of equal-width keys, so the bar
 /// lines up on every screen width. Keys act on touch-down like a real
@@ -37,7 +38,7 @@ class ExtraKeysBar extends StatelessWidget {
                 ValueListenableBuilder(
                   valueListenable: session.state,
                   builder: (context, state, _) => _Key(
-                    icon: Icons.auto_awesome_rounded,
+                    icon: AppIcons.agent,
                     name: 'Ask the assistant',
                     accent: true,
                     onPress: state == SessionState.running ? onAsk : null,
@@ -47,15 +48,15 @@ class ExtraKeysBar extends StatelessWidget {
                 text('/', () => session.sendText('/')),
                 text('-', () => session.sendText('-')),
                 text('|', () => session.sendText('|')),
-                arrow(Icons.keyboard_arrow_up_rounded, 'Up', TerminalKey.arrowUp),
+                arrow(AppIcons.keyboardUp, 'Up', TerminalKey.arrowUp),
               ]),
               _row([
                 key('TAB', TerminalKey.tab),
                 _Key(label: 'CTRL', active: m.ctrl || m.volumeCtrl, onPress: m.toggleCtrl),
                 _Key(label: 'ALT', active: m.alt, onPress: m.toggleAlt),
-                arrow(Icons.keyboard_arrow_left_rounded, 'Left', TerminalKey.arrowLeft),
-                arrow(Icons.keyboard_arrow_down_rounded, 'Down', TerminalKey.arrowDown),
-                arrow(Icons.keyboard_arrow_right_rounded, 'Right', TerminalKey.arrowRight),
+                arrow(AppIcons.keyboardLeft, 'Left', TerminalKey.arrowLeft),
+                arrow(AppIcons.keyboardDown, 'Down', TerminalKey.arrowDown),
+                arrow(AppIcons.keyboardRight, 'Right', TerminalKey.arrowRight),
               ]),
             ],
           ),

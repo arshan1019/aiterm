@@ -31,9 +31,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
   # Vendored with parser fixes; see third_party/xterm/PATCHES.md.
   xterm:
     path: third_party/xterm
@@ -41,6 +38,8 @@ dependencies:
   crypto: ^3.0.7
   webview_flutter: ^4.14.1
   webview_flutter_platform_interface: ^2.15.1
+  # HCT tonal palettes for Wallpaper colors (pinned by the Flutter SDK).
+  material_color_utilities: any
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +69,7 @@ flutter:
     - assets/github/
     - assets/fonts/IBMPlexSans-OFL.txt
     - assets/fonts/JetBrainsMono-OFL.txt
+    - assets/fonts/MaterialSymbols-LICENSE.txt
 
   fonts:
     - family: IBMPlexSans
@@ -79,6 +79,11 @@ flutter:
           weight: 500
         - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
           weight: 600
+    # Material Symbols Outlined, subset to the app's icons with its
+    # variable axes (tool/icons/generate.py).
+    - family: MaterialSymbols
+      fonts:
+        - asset: assets/fonts/MaterialSymbolsOutlined.ttf
     - family: JetBrainsMono
       fonts:
         - asset: assets/fonts/JetBrainsMono-Regular.ttf

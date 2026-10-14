@@ -1,0 +1,66 @@
+# The app's icons: `name` or `dartName=symbol_name` (Material Symbols
+# Outlined), plus ` rtl` for icons that mirror in right-to-left text. Run tool/icons/generate.py after editing.
+add
+addCircle=add_circle
+agent=robot_2
+arrowBack=arrow_back rtl
+arrowForward=arrow_forward rtl
+arrowUpward=arrow_upward
+badge
+book
+branch=call_split
+check
+checkCircle=check_circle
+chevronRight=chevron_right rtl
+circle
+close
+cloud
+cloudDownload=cloud_download
+cloudUpload=cloud_upload
+copy=content_copy
+cut=content_cut
+delete
+description
+diff=difference
+download
+error
+exportFile=ios_share
+folder
+folderNew=create_new_folder
+folderOpen=folder_open
+folderShared=folder_shared
+history
+home
+keyboardDown=keyboard_arrow_down
+keyboardLeft=keyboard_arrow_left rtl
+keyboardRight=keyboard_arrow_right rtl
+keyboardUp=keyboard_arrow_up
+lightbulb
+linkOff=link_off
+lock
+login
+mic
+moreVert=more_vert
+openInNew=open_in_new
+project=folder_special
+pushPin=push_pin
+redo rtl
+refresh
+remove
+removeCircle=do_not_disturb_on
+removeFromList=playlist_remove
+rename=drive_file_rename_outline
+restore=settings_backup_restore
+save=save_alt
+search
+settings
+smartphone
+stop
+suggest=edit_note
+sync
+tabClose=tab_close
+terminal
+undo rtl
+warning
+wifiTethering=wifi_tethering
+power=power_settings_new

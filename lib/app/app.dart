@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../projects/project_screen.dart';
 import '../phone/share_receiver.dart';
+import '../settings/settings.dart';
 import 'home_shell.dart';
 import 'services.dart';
 import 'theme.dart';
@@ -16,7 +17,7 @@ class AiTermApp extends StatelessWidget {
     return AppScope(
       services: services,
       child: ListenableBuilder(
-        listenable: services.settings,
+        listenable: Listenable.merge([services.settings, services.systemAccent]),
         builder: (context, _) => MaterialApp(
           title: 'aiterm',
           navigatorKey: services.navigation.navigatorKey,
@@ -24,7 +25,13 @@ class AiTermApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           // MaterialApp animates between themes; AppColors interpolates, so
           // light/dark cross-fades.
-          theme: buildTheme(dark: services.settings.dark),
+          theme: services.theme(dark: false),
+          darkTheme: services.theme(dark: true),
+          themeMode: switch (services.settings.theme) {
+            ThemeChoice.system => ThemeMode.system,
+            ThemeChoice.light => ThemeMode.light,
+            ThemeChoice.dark => ThemeMode.dark,
+          },
           themeAnimationDuration: Motion.standard,
           themeAnimationCurve: Motion.move,
           home: const ShareReceiver(child: HomeShell()),

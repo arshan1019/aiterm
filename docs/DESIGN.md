@@ -223,6 +223,14 @@ Write in sentence case everywhere: "New session", "Clone repo". Fluent and Googl
 | P2-13 | Compact density setting; "Match wallpaper", AMOLED terminal and "Terminal always dark" options; M3 Expressive button groups, split button and loading indicator as Flutter's `material_ui` lands | Power-user comfort and native alignment | Medium |
 | P2-14 | Write the language into a DESIGN.md beside `theme.dart` and add CI golden and contrast tests for both themes at 100% and 200% text | Prevents drift; fits CI-only widget testing | Low |
 
+### Status (October 2026)
+
+- **Done:** P0-1 to P0-5, P1-6, P1-8 to P1-11, P2-12 to P2-14.
+- **Icons (P2-12):** Material Symbols Outlined is subset to the app's icons by `tool/icons/generate.py`, which writes `assets/fonts/MaterialSymbolsOutlined.ttf` (about 100 KB, all four axes) and `lib/app/icons.dart`. To add an icon, list it in `tool/icons/icons.txt` and run the script; the full package would ship 30 MB of fonts in debug builds, which don't tree-shake. Fill is reserved for state: the selected tab (animated), success checks, a pinned tab and folders. Agents use `robot_2`, never a sparkle.
+- **Options (P2-13):** Theme (System, Light or Dark; System is the default), Wallpaper colors (Android 12+; the wallpaper hue at the teal's tones, so contrast holds for every hue), Compact lists (48/64dp rows; hit areas stay at 48dp), and for the terminal Always dark and Black background. M3 Expressive components wait for Flutter.
+- **Tests (P2-14):** Contrast tests cover both themes, wallpaper accents across every 15° of hue, and the black terminal. Widget tests lay out the main screens at 200% text on a 360dp phone, in dark and in light with compact lists, and fail on any overflow. These tests are layout checks, not pixel goldens: CI is the only runner, so goldens would mostly catch rendering noise.
+- **Open:** P1-7 (blocks) needs its own plan, because agents draw their own TUIs. The high-contrast variant from "Color" is not built yet.
+
 ## Conclusion
 
 The research points somewhere unexpected. aiterm's risk is not looking unpolished. It is looking polished the way generated software looks polished: a near-black screen, one tasteful accent, mono everywhere, small caps and outlined boxes. The way out is not a louder aesthetic. It is to tie each visual choice to a fact about the product. Mono marks literal text. The accent marks the one thing you can do or the agent that is working. Tone marks depth. A block marks a unit of work that can be inspected, repeated or undone. That makes aiterm distinctive in the way Warp's blocks and Raycast's action bar are distinctive: through structure that only this product needs, carried by an otherwise native, quiet Android surface.

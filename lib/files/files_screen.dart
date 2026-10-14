@@ -20,6 +20,7 @@ import 'files_browser.dart';
 import 'text_editor_screen.dart';
 import '../editor/editor_screen.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+import '../app/icons.dart';
 
 /// Browse files, open text files, and create, rename, copy or delete
 /// entries. The Files tab (Linux home and the phone's storage), or a
@@ -279,9 +280,9 @@ class _FilesScreenState extends State<FilesScreen> {
     if (chosen) {
       final item = _services.phone.grants.where((g) => g.path == e.path).firstOrNull;
       showActionSheet(context, title: e.name, actions: [
-        SheetAction(Icons.copy_rounded, 'Copy', () => _clipboard.copy([e])),
+        SheetAction(AppIcons.copy, 'Copy', () => _clipboard.copy([e])),
         null,
-        if (item != null) SheetAction(Icons.link_off_rounded, 'Remove', () => _services.phone.forget(item), danger: true),
+        if (item != null) SheetAction(AppIcons.linkOff, 'Remove', () => _services.phone.forget(item), danger: true),
       ]);
       return;
     }
@@ -290,29 +291,29 @@ class _FilesScreenState extends State<FilesScreen> {
       title: e.name,
       actions: [
         if (folder && !onPhone) ...[
-          SheetAction(Icons.terminal_rounded, 'Open terminal here', () => _openTerminalHere(e.path)),
+          SheetAction(AppIcons.terminal, 'Open terminal here', () => _openTerminalHere(e.path)),
           if (_project == null && _inLinux)
             for (final agent in _services.agents.installed)
             SheetAction(
-              Icons.auto_awesome_rounded,
+              AppIcons.agent,
               'Open in ${agent.name}',
               () => _openInAgent(agent.id, e.path),
               accent: true,
             ),
           if (_inLinux && _project == null) ...[
-            SheetAction(Icons.folder_special_outlined, 'Open as project', () => _openAsProject(e.path)),
-            SheetAction(Icons.call_split_rounded, 'Git changes', () => _openGit(e.path)),
+            SheetAction(AppIcons.project, 'Open as project', () => _openAsProject(e.path)),
+            SheetAction(AppIcons.branch, 'Git changes', () => _openGit(e.path)),
           ],
           null,
         ],
-        SheetAction(Icons.copy_rounded, 'Copy', () => _clipboard.copy([e])),
-        SheetAction(Icons.content_cut_rounded, 'Move', () => _clipboard.cut([e])),
-        SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () async {
+        SheetAction(AppIcons.copy, 'Copy', () => _clipboard.copy([e])),
+        SheetAction(AppIcons.cut, 'Move', () => _clipboard.cut([e])),
+        SheetAction(AppIcons.rename, 'Rename', () async {
           final name = await _askName('Rename', 'Rename', initial: e.name);
           if (name != null) await _browser.rename(e, name);
           _touched();
         }),
-        SheetAction(Icons.delete_outline_rounded, 'Delete', () async {
+        SheetAction(AppIcons.delete, 'Delete', () async {
           if (await _confirmDelete(e)) await _browser.delete(e);
           _touched();
         }, danger: true),
@@ -395,7 +396,7 @@ class _FilesScreenState extends State<FilesScreen> {
           width: 52,
           height: 52,
           decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(16)),
-          child: Icon(Icons.add_rounded, color: c.bg),
+          child: Icon(AppIcons.add, color: c.bg),
         ),
       ),
       ),
@@ -468,9 +469,9 @@ class _HeaderState extends State<_Header> {
       ),
       child: Row(
         children: [
-          _NavButton(icon: Icons.arrow_back_rounded, tooltip: 'Back', onTap: b.canGoBack ? b.back : null),
-          _NavButton(icon: Icons.arrow_forward_rounded, tooltip: 'Forward', onTap: b.canGoForward ? b.forward : null),
-          _NavButton(icon: Icons.arrow_upward_rounded, tooltip: 'Up a folder', onTap: b.canGoUp ? b.up : null),
+          _NavButton(icon: AppIcons.arrowBack, tooltip: 'Back', onTap: b.canGoBack ? b.back : null),
+          _NavButton(icon: AppIcons.arrowForward, tooltip: 'Forward', onTap: b.canGoForward ? b.forward : null),
+          _NavButton(icon: AppIcons.arrowUpward, tooltip: 'Up a folder', onTap: b.canGoUp ? b.up : null),
           const SizedBox(width: 4),
           Expanded(
             child: ListView.builder(
@@ -481,7 +482,7 @@ class _HeaderState extends State<_Header> {
                 final last = i == crumbs.length - 1;
                 return Row(
                   children: [
-                    if (i > 0) Icon(Icons.chevron_right_rounded, size: 14, color: c.border),
+                    if (i > 0) Icon(AppIcons.chevronRight, size: 14, color: c.border),
                     InkWell(
                       onTap: last ? null : () => b.open(crumbs[i].path),
                       borderRadius: BorderRadius.circular(6),
@@ -504,7 +505,7 @@ class _HeaderState extends State<_Header> {
           ),
           PopupMenuButton<String>(
             tooltip: 'Folder actions',
-            icon: Icon(Icons.more_vert_rounded, color: c.textMuted, size: 20),
+            icon: Icon(AppIcons.moreVert, color: c.textMuted, size: 20),
             onSelected: (v) => switch (v) {
               'terminal' => widget.onOpenTerminal(),
               final v when v.startsWith('agent:') => widget.onOpenAgent?.call(v.substring(6)),
@@ -615,14 +616,15 @@ class _ListingState extends State<_Listing> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(top: 4, bottom: 96),
               itemCount: entries.length,
-              itemExtent: 60,
+              // List rows size themselves (56/72dp, compact 48/64dp) and
+              // grow with the text size.
               itemBuilder: (context, i) {
                 final e = entries[i];
                 final dir = e.kind == EntryKind.directory;
                 return ListTile(
-                  dense: true,
                   leading: Icon(
-                    dir ? Icons.folder_rounded : Icons.description_outlined,
+                    dir ? AppIcons.folder : AppIcons.description,
+                    fill: dir ? 1 : 0,
                     color: dir ? c.accent : c.textMuted,
                   ),
                   title: Text(
@@ -636,7 +638,7 @@ class _ListingState extends State<_Listing> {
                   // only a shortcut to the same menu.
                   trailing: IconButton(
                     tooltip: 'Actions',
-                    icon: Icon(Icons.more_vert_rounded, size: 18, color: c.textMuted),
+                    icon: Icon(AppIcons.moreVert, size: 18, color: c.textMuted),
                     onPressed: () => widget.onActions(e),
                   ),
                   onTap: () => widget.onOpen(e),
@@ -674,12 +676,12 @@ class _LocationSwitcher extends StatelessWidget {
           segments: const [
             ButtonSegment(
               value: LocationKind.linux,
-              icon: Icon(Icons.terminal_rounded, size: 16),
+              icon: Icon(AppIcons.terminal, size: 16),
               label: Text('Linux'),
             ),
             ButtonSegment(
               value: LocationKind.phone,
-              icon: Icon(Icons.smartphone_rounded, size: 16),
+              icon: Icon(AppIcons.smartphone, size: 16),
               label: Text('Phone'),
             ),
           ],
@@ -711,17 +713,17 @@ class _PhoneAccessPrompt extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.folder_shared_rounded, size: 40, color: c.accent),
+              Icon(AppIcons.folderShared, size: 40, color: c.accent),
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: onChoose,
-                icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+                icon: const Icon(AppIcons.folderNew, size: 18),
                 label: const Text('Choose folders'),
               ),
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: onAllFiles,
-                icon: const Icon(Icons.folder_open_rounded, size: 18),
+                icon: const Icon(AppIcons.folderOpen, size: 18),
                 label: const Text('Allow all files'),
               ),
             ],
@@ -772,7 +774,7 @@ class _PasteBar extends StatelessWidget {
                         Row(
                       children: [
                         Icon(
-                          clipboard.mode == ClipMode.cut ? Icons.content_cut_rounded : Icons.copy_rounded,
+                          clipboard.mode == ClipMode.cut ? AppIcons.cut : AppIcons.copy,
                           size: 16,
                           color: c.accent,
                         ),

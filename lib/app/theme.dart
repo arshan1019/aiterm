@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:material_color_utilities/material_color_utilities.dart';
+import 'icons.dart';
 
 /// The palette (docs/DESIGN.md, "Color"), generated in OKLCH from three
 /// inputs: the accent hue (teal, 172°), neutrals tinted toward it (190°,
@@ -100,7 +102,37 @@ class AppColors extends ThemeExtension<AppColors> {
   );
 
   @override
-  AppColors copyWith() => this;
+  AppColors copyWith({Color? bg, Color? surface, Color? surfaceAlt, Color? border, Color? outline, Color? text, Color? textMuted, Color? accent, Color? accentContainer, Color? onAccentContainer, Color? danger, Color? success, Color? warning, Color? diffAdded, Color? diffRemoved}) => AppColors(
+        bg: bg ?? this.bg,
+        surface: surface ?? this.surface,
+        surfaceAlt: surfaceAlt ?? this.surfaceAlt,
+        border: border ?? this.border,
+        outline: outline ?? this.outline,
+        text: text ?? this.text,
+        textMuted: textMuted ?? this.textMuted,
+        accent: accent ?? this.accent,
+        accentContainer: accentContainer ?? this.accentContainer,
+        onAccentContainer: onAccentContainer ?? this.onAccentContainer,
+        danger: danger ?? this.danger,
+        success: success ?? this.success,
+        warning: warning ?? this.warning,
+        diffAdded: diffAdded ?? this.diffAdded,
+        diffRemoved: diffRemoved ?? this.diffRemoved,
+      );
+
+  /// These colors with the accent roles taken from [seed] (the wallpaper's
+  /// color): its hue at the tones and chroma the built-in teal uses, so
+  /// every contrast pairing holds whatever the wallpaper.
+  AppColors seeded(Color seed) {
+    final dark = bg.computeLuminance() < 0.5;
+    final palette = TonalPalette.of(Hct.fromInt(seed.toARGB32()).hue, 36);
+    Color tone(int t) => Color(palette.get(t));
+    return copyWith(
+      accent: tone(dark ? 76 : 42),
+      accentContainer: tone(dark ? 20 : 92),
+      onAccentContainer: tone(dark ? 86 : 20),
+    );
+  }
 
   @override
   AppColors lerp(AppColors? other, double t) {
@@ -273,8 +305,11 @@ TextTheme _textTheme(AppColors c) {
   );
 }
 
-ThemeData buildTheme({required bool dark}) {
-  final c = dark ? AppColors.dark : AppColors.light;
+/// The app's theme. [seed] replaces the teal accent (Wallpaper colors);
+/// [compact] shortens list rows to 48/64dp (hit areas stay ≥ 48dp).
+ThemeData buildTheme({required bool dark, Color? seed, bool compact = false}) {
+  final base = dark ? AppColors.dark : AppColors.light;
+  final c = seed == null ? base : base.seeded(seed);
   final brightness = dark ? Brightness.dark : Brightness.light;
   return ThemeData(
     useMaterial3: true,
@@ -300,7 +335,15 @@ ThemeData buildTheme({required bool dark}) {
       outlineVariant: c.border,
     ),
     textTheme: _textTheme(c),
-    iconTheme: IconThemeData(color: c.textMuted, size: 20),
+    // Material Symbols' axes: regular weight, outlined (fill is for
+    // selection and status), slightly lighter grade on dark so light-on-
+    // dark strokes don't bloom.
+    iconTheme: IconThemeData(color: c.textMuted, size: 20, fill: 0, weight: 400, grade: dark ? -25 : 0, opticalSize: 20),
+    // Back and close buttons in the same icon set as everything else.
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (_) => const Icon(AppIcons.arrowBack, size: 24, opticalSize: 24),
+      closeButtonIconBuilder: (_) => const Icon(AppIcons.close, size: 24, opticalSize: 24),
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: c.bg,
       foregroundColor: c.text,
@@ -332,7 +375,11 @@ ThemeData buildTheme({required bool dark}) {
       contentTextStyle: _textTheme(c).bodyMedium,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
     ),
-    listTileTheme: ListTileThemeData(iconColor: c.textMuted, textColor: c.text),
+    listTileTheme: ListTileThemeData(
+      iconColor: c.textMuted,
+      textColor: c.text,
+      visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+    ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.bg : c.textMuted),
       trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? c.accent : c.surfaceAlt),
@@ -399,7 +446,7 @@ ThemeData buildTheme({required bool dark}) {
       surfaceTintColor: Colors.transparent,
       indicatorColor: c.accentContainer,
       iconTheme: WidgetStateProperty.resolveWith(
-        (s) => IconThemeData(color: s.contains(WidgetState.selected) ? c.onAccentContainer : c.textMuted, size: 24),
+        (s) => IconThemeData(color: s.contains(WidgetState.selected) ? c.onAccentContainer : c.textMuted, size: 24, opticalSize: 24),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (s) => _textTheme(c).labelMedium!.copyWith(

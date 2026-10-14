@@ -12,6 +12,7 @@ import '../../shared/settled_size.dart';
 import '../terminal_session.dart';
 import 'notice.dart';
 import 'terminal_selection.dart';
+import '../../app/icons.dart';
 
 /// Renders one [TerminalSession]: the terminal itself, link/selection
 /// handling, and notices floating over its top edge.
@@ -186,7 +187,7 @@ class _TerminalPaneState extends State<TerminalPane> {
       final killed = _killedByAndroid;
       return Notice(
         key: ValueKey('exited $killed'),
-        icon: Icons.power_settings_new_rounded,
+        icon: AppIcons.power,
         title: killed ? 'Android stopped this session' : _session.error ?? 'Session ended',
         isError: killed || _session.error != null,
         action: 'Restart',
@@ -198,7 +199,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (_killedByAndroid) {
       return Notice(
         key: const ValueKey('killed'),
-        icon: Icons.warning_amber_rounded,
+        icon: AppIcons.warning,
         title: 'Android stopped a process here (signal 9)',
         detail: 'Let aiterm keep agents running in the background',
         isError: true,
@@ -211,7 +212,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (fix == null) return _review();
     return Notice(
       key: ValueKey(fix),
-      icon: Icons.lightbulb_outline_rounded,
+      icon: AppIcons.lightbulb,
       title: fix.problem,
       detail: fix.needsInput ? '${fix.command}…' : fix.command,
       action: 'Insert',
@@ -228,7 +229,7 @@ class _TerminalPaneState extends State<TerminalPane> {
     if (hint == null) return null;
     return Notice(
       key: ValueKey(hint),
-      icon: Icons.call_split_rounded,
+      icon: AppIcons.branch,
       title: hint.title,
       action: 'Review',
       onAction: () {

@@ -8,6 +8,7 @@ import 'git_repo.dart';
 import 'git_tools.dart';
 import 'github_auth.dart';
 import '../shared/form.dart';
+import '../app/icons.dart';
 
 /// The git flows every screen shares: one-time tool install, GitHub
 /// sign-in, commit identity, and git errors turned into a next step.
@@ -176,7 +177,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                         const SizedBox(height: 18),
                         FilledButton.icon(
                           onPressed: () => _copyAndOpen(state),
-                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          icon: const Icon(AppIcons.openInNew, size: 18),
                           label: const Text('Copy code & open GitHub'),
                         ),
                         const SizedBox(height: 12),

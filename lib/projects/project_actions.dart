@@ -10,21 +10,22 @@ import '../shared/form.dart';
 import '../shared/format.dart';
 import '../shared/name_dialog.dart';
 import 'project.dart';
+import '../app/icons.dart';
 
 /// A project's actions, from its card on Projects and from its workspace:
 /// open, rename, copy to the phone, remove from the list, delete.
 void showProjectActions(BuildContext context, Project p, {bool showOpen = true}) {
   final s = context.services;
   showActionSheet(context, title: p.name, actions: [
-    if (showOpen) SheetAction(Icons.open_in_new_rounded, 'Open', () => s.showProject(p), accent: true),
-    SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () async {
+    if (showOpen) SheetAction(AppIcons.openInNew, 'Open', () => s.showProject(p), accent: true),
+    SheetAction(AppIcons.rename, 'Rename', () async {
       final name = await showNameDialog(context, title: 'Rename project', action: 'Rename', initial: p.name);
       if (name != null) await s.projects.rename(p, name);
     }),
-    if (!onPhoneStorage(p.path)) SheetAction(Icons.ios_share_rounded, 'Export to phone', () => _export(context, p)),
+    if (!onPhoneStorage(p.path)) SheetAction(AppIcons.exportFile, 'Export to phone', () => _export(context, p)),
     null,
-    SheetAction(Icons.playlist_remove_rounded, 'Remove from projects', () => _remove(context, p)),
-    SheetAction(Icons.delete_outline_rounded, 'Delete project and files', () => _delete(context, p), danger: true),
+    SheetAction(AppIcons.removeFromList, 'Remove from projects', () => _remove(context, p)),
+    SheetAction(AppIcons.delete, 'Delete project and files', () => _delete(context, p), danger: true),
   ]);
 }
 

@@ -13,6 +13,7 @@ import 'commit_message.dart';
 import 'git_actions.dart';
 import 'git_parsers.dart';
 import 'git_repo.dart';
+import '../app/icons.dart';
 
 /// A folder's git changes: branch, sync, staged and unstaged files, and
 /// commit. A project's Changes tab ([embedded]: no app bar of its own), or
@@ -85,13 +86,13 @@ class _GitScreenState extends State<GitScreen> {
     final body = switch (_load) {
       _Load.loading => const SizedBox.expand(),
       _Load.noTools => _Message(
-          icon: Icons.download_rounded,
+          icon: AppIcons.download,
           title: 'Git isn\'t set up yet',
           action: 'Install git',
           onAction: _installTools,
         ),
       _Load.notRepo => _Message(
-          icon: Icons.history_rounded,
+          icon: AppIcons.history,
           title: 'Not tracked by git',
           action: 'Start tracking',
           onAction: _init,
@@ -161,20 +162,20 @@ class _RepoMenu extends StatelessWidget {
     final s = context.services;
     return IconButton(
       tooltip: 'More',
-      icon: const Icon(Icons.more_vert_rounded),
+      icon: const Icon(AppIcons.moreVert),
       onPressed: () => showActionSheet(context, title: shortPath(repo.path), actions: [
-        SheetAction(Icons.call_split_rounded, 'Branches', () => showBranchSheet(context, repo)),
+        SheetAction(AppIcons.branch, 'Branches', () => showBranchSheet(context, repo)),
         if (repo.remotes?.isNotEmpty ?? false)
-          SheetAction(Icons.cloud_download_outlined, 'Fetch', () => runGit(context, repo.fetch, repo: repo, done: 'Fetched')),
+          SheetAction(AppIcons.cloudDownload, 'Fetch', () => runGit(context, repo.fetch, repo: repo, done: 'Fetched')),
         if (repo.remotes?.isEmpty ?? false)
-          SheetAction(Icons.cloud_upload_outlined, 'Publish to GitHub', () => publishToGitHub(context, repo)),
+          SheetAction(AppIcons.cloudUpload, 'Publish to GitHub', () => publishToGitHub(context, repo)),
         null,
-        SheetAction(Icons.terminal_rounded, 'Open terminal here', () {
+        SheetAction(AppIcons.terminal, 'Open terminal here', () {
           s.tabs.open(cwd: repo.path);
           s.navigation.open(AppTab.terminal);
         }),
-        SheetAction(Icons.folder_open_rounded, 'Show in Files', () => s.navigation.showFolder(repo.path)),
-        SheetAction(Icons.badge_outlined, 'Commit name & email', () => askCommitIdentity(context)),
+        SheetAction(AppIcons.folderOpen, 'Show in Files', () => s.navigation.showFolder(repo.path)),
+        SheetAction(AppIcons.badge, 'Commit name & email', () => askCommitIdentity(context)),
       ]),
     );
   }
@@ -272,7 +273,7 @@ Future<void> showBranchSheet(BuildContext context, GitRepo repo) async {
       if (b.remote && !localNames.contains(b.name.substring(b.name.indexOf('/') + 1))) b,
   ];
   await showActionSheet(context, title: 'Branches', actions: [
-    SheetAction(Icons.add_rounded, 'New branch…', () async {
+    SheetAction(AppIcons.add, 'New branch…', () async {
       final name = await showNameDialog(context, title: 'New branch', action: 'Create', hint: 'e.g. fix-login');
       if (name != null && context.mounted) {
         await runGit(context, () => repo.createBranch(name.replaceAll(' ', '-')), repo: repo);
@@ -280,12 +281,12 @@ Future<void> showBranchSheet(BuildContext context, GitRepo repo) async {
     }, accent: true),
     null,
     for (final b in local)
-      SheetAction(b.current ? Icons.check_rounded : Icons.call_split_rounded, b.name, () {
+      SheetAction(b.current ? AppIcons.check : AppIcons.branch, b.name, () {
         if (!b.current) runGit(context, () => repo.switchBranch(b.name), repo: repo);
       }),
     if (remoteOnly.isNotEmpty) null,
     for (final b in remoteOnly)
-      SheetAction(Icons.cloud_outlined, b.name, () {
+      SheetAction(AppIcons.cloud, b.name, () {
         runGit(context, () => repo.switchBranch(b.name.substring(b.name.indexOf('/') + 1)), repo: repo);
       }),
   ]);
@@ -350,14 +351,14 @@ class _RepoViewState extends State<_RepoView> {
     final s = context.services;
     final dir = change.path.contains('/') ? change.path.substring(0, change.path.lastIndexOf('/')) : '';
     showActionSheet(context, title: change.path, actions: [
-      SheetAction(Icons.difference_outlined, 'Show changes', () => _openDiff(change, staged)),
-      SheetAction(staged ? Icons.remove_circle_outline_rounded : Icons.add_circle_outline_rounded,
+      SheetAction(AppIcons.diff, 'Show changes', () => _openDiff(change, staged)),
+      SheetAction(staged ? AppIcons.removeCircle : AppIcons.addCircle,
           staged ? 'Unstage' : 'Stage', () => _toggle(change, staged)),
-      SheetAction(Icons.folder_open_rounded, 'Show in Files',
+      SheetAction(AppIcons.folderOpen, 'Show in Files',
           () => s.navigation.showFolder(dir.isEmpty ? repo.path : '${repo.path}/$dir')),
       if (!staged) ...[
         null,
-        SheetAction(Icons.undo_rounded, 'Discard changes', () => _discard(change), danger: true),
+        SheetAction(AppIcons.undo, 'Discard changes', () => _discard(change), danger: true),
       ],
     ]);
   }
@@ -509,12 +510,12 @@ class _RepoBar extends StatelessWidget {
     final s = status;
     final noRemote = repo.remotes?.isEmpty ?? false;
     final (IconData icon, String label) = switch (s) {
-      _ when noRemote => (Icons.cloud_upload_outlined, 'Publish'),
-      GitStatus(upstream: null) => (Icons.cloud_upload_outlined, 'Publish branch'),
-      GitStatus(:final ahead, :final behind) when ahead > 0 && behind > 0 => (Icons.sync_rounded, '↓$behind ↑$ahead'),
-      GitStatus(:final behind) when behind > 0 => (Icons.cloud_download_outlined, 'Pull ↓$behind'),
-      GitStatus(:final ahead) when ahead > 0 => (Icons.cloud_upload_outlined, 'Push ↑$ahead'),
-      _ => (Icons.sync_rounded, 'Sync'),
+      _ when noRemote => (AppIcons.cloudUpload, 'Publish'),
+      GitStatus(upstream: null) => (AppIcons.cloudUpload, 'Publish branch'),
+      GitStatus(:final ahead, :final behind) when ahead > 0 && behind > 0 => (AppIcons.sync, '↓$behind ↑$ahead'),
+      GitStatus(:final behind) when behind > 0 => (AppIcons.cloudDownload, 'Pull ↓$behind'),
+      GitStatus(:final ahead) when ahead > 0 => (AppIcons.cloudUpload, 'Push ↑$ahead'),
+      _ => (AppIcons.sync, 'Sync'),
     };
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
@@ -526,7 +527,7 @@ class _RepoBar extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: ActionChip(
                 tooltip: 'Branches',
-                avatar: Icon(Icons.call_split_rounded, size: 16, color: c.accent),
+                avatar: Icon(AppIcons.branch, size: 16, color: c.accent),
                 label: Text(s.branch ?? 'detached', overflow: TextOverflow.ellipsis, style: codeStyle(c.text)),
                 onPressed: () => showBranchSheet(context, repo),
               ),
@@ -556,7 +557,7 @@ class _Clean extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(28, 100, 28, 28),
       child: Column(
         children: [
-          Icon(Icons.check_circle_outline_rounded, size: 40, color: c.success),
+          Icon(AppIcons.checkCircle, fill: 1, size: 40, color: c.success),
           const SizedBox(height: 12),
           Text('No changes', style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
@@ -658,7 +659,7 @@ class _ChangeRow extends StatelessWidget {
             ),
             IconButton(
               tooltip: 'Actions',
-              icon: Icon(Icons.more_vert_rounded, size: 18, color: c.textMuted),
+              icon: Icon(AppIcons.moreVert, size: 18, color: c.textMuted),
               onPressed: onMenu,
             ),
           ],
@@ -691,13 +692,13 @@ class _OutcomeCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(outcome.isError ? Icons.error_outline_rounded : Icons.check_circle_rounded, size: 18, color: tint),
+          Icon(outcome.isError ? AppIcons.error : AppIcons.checkCircle, fill: 1, size: 18, color: tint),
           const SizedBox(width: 10),
           Expanded(child: Text(outcome.message, style: TextStyle(color: c.text, fontSize: 13, height: 1.35))),
           if (outcome.action case final action?) TextButton(onPressed: outcome.onAction, child: Text(action)),
           IconButton(
             tooltip: 'Dismiss',
-            icon: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
+            icon: Icon(AppIcons.close, size: 16, color: c.textMuted),
             onPressed: onDismiss,
           ),
         ],
@@ -746,7 +747,7 @@ class _CommitBar extends StatelessWidget {
                           controller.text = suggestCommitMessage(status.changes);
                           controller.selection = TextSelection.collapsed(offset: controller.text.length);
                         },
-                        icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+                        icon: const Icon(AppIcons.suggest, size: 16),
                         label: const Text('Suggest'),
                       ),
                     ),

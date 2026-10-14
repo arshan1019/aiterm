@@ -4,6 +4,7 @@ import '../app/services.dart';
 import '../app/theme.dart';
 import 'format.dart';
 import 'name_dialog.dart';
+import '../app/icons.dart';
 
 /// Picks a folder in Linux. Returns its guest path (as the shell sees it).
 Future<String?> pickLinuxFolder(BuildContext context, {required String title, String? start, String action = 'Select'}) =>
@@ -93,7 +94,7 @@ class _FolderPickerState extends State<_FolderPicker> {
             ],
           ),
           actions: [
-            IconButton(tooltip: 'New folder', icon: const Icon(Icons.create_new_folder_outlined), onPressed: _newFolder),
+            IconButton(tooltip: 'New folder', icon: const Icon(AppIcons.folderNew), onPressed: _newFolder),
           ],
         ),
         body: Column(
@@ -105,13 +106,13 @@ class _FolderPickerState extends State<_FolderPicker> {
                       children: [
                         if (_guest != '/')
                           ListTile(
-                            leading: Icon(Icons.arrow_upward_rounded, color: c.textMuted),
+                            leading: Icon(AppIcons.arrowUpward, color: c.textMuted),
                             title: const Text('..', style: TextStyle(fontSize: 14)),
                             onTap: () => _go(_parent),
                           ),
                         for (final name in _folders)
                           ListTile(
-                            leading: Icon(Icons.folder_rounded, color: c.accent),
+                            leading: Icon(AppIcons.folder, fill: 1, color: c.accent),
                             title: Text(name, style: const TextStyle(fontSize: 14)),
                             onTap: () => _go(_guest == '/' ? '/$name' : '$_guest/$name'),
                           ),

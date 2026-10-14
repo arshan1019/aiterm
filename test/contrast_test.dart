@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/app/contrast.dart';
 import 'package:aiterm/app/theme.dart';
@@ -42,6 +43,28 @@ void main() {
       });
     });
   }
+
+  test('wallpaper accents keep every accent pairing readable, whatever the hue', () {
+    for (var hue = 0; hue < 360; hue += 15) {
+      final seed = HSVColor.fromAHSV(1, hue.toDouble(), 0.7, 0.8).toColor();
+      for (final base in [AppColors.dark, AppColors.light]) {
+        final c = base.seeded(seed);
+        for (final bg in [c.bg, c.surface]) {
+          expect(contrastRatio(c.accent, bg), greaterThanOrEqualTo(4.5), reason: 'accent on $bg, hue $hue');
+        }
+        expect(contrastRatio(c.bg, c.accent), greaterThanOrEqualTo(4.5), reason: 'on accent, hue $hue');
+        expect(contrastRatio(c.onAccentContainer, c.accentContainer), greaterThanOrEqualTo(4.5), reason: 'nav pill, hue $hue');
+      }
+    }
+  });
+
+  test('a black terminal keeps text and colors readable', () {
+    const black = Color(0xFF000000);
+    final t = TerminalPalette.dark;
+    for (final color in [AppColors.dark.text, AppColors.dark.textMuted, t.red, t.green, t.yellow, t.blue, t.magenta, t.cyan]) {
+      expect(contrastRatio(color, black), greaterThanOrEqualTo(4.5), reason: '$color on black');
+    }
+  });
 
   test('terminal colors are readable on the terminal background, in both themes', () {
     for (final (bg, t) in [(AppColors.dark.bg, TerminalPalette.dark), (AppColors.light.bg, TerminalPalette.light)]) {

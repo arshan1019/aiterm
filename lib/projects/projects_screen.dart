@@ -15,6 +15,7 @@ import 'new_project.dart';
 import 'project.dart';
 import 'project_actions.dart';
 import 'project_screen.dart';
+import '../app/icons.dart';
 
 /// Home: the user's projects. Each opens a workspace where agents,
 /// terminals, files and git start in the project's folder. On first
@@ -59,7 +60,7 @@ class _Projects extends StatelessWidget {
                   ),
                   TextButton.icon(
                     onPressed: () => openAgents(context),
-                    icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                    icon: const Icon(AppIcons.agent, size: 18),
                     label: const Text('Agents'),
                   ),
                 ],
@@ -100,9 +101,9 @@ void openAgentInProject(BuildContext context, String id) {
   final projects = s.projects.projects;
   if (projects.isEmpty) return showAddProject(context);
   showActionSheet(context, title: 'Open ${AgentInstaller.recipe(id).name} in', actions: [
-    for (final p in projects.take(6)) SheetAction(Icons.folder_rounded, p.name, () => s.agents.open(id, cwd: p.path)),
+    for (final p in projects.take(6)) SheetAction(AppIcons.project, p.name, () => s.agents.open(id, cwd: p.path)),
     null,
-    SheetAction(Icons.add_rounded, 'Add project', () => showAddProject(context)),
+    SheetAction(AppIcons.add, 'Add project', () => showAddProject(context)),
   ]);
 }
 
@@ -149,7 +150,7 @@ class _AgentsPrompt extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           child: Row(
             children: [
-              Icon(Icons.auto_awesome_rounded, color: c.accent),
+              Icon(AppIcons.agent, color: c.accent),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -162,7 +163,7 @@ class _AgentsPrompt extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: c.textMuted),
+              Icon(AppIcons.chevronRight, color: c.textMuted),
             ],
           ),
         ),
@@ -200,7 +201,7 @@ class _BottomActions extends StatelessWidget {
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                       onPressed: () => showAddProject(context),
-                      icon: const Icon(Icons.add_rounded, size: 20),
+                      icon: const Icon(AppIcons.add, size: 20),
                       label: const Text('Add project'),
                     ),
                   ),
@@ -227,7 +228,7 @@ class _Empty extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.folder_special_outlined, size: 44, color: c.accent),
+          Icon(AppIcons.project, size: 44, color: c.accent),
           const SizedBox(height: 12),
           Text('No projects yet',
               textAlign: TextAlign.center, style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
@@ -304,7 +305,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                     Row(
                       children: [
                         if (onPhoneStorage(p.path)) ...[
-                          Icon(Icons.smartphone_rounded, size: 13, color: c.textMuted),
+                          Icon(AppIcons.smartphone, size: 13, color: c.textMuted),
                           const SizedBox(width: 4),
                         ],
                         Flexible(
@@ -316,7 +317,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                     const SizedBox(height: 6),
                     if (_s.tabs.tabs.where((t) => t.project == p.path && t.agent != null).firstOrNull case final tab?) ...[
                       Row(children: [
-                        Icon(Icons.auto_awesome_rounded, size: 13, color: c.accent),
+                        Icon(AppIcons.agent, size: 13, color: c.accent),
                         const SizedBox(width: 4),
                         Text(
                           '${AgentInstaller.recipe(tab.agent!).name} · ${switch (tab.activity.value) {
@@ -342,7 +343,7 @@ class _ProjectCardState extends State<_ProjectCard> {
               ),
               IconButton(
                 tooltip: 'Project actions',
-                icon: Icon(Icons.more_vert_rounded, color: c.textMuted),
+                icon: Icon(AppIcons.moreVert, color: c.textMuted),
                 onPressed: () => showProjectActions(context, p),
               ),
             ],
@@ -367,7 +368,7 @@ class _GitLine extends StatelessWidget {
     final changed = s.changes.length;
     return Row(
       children: [
-        Icon(Icons.call_split_rounded, size: 13, color: c.accent),
+        Icon(AppIcons.branch, size: 13, color: c.accent),
         const SizedBox(width: 4),
         Flexible(child: Text(s.branch ?? 'detached', maxLines: 1, overflow: TextOverflow.ellipsis, style: codeStyle(c.textMuted, size: 12))),
         if (changed > 0) ...[

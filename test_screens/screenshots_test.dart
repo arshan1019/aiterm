@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/agents/agent_installer.dart';
 import 'package:aiterm/app/app.dart';
+import 'package:aiterm/app/icons.dart';
+import 'package:aiterm/settings/settings.dart';
 import 'package:aiterm/app/navigation.dart';
 import 'package:aiterm/app/services.dart';
 import 'package:aiterm/git/git_registry.dart';
@@ -100,6 +102,7 @@ void main() {
       ]));
     }
     final s = (await tester.runAsync(AppServices.load))!;
+    s.settings.theme = ThemeChoice.dark;
     s.gitTools = GitTools(run: (script, onLine) async => 0);
     await tester.runAsync(s.gitTools.refresh);
     s.git = GitRegistry(_FakeGit());
@@ -216,7 +219,7 @@ void main() {
     s.navigation.open(AppTab.files);
     await settle(tester);
     await shot(tester, '18-files');
-    await tester.tap(find.byIcon(Icons.add_rounded).last);
+    await tester.tap(find.byIcon(AppIcons.add).last);
     await settle(tester);
     await shot(tester, '22-files-add-menu');
     await tester.tapAt(const Offset(20, 300));
@@ -232,7 +235,7 @@ void main() {
   });
 
   testWidgets('large text', (tester) async {
-    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     final s = await boot(tester);
     await shot(tester, '25-large-projects');
@@ -248,7 +251,7 @@ void main() {
 
   testWidgets('light theme', (tester) async {
     final s = await boot(tester);
-    s.settings.dark = false;
+    s.settings.theme = ThemeChoice.light;
     await settle(tester);
     await shot(tester, '20-projects-light');
     await tester.tap(find.text('Weather app'));
@@ -256,6 +259,37 @@ void main() {
     s.navigation.openWorkspaceTab(WorkspaceTab.changes);
     await settle(tester);
     await shot(tester, '21-changes-light');
+  });
+
+  testWidgets('appearance options', (tester) async {
+    final s = await boot(tester);
+    // Wallpaper colors with a violet wallpaper.
+    s.systemAccent.value = const Color(0xFF6750A4);
+    s.settings.wallpaperColors = true;
+    await settle(tester);
+    await shot(tester, '28-wallpaper-projects');
+    s.navigation.open(AppTab.settings);
+    await settle(tester);
+    await shot(tester, '29-wallpaper-settings');
+    s.settings.wallpaperColors = false;
+    // Light theme, terminal kept dark.
+    s.settings.theme = ThemeChoice.light;
+    s.settings.darkTerminal = true;
+    s.navigation.open(AppTab.terminal);
+    await settle(tester);
+    s.tabs.activeIn(null)!.terminal.write('\r\nlocalhost:~# ls\r\n\x1b[34mapp\x1b[0m  \x1b[32mdotfiles\x1b[0m  site\r\nlocalhost:~# ');
+    await settle(tester);
+    await shot(tester, '30-terminal-dark-in-light');
+    // Dark theme, black terminal.
+    s.settings.theme = ThemeChoice.dark;
+    s.settings.blackTerminal = true;
+    await settle(tester);
+    await shot(tester, '31-terminal-black');
+    // Compact lists.
+    s.settings.compact = true;
+    s.navigation.open(AppTab.files);
+    await settle(tester);
+    await shot(tester, '32-files-compact');
   });
 }
 

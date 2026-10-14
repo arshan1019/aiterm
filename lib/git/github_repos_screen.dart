@@ -5,6 +5,7 @@ import '../shared/format.dart';
 import 'git_actions.dart';
 import 'git_repo.dart';
 import 'github_auth.dart';
+import '../app/icons.dart';
 
 /// Signs in to GitHub if needed, then lists the account's repositories.
 Future<void> openGitHubRepos(BuildContext context) async {
@@ -87,7 +88,7 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: TextField(
-              decoration: const InputDecoration(hintText: 'Search repositories', prefixIcon: Icon(Icons.search_rounded, size: 20)),
+              decoration: const InputDecoration(hintText: 'Search repositories', prefixIcon: Icon(AppIcons.search, size: 20)),
               onChanged: (v) => setState(() => _filter = v.trim().toLowerCase()),
             ),
           ),
@@ -101,12 +102,12 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline_rounded, size: 18, color: c.danger),
+                  Icon(AppIcons.error, size: 18, color: c.danger),
                   const SizedBox(width: 10),
                   Expanded(child: Text(f, style: TextStyle(color: c.text, fontSize: 13))),
                   IconButton(
                     tooltip: 'Dismiss',
-                    icon: Icon(Icons.close_rounded, size: 18, color: c.textMuted),
+                    icon: Icon(AppIcons.close, size: 18, color: c.textMuted),
                     onPressed: () => setState(() => _failure = null),
                   ),
                 ],
@@ -140,7 +141,7 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
                         final added = _s.projectService.repositoryProject(r.name) != null;
                         return ListTile(
                           enabled: _cloning == null || _cloning == r.fullName,
-                          leading: Icon(r.private ? Icons.lock_outline_rounded : Icons.book_outlined, size: 20),
+                          leading: Icon(r.private ? AppIcons.lock : AppIcons.book, size: 20),
                           title: Text(r.fullName, style: codeStyle(c.text, size: 14)),
                           subtitle: Text(
                             [?r.description, timeAgo(r.updatedAt)].join(' · '),

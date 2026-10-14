@@ -8,6 +8,7 @@ import '../phone/phone_files.dart';
 import '../shared/form.dart';
 import 'language_servers.dart';
 import 'lsp_process.dart';
+import '../app/icons.dart';
 
 enum _Server { none, missing, installing, starting, running, failed }
 
@@ -61,10 +62,17 @@ class _EditorScreenState extends State<EditorScreen> {
     _load();
   }
 
+  AppColors? _colors;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _web.setBackgroundColor(context.colors.bg);
+    // The theme changed (light/dark, the system's choice, wallpaper colors).
+    if (_colors != context.colors) {
+      _colors = context.colors;
+      _web.setBackgroundColor(_colors!.bg);
+      _applyTheme();
+    }
   }
 
   @override
@@ -112,7 +120,7 @@ class _EditorScreenState extends State<EditorScreen> {
         'danger': hex(c.danger),
         'warning': hex(c.warning),
       },
-      'dark': _s.settings.dark,
+      'dark': Theme.of(context).brightness == Brightness.dark,
       'fontSize': _s.settings.fontSize,
     };
   }
@@ -233,12 +241,12 @@ class _EditorScreenState extends State<EditorScreen> {
         appBar: AppBar(
           title: Text(widget.entry.name, overflow: TextOverflow.ellipsis),
           actions: [
-            IconButton(tooltip: 'Undo', icon: const Icon(Icons.undo_rounded), onPressed: () => _js('aiterm.undo()')),
-            IconButton(tooltip: 'Redo', icon: const Icon(Icons.redo_rounded), onPressed: () => _js('aiterm.redo()')),
-            IconButton(tooltip: 'Find', icon: const Icon(Icons.search_rounded), onPressed: () => _js('aiterm.search()')),
+            IconButton(tooltip: 'Undo', icon: const Icon(AppIcons.undo), onPressed: () => _js('aiterm.undo()')),
+            IconButton(tooltip: 'Redo', icon: const Icon(AppIcons.redo), onPressed: () => _js('aiterm.redo()')),
+            IconButton(tooltip: 'Find', icon: const Icon(AppIcons.search), onPressed: () => _js('aiterm.search()')),
             IconButton(
               tooltip: 'Save',
-              icon: Icon(Icons.check_rounded, color: _dirty ? c.accent : null),
+              icon: Icon(AppIcons.check, color: _dirty ? c.accent : null),
               onPressed: _dirty ? _save : null,
             ),
           ],
@@ -261,7 +269,7 @@ class _EditorScreenState extends State<EditorScreen> {
       _ when server == null => null,
       _Server.missing => TextButton.icon(
           onPressed: () => _startServer(installIfMissing: true),
-          icon: const Icon(Icons.download_rounded, size: 18),
+          icon: const Icon(AppIcons.download, size: 18),
           label: Text('Install ${server.name} support'),
         ),
       _Server.installing || _Server.starting => Row(
@@ -274,7 +282,7 @@ class _EditorScreenState extends State<EditorScreen> {
         ),
       _Server.failed => TextButton.icon(
           onPressed: () => _startServer(installIfMissing: true),
-          icon: Icon(Icons.refresh_rounded, size: 18, color: c.danger),
+          icon: Icon(AppIcons.refresh, size: 18, color: c.danger),
           label: Text('Restart ${server.name} support', style: TextStyle(color: c.danger)),
         ),
       _ => null,

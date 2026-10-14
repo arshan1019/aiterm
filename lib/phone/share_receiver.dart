@@ -7,6 +7,7 @@ import '../shared/sheet.dart';
 import '../shared/format.dart';
 import '../git/github_button.dart';
 import 'phone_files.dart';
+import '../app/icons.dart';
 
 /// Files shared to aiterm (Share → aiterm in any app): asks which project
 /// they go into, copies them there, and shows them.
@@ -88,13 +89,13 @@ class _ShareSheet extends StatelessWidget {
                 children: [
                   for (final p in projects)
                     ListTile(
-                      leading: Icon(Icons.folder_special_outlined, color: c.accent),
+                      leading: Icon(AppIcons.project, color: c.accent),
                       title: Text(p.name),
                       subtitle: Text(shortPath(p.path), style: codeStyle(c.textMuted, size: 12)),
                       onTap: () => _addTo(context, p.path, () => s.showProject(p, tab: WorkspaceTab.files)),
                     ),
                   ListTile(
-                    leading: Icon(Icons.home_outlined, color: c.textMuted),
+                    leading: Icon(AppIcons.home, color: c.textMuted),
                     title: const Text('Home folder'),
                     subtitle: Text('~', style: TextStyle(color: c.textMuted, fontSize: 12)),
                     onTap: () => _addTo(context, '/root', () => s.navigation.showFolder('/root')),

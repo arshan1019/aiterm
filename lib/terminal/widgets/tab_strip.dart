@@ -3,6 +3,7 @@ import '../../app/theme.dart';
 import '../../platform/haptics.dart';
 import '../terminal_session.dart';
 import '../terminal_tabs.dart';
+import '../../app/icons.dart';
 
 /// The row of terminal tabs. Tap to switch; tap the active tab or
 /// long-press any tab for pin / rename / close.
@@ -95,7 +96,7 @@ class _TabStripState extends State<TabStrip> {
               tooltip: 'New tab',
               iconSize: 20,
               onPressed: widget.onNew,
-              icon: Icon(Icons.add_rounded, color: c.textMuted),
+              icon: Icon(AppIcons.add, color: c.textMuted),
             ),
           ),
         ],
@@ -155,7 +156,7 @@ class _Tab extends StatelessWidget {
                 const SizedBox(width: 6),
               ],
               if (session.pinned) ...[
-                Icon(Icons.push_pin_rounded, size: 12, color: active ? c.accent : c.textMuted),
+                Icon(AppIcons.pushPin, fill: 1, size: 12, color: active ? c.accent : c.textMuted),
                 const SizedBox(width: 4),
               ],
               AnimatedDefaultTextStyle(
@@ -182,7 +183,7 @@ class _Tab extends StatelessWidget {
                         onTap: onClose,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
-                          child: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
+                          child: Icon(AppIcons.close, size: 16, color: c.textMuted),
                         ),
                       ),
                       )

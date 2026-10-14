@@ -5,6 +5,7 @@ import '../app/theme.dart';
 import 'commands.dart';
 import 'needle.dart';
 import 'tool_call.dart';
+import '../app/icons.dart';
 
 /// "What do you want to do?", typed or spoken. Commands are typed into the
 /// shell without pressing Enter so the user reviews them; app actions
@@ -199,7 +200,7 @@ class _AskSheetState extends State<AskSheet> {
               )
             : IconButton(
                 key: const ValueKey('send'),
-                icon: Icon(Icons.arrow_upward_rounded, color: c.accent),
+                icon: Icon(AppIcons.arrowUpward, color: c.accent),
                 onPressed: _ask,
               ),
       ),
@@ -227,7 +228,7 @@ class _AskSheetState extends State<AskSheet> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Icon(
-                    recording ? Icons.stop_rounded : Icons.mic_none_rounded,
+                    recording ? AppIcons.stop : AppIcons.mic,
                     key: ValueKey(recording),
                     color: recording ? c.bg : c.accent,
                   ),

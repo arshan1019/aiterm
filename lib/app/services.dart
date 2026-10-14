@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import '../assistant/assistant.dart';
 import '../assistant/needle.dart';
 import '../assistant/tool_call.dart';
@@ -10,6 +10,7 @@ import '../onboarding/setup_pipeline.dart';
 import '../linux/linux_environment.dart';
 import '../phone/phone_files.dart';
 import '../platform/android_env.dart';
+import '../platform/system_colors.dart';
 import '../settings/settings.dart';
 import '../ssh/ssh_keys.dart';
 import '../git/git_registry.dart';
@@ -27,6 +28,7 @@ import '../preview/preview_controller.dart';
 import '../terminal/session_presence.dart';
 import '../terminal/terminal_tabs.dart';
 import 'navigation.dart';
+import 'theme.dart';
 
 /// Everything the app's screens share, created once at startup and handed
 /// down through [AppScope]. Plain objects with explicit dependencies; no
@@ -56,7 +58,11 @@ class AppServices {
         _updatePresence();
       },
       // Back from battery or notification settings: show the new state.
-      onResume: () => keepAlive.refresh().ignore(),
+      // The wallpaper may have changed meanwhile.
+      onResume: () {
+        keepAlive.refresh().ignore();
+        _readAccent().ignore();
+      },
     );
     navigation.addListener(_updatePresence);
     tabs.addListener(_updatePresence);
@@ -96,6 +102,18 @@ class AppServices {
       titles: {for (final t in tabs.tabs) ?t.ptyId: t.title},
     );
   }
+
+  /// The wallpaper's accent (Android 12+), for "Wallpaper colors".
+  final systemAccent = ValueNotifier<Color?>(null);
+
+  Future<void> _readAccent() async => systemAccent.value = await SystemColors.accent();
+
+  /// The app's theme for [dark], with the user's appearance settings.
+  ThemeData theme({required bool dark}) => buildTheme(
+        dark: dark,
+        seed: settings.wallpaperColors ? systemAccent.value : null,
+        compact: settings.compact,
+      );
 
   void _refreshGit() {
     if (!linux.installed) return;
@@ -246,7 +264,7 @@ class AppServices {
     await tabs.reattach();
     final services = AppServices._(paths, settings, linux, tabs);
     services.keepAlive.refresh().ignore();
-    await services.projects.load();
+    await (services.projects.load(), services._readAccent()).wait;
     services._reconcileTabs();
     return services;
   }
@@ -258,7 +276,7 @@ class AppServices {
       case 'set_font_size':
         settings.stepFontSize(action.args['change'] == 'smaller' ? -1 : 1);
       case 'set_theme':
-        settings.dark = action.args['theme'] != 'light';
+        settings.theme = action.args['theme'] == 'light' ? ThemeChoice.light : ThemeChoice.dark;
       case 'open_tab':
         navigation.open(switch (action.args['tab']) {
           'files' => AppTab.files,

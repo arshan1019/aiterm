@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../shared/form.dart';
 import '../app/theme.dart';
 import 'file_system_service.dart';
+import '../app/icons.dart';
 
 /// A plain text editor for one file. Asks before discarding unsaved edits.
 class TextEditorScreen extends StatefulWidget {
@@ -79,7 +80,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                     ? IconButton(
                         key: const ValueKey('save'),
                         tooltip: 'Save',
-                        icon: Icon(Icons.check_rounded, color: c.accent),
+                        icon: Icon(AppIcons.check, color: c.accent),
                         onPressed: _save,
                       )
                     : const SizedBox(key: ValueKey('none'), width: 48),
