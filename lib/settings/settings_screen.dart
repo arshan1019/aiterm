@@ -360,7 +360,9 @@ class _BackupSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(4),
-            child: Row(
+            // Side by side; one under the other when large text needs it.
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 TextButton.icon(
                   onPressed: backup.busy || !linuxInstalled ? null : backup.backup,

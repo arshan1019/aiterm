@@ -588,8 +588,10 @@ class _GroupHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
       child: Row(
         children: [
-          Text('$label · $count', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: c.textMuted)),
-          const Spacer(),
+          // Wraps at large text sizes rather than pushing the action off.
+          Expanded(
+            child: Text('$label · $count', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: c.textMuted)),
+          ),
           TextButton(
             onPressed: onAction,
             child: Text(action, style: const TextStyle(fontSize: 12)),

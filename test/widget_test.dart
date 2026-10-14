@@ -44,7 +44,13 @@ void main() {
     );
   });
 
-  tearDown(() => dir.deleteSync(recursive: true));
+  tearDown(() {
+    try {
+      dir.deleteSync(recursive: true);
+    } on FileSystemException {
+      // A settings write landed mid-delete; it's a temp folder.
+    }
+  });
 
   /// A destination of the bottom navigation bar showing now.
   Finder navTab(String label) => find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
