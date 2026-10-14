@@ -451,7 +451,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Project actions').first);
     await tester.pumpAndSettle();
-    for (final action in ['Open', 'Rename', 'Copy to phone', 'Remove from projects', 'Delete project and files']) {
+    for (final action in ['Open', 'Rename', 'Export to phone', 'Remove from projects', 'Delete project and files']) {
       expect(find.text(action), findsOneWidget);
     }
     await tester.tap(find.text('Rename'));
