@@ -111,13 +111,65 @@ extension ThemeContext on BuildContext {
   AppColors get colors => Theme.of(this).extension<AppColors>()!;
 }
 
+/// Two voices (docs/DESIGN.md): the app speaks in a sans; anything literal,
+/// that could be pasted into a shell (paths, branches, hashes, commands,
+/// code, logs), is mono. Mono is information here, never decoration.
+abstract final class AppFonts {
+  static const sans = 'IBMPlexSans';
+  static const mono = 'JetBrainsMono';
+}
+
+/// Machine text inside UI: paths, branches, hashes, commands (13/20 mono,
+/// tabular figures). [size] for the occasional larger code (a sign-in code).
+TextStyle codeStyle(Color color, {double size = 13, FontWeight weight = FontWeight.w400}) => TextStyle(
+      fontFamily: AppFonts.mono,
+      fontSize: size,
+      height: size <= 13 ? 20 / 13 : 1.3,
+      fontWeight: weight,
+      color: color,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+/// Radii: four values plus full (M3 shape tokens), nested concentrically.
+abstract final class Radii {
+  static const small = 4.0; // checkboxes, inline code, diff hunks
+  static const medium = 8.0; // buttons, inputs, chips, selected rows
+  static const large = 12.0; // cards, blocks, menus, snackbars
+  static const sheet = 20.0; // sheet top corners, dialogs
+}
+
+/// The type ramp (M3's sizes; every line height a multiple of 4; weights
+/// 400/500/600 only; no letter-spacing).
+TextTheme _textTheme(AppColors c) {
+  TextStyle t(double size, double line, FontWeight w, [Color? color]) => TextStyle(
+        fontFamily: AppFonts.sans,
+        fontSize: size,
+        height: line / size,
+        fontWeight: w,
+        letterSpacing: 0,
+        color: color ?? c.text,
+      );
+  return TextTheme(
+    headlineSmall: t(24, 32, FontWeight.w600),
+    titleLarge: t(22, 28, FontWeight.w600),
+    titleMedium: t(16, 24, FontWeight.w600),
+    titleSmall: t(14, 20, FontWeight.w600),
+    bodyLarge: t(16, 24, FontWeight.w400),
+    bodyMedium: t(14, 20, FontWeight.w400),
+    bodySmall: t(12, 16, FontWeight.w400, c.textMuted),
+    labelLarge: t(14, 20, FontWeight.w500),
+    labelMedium: t(12, 16, FontWeight.w500),
+    labelSmall: t(11, 16, FontWeight.w500),
+  );
+}
+
 ThemeData buildTheme({required bool dark}) {
   final c = dark ? AppColors.dark : AppColors.light;
   final brightness = dark ? Brightness.dark : Brightness.light;
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
-    fontFamily: 'JetBrainsMono',
+    fontFamily: AppFonts.sans,
     scaffoldBackgroundColor: c.bg,
     canvasColor: c.bg,
     dividerColor: c.border,
@@ -137,11 +189,7 @@ ThemeData buildTheme({required bool dark}) {
       outline: c.outline,
       outlineVariant: c.border,
     ),
-    textTheme: (dark ? Typography.whiteMountainView : Typography.blackMountainView).apply(
-      bodyColor: c.text,
-      displayColor: c.text,
-      fontFamily: 'JetBrainsMono',
-    ),
+    textTheme: _textTheme(c),
     iconTheme: IconThemeData(color: c.textMuted, size: 20),
     appBarTheme: AppBarTheme(
       backgroundColor: c.bg,
@@ -150,29 +198,29 @@ ThemeData buildTheme({required bool dark}) {
       scrolledUnderElevation: 0,
       // Titles start right after the back arrow on every page.
       titleSpacing: 0,
-      titleTextStyle: TextStyle(color: c.text, fontSize: 15, fontWeight: FontWeight.w600, fontFamily: 'JetBrainsMono'),
+      titleTextStyle: _textTheme(c).titleMedium,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.sheet)),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: c.surface,
       showDragHandle: true,
       dragHandleColor: c.border,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.sheet))),
     ),
     popupMenuTheme: PopupMenuThemeData(
       color: c.surface,
       elevation: 3,
       shadowColor: Colors.black26,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: c.border)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large), side: BorderSide(color: c.border)),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: c.surfaceAlt,
-      contentTextStyle: TextStyle(color: c.text, fontFamily: 'JetBrainsMono', fontSize: 13),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      contentTextStyle: _textTheme(c).bodyMedium,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
     ),
     listTileTheme: ListTileThemeData(iconColor: c.textMuted, textColor: c.text),
     switchTheme: SwitchThemeData(
@@ -191,10 +239,10 @@ ThemeData buildTheme({required bool dark}) {
       fillColor: c.surfaceAlt,
       hintStyle: TextStyle(color: c.textMuted),
       // A visible edge identifies the field (WCAG 1.4.11); focus thickens it.
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.outline)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.outline)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.accent, width: 2)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.danger)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.medium), borderSide: BorderSide(color: c.outline)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.medium), borderSide: BorderSide(color: c.outline)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.medium), borderSide: BorderSide(color: c.accent, width: 2)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Radii.medium), borderSide: BorderSide(color: c.danger)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
     // One button shape everywhere: 10px corners, 44px tall.
@@ -204,25 +252,25 @@ ThemeData buildTheme({required bool dark}) {
         foregroundColor: c.bg,
         disabledBackgroundColor: c.surfaceAlt,
         disabledForegroundColor: c.textMuted,
-        minimumSize: const Size(64, 44),
+        minimumSize: const Size(64, 48),
         padding: const EdgeInsets.symmetric(horizontal: 18),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.medium)),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: c.accent,
         disabledForegroundColor: c.textMuted,
-        minimumSize: const Size(64, 44),
+        minimumSize: const Size(64, 48),
         padding: const EdgeInsets.symmetric(horizontal: 18),
         side: BorderSide(color: c.outline),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.medium)),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: c.accent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.medium)),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -244,11 +292,9 @@ ThemeData buildTheme({required bool dark}) {
         (s) => IconThemeData(color: s.contains(WidgetState.selected) ? c.accent : c.textMuted, size: 24),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
-        (s) => TextStyle(
-          fontFamily: 'JetBrainsMono',
-          fontSize: 12,
+        (s) => _textTheme(c).labelMedium!.copyWith(
           color: s.contains(WidgetState.selected) ? c.text : c.textMuted,
-          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w400,
+          fontWeight: s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
         ),
       ),
     ),
@@ -259,8 +305,8 @@ ThemeData buildTheme({required bool dark}) {
     chipTheme: ChipThemeData(
       backgroundColor: c.surface,
       side: BorderSide(color: c.border),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      labelStyle: TextStyle(color: c.text, fontSize: 13, fontFamily: 'JetBrainsMono'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.medium)),
+      labelStyle: _textTheme(c).labelLarge,
     ),
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {TargetPlatform.android: PredictiveBackPageTransitionsBuilder()},

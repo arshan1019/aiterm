@@ -62,7 +62,7 @@ class _AgentCard extends StatelessWidget {
     showAppSheet<void>(
       context,
       title: '${agent.name} install log',
-      builder: (sheet) => SelectableText(state.log, style: TextStyle(color: sheet.colors.text, fontSize: 11, height: 1.4)),
+      builder: (sheet) => SelectableText(state.log, style: codeStyle(sheet.colors.text, size: 12)),
     );
   }
 
@@ -73,7 +73,7 @@ class _AgentCard extends StatelessWidget {
     final installing = state.status == AgentStatus.installing;
     return Material(
       color: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: c.border)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),

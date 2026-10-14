@@ -515,7 +515,7 @@ class _RepoBar extends StatelessWidget {
               child: ActionChip(
                 tooltip: 'Branches',
                 avatar: Icon(Icons.call_split_rounded, size: 16, color: c.accent),
-                label: Text(s.branch ?? 'detached', overflow: TextOverflow.ellipsis),
+                label: Text(s.branch ?? 'detached', overflow: TextOverflow.ellipsis, style: codeStyle(c.text)),
                 onPressed: () => showBranchSheet(context, repo),
               ),
             ),
@@ -575,8 +575,7 @@ class _GroupHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
       child: Row(
         children: [
-          Text('${label.toUpperCase()} · $count',
-              style: TextStyle(color: c.textMuted, fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w600)),
+          Text('$label · $count', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: c.textMuted)),
           const Spacer(),
           TextButton(
             onPressed: onAction,
@@ -627,7 +626,7 @@ class _ChangeRow extends StatelessWidget {
             ),
             SizedBox(
               width: 18,
-              child: Text(letter, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+              child: Text(letter, style: codeStyle(color, size: 12, weight: FontWeight.w600)),
             ),
             Expanded(
               child: Column(
@@ -636,14 +635,12 @@ class _ChangeRow extends StatelessWidget {
                   Text(name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: c.text,
-                        fontSize: 14,
+                      style: codeStyle(c.text, size: 14).copyWith(
                         decoration: kind == GitChangeKind.deleted ? TextDecoration.lineThrough : null,
                       )),
                   if (dir != null || change.origPath != null)
                     Text(change.origPath != null ? 'from ${change.origPath}' : dir!,
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.textMuted, fontSize: 11)),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: codeStyle(c.textMuted, size: 12)),
                 ],
               ),
             ),

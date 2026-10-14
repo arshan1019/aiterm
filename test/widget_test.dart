@@ -384,7 +384,7 @@ void main() {
     await tester.tap(navTab('Changes'));
     await settleIo(tester);
 
-    expect(find.text('CHANGES · 2'), findsOneWidget);
+    expect(find.text('Changes · 2'), findsOneWidget);
     expect(find.text('Publish'), findsOneWidget); // no remote yet
     expect(find.text('README.md'), findsOneWidget);
     // No typing on a phone keyboard: Suggest writes the message.
@@ -553,7 +553,7 @@ void main() {
     await tester.tap(find.text('Start tracking'));
     await settleIo(tester);
     expect(git.calls, contains('init -q'));
-    expect(find.text('CHANGES · 2'), findsOneWidget);
+    expect(find.text('Changes · 2'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 

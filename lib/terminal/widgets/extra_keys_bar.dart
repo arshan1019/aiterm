@@ -161,7 +161,7 @@ class _KeyState extends State<_Key> {
                     color: fg,
                     fontSize: widget.accent ? 16 : 12,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
+                    fontFamily: AppFonts.mono,
                     height: 1,
                   ),
                 ),

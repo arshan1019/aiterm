@@ -12,6 +12,7 @@ import '../keep_alive/keep_alive_controller.dart';
 import '../linux/linux_environment.dart';
 import '../shared/name_dialog.dart';
 import '../shared/form.dart';
+import '../shared/group.dart';
 import '../ssh/ssh_keys.dart';
 
 import 'package:flutter/services.dart';
@@ -113,6 +114,7 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
+/// A settings group (the shared [Group]).
 class _Section extends StatelessWidget {
   const _Section({required this.title, required this.children});
 
@@ -120,31 +122,7 @@ class _Section extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    // A Material (not a colored box) so the tiles' ink shows on the card.
-    return Material(
-      color: c.surface,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: c.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-            child: Text(
-              title.toUpperCase(),
-              style: TextStyle(color: c.textMuted, fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w600),
-            ),
-          ),
-          ...children,
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Group(title: title, children: children);
 }
 
 class _KeepAliveSection extends StatelessWidget {

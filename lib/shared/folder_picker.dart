@@ -89,7 +89,7 @@ class _FolderPickerState extends State<_FolderPicker> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(widget.title),
-              Text(shortPath(_guest), style: TextStyle(color: c.textMuted, fontSize: 11, fontWeight: FontWeight.w400)),
+              Text(shortPath(_guest), style: codeStyle(c.textMuted, size: 12)),
             ],
           ),
           actions: [

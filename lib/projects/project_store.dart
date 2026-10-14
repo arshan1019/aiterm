@@ -75,6 +75,14 @@ class ProjectStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Puts back a project [remove] took out (Undo).
+  Future<void> restore(Project p) async {
+    if (_projects.any((x) => x.id == p.id || x.path == p.path)) return;
+    _projects.add(p);
+    _sort();
+    await _save();
+  }
+
   Future<void> _replace(Project old, Project updated) async {
     final i = _projects.indexWhere((x) => x.id == old.id);
     if (i < 0) return;

@@ -145,7 +145,6 @@ class _Tab extends StatelessWidget {
                   color: active ? c.text : c.textMuted,
                   fontSize: 12,
                   fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                  fontFamily: 'JetBrainsMono',
                 ),
                 child: Text(session.title),
               ),

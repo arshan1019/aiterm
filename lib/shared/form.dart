@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../app/theme.dart';
 
-/// The small caps label over a form field or group ("NAME", "FOLDER").
+/// The label over a form field ("Name", "Folder"): sentence case.
 class FieldLabel extends StatelessWidget {
   const FieldLabel(this.text, {super.key});
   final String text;
@@ -9,8 +9,7 @@ class FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text.toUpperCase(),
-            style: TextStyle(color: context.colors.textMuted, fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w600)),
+        child: Text(text, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: context.colors.textMuted)),
       );
 }
 

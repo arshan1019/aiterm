@@ -106,7 +106,7 @@ class _HunkHeader extends StatelessWidget {
       color: c.surfaceAlt,
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
       margin: const EdgeInsets.only(top: 8),
-      child: Text(header, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.textMuted, fontSize: 11)),
+      child: Text(header, maxLines: 1, overflow: TextOverflow.ellipsis, style: codeStyle(c.textMuted, size: 12)),
     );
   }
 }
@@ -123,7 +123,7 @@ class _Line extends StatelessWidget {
       DiffLineKind.removed => (c.danger.withValues(alpha: 0.12), '−', c.danger),
       DiffLineKind.context => (null, ' ', c.textMuted),
     };
-    final gutter = TextStyle(color: c.textMuted.withValues(alpha: 0.7), fontSize: 10, height: 1.6);
+    final gutter = codeStyle(c.textMuted, size: 11);
     return Container(
       color: bg,
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -134,10 +134,10 @@ class _Line extends StatelessWidget {
           SizedBox(width: 30, child: Text('${line.newLine ?? ''}', textAlign: TextAlign.right, style: gutter)),
           SizedBox(
             width: 16,
-            child: Text(sign, textAlign: TextAlign.center, style: TextStyle(color: signColor, fontSize: 12, height: 1.45)),
+            child: Text(sign, textAlign: TextAlign.center, style: codeStyle(signColor, size: 12)),
           ),
           Expanded(
-            child: Text(line.text, style: TextStyle(color: c.text, fontSize: 12, height: 1.45)),
+            child: Text(line.text, style: codeStyle(c.text, size: 12)),
           ),
         ],
       ),

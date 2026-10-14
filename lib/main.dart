@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'app/app.dart';
 import 'app/services.dart';
 
@@ -17,5 +19,11 @@ Future<void> main() async {
   // Settings and paths load before the first frame (the native splash is
   // still up), so the app opens in the right theme with nothing popping in.
   final services = await AppServices.load();
+  // The bundled fonts' licences (SIL OFL 1.1) on the licences page.
+  LicenseRegistry.addLicense(() async* {
+    for (final (font, file) in const [('IBM Plex Sans', 'IBMPlexSans-OFL.txt'), ('JetBrains Mono', 'JetBrainsMono-OFL.txt')]) {
+      yield LicenseEntryWithLineBreaks([font], await rootBundle.loadString('assets/fonts/$file'));
+    }
+  });
   runApp(AiTermApp(services: services));
 }

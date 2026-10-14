@@ -147,7 +147,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                   Text(p.name, overflow: TextOverflow.ellipsis),
                   Text(
                     status?.branch != null ? [status!.branch!, if (sync.isNotEmpty) sync].join('  ') : shortPath(p.path),
-                    style: TextStyle(color: c.textMuted, fontSize: 11, fontWeight: FontWeight.w400),
+                    style: codeStyle(c.textMuted, size: 12),
                   ),
                 ],
               ),

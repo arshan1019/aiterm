@@ -90,7 +90,7 @@ class _ShareSheet extends StatelessWidget {
                     ListTile(
                       leading: Icon(Icons.folder_special_outlined, color: c.accent),
                       title: Text(p.name),
-                      subtitle: Text(shortPath(p.path), style: TextStyle(color: c.textMuted, fontSize: 12)),
+                      subtitle: Text(shortPath(p.path), style: codeStyle(c.textMuted, size: 12)),
                       onTap: () => _addTo(context, p.path, () => s.showProject(p, tab: WorkspaceTab.files)),
                     ),
                   ListTile(

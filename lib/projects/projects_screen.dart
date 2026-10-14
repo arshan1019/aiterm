@@ -114,7 +114,7 @@ class _PreviewChip extends StatelessWidget {
     final c = context.colors;
     return Material(
       color: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: c.border)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
       child: ListTile(
         dense: true,
         leading: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle)),
@@ -140,9 +140,9 @@ class _AgentsPrompt extends StatelessWidget {
     final c = context.colors;
     return Material(
       color: c.accent.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: c.accent.withValues(alpha: 0.4))),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Radii.large),
         onTap: () => openAgents(context),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
@@ -283,7 +283,7 @@ class _ProjectCardState extends State<_ProjectCard> {
     final p = widget.project;
     return Material(
       color: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: c.border)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => openProject(context, p),
@@ -308,7 +308,7 @@ class _ProjectCardState extends State<_ProjectCard> {
                         ],
                         Flexible(
                           child: Text(shortPath(p.path),
-                              maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.textMuted, fontSize: 12)),
+                              maxLines: 1, overflow: TextOverflow.ellipsis, style: codeStyle(c.textMuted, size: 12)),
                         ),
                       ],
                     ),
@@ -357,7 +357,7 @@ class _GitLine extends StatelessWidget {
       children: [
         Icon(Icons.call_split_rounded, size: 13, color: c.accent),
         const SizedBox(width: 4),
-        Flexible(child: Text(s.branch ?? 'detached', maxLines: 1, overflow: TextOverflow.ellipsis, style: style)),
+        Flexible(child: Text(s.branch ?? 'detached', maxLines: 1, overflow: TextOverflow.ellipsis, style: codeStyle(c.textMuted, size: 12))),
         if (changed > 0) ...[
           const SizedBox(width: 10),
           Container(width: 6, height: 6, decoration: BoxDecoration(color: c.accent, shape: BoxShape.circle)),

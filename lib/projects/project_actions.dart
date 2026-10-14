@@ -50,16 +50,19 @@ Future<void> _export(BuildContext context, Project p) async {
   }
 }
 
-/// Leaves the list; its folder stays and its terminals move to the Terminal tab.
+/// Leaves the list right away, with Undo (it's reversible, so no
+/// "Are you sure?"); the folder stays and its terminals move to the
+/// Terminal tab.
 Future<void> _remove(BuildContext context, Project p) async {
   final s = context.services;
-  final ok = await confirmAction(context,
-      title: 'Remove “${p.name}”?',
-      message: 'Its folder ${shortPath(p.path)} stays as it is.',
-      action: 'Remove');
-  if (!ok) return;
+  final messenger = ScaffoldMessenger.of(context);
   _leave(s, p);
   await s.projects.remove(p);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(SnackBar(
+    content: Text('Removed ${p.name}'),
+    action: SnackBarAction(label: 'Undo', onPressed: () => s.projects.restore(p)),
+  ));
 }
 
 Future<void> _delete(BuildContext context, Project p) async {

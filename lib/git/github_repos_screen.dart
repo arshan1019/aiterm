@@ -112,7 +112,7 @@ class _GitHubReposScreenState extends State<GitHubReposScreen> {
                         return ListTile(
                           enabled: _cloning == null || _cloning == r.fullName,
                           leading: Icon(r.private ? Icons.lock_outline_rounded : Icons.book_outlined, size: 20),
-                          title: Text(r.fullName, style: const TextStyle(fontSize: 14)),
+                          title: Text(r.fullName, style: codeStyle(c.text, size: 14)),
                           subtitle: Text(
                             [?r.description, timeAgo(r.updatedAt)].join(' · '),
                             maxLines: 1,

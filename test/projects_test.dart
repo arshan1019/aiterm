@@ -46,6 +46,25 @@ void main() {
       expect(again.projects, hasLength(2));
     });
 
+    test('a removed project comes back with Undo, exactly as it was', () async {
+      final file = '${tmp.path}/projects.json';
+      final store = ProjectStore(file);
+      await store.load();
+      final p = await store.usedAgent('/root/app', 'claude');
+      await store.add(name: 'other', path: '/root/other');
+      await store.remove(p!);
+      expect(store.byPath('/root/app'), isNull);
+      await store.restore(p);
+      final back = store.byPath('/root/app')!;
+      expect(back.id, p.id);
+      expect(back.agentId, 'claude');
+      final again = ProjectStore(file);
+      await again.load();
+      expect(again.byPath('/root/app')?.id, p.id);
+      await store.restore(p); // already there: nothing doubles
+      expect(store.projects.where((x) => x.path == '/root/app'), hasLength(1));
+    });
+
     test('home and / are not projects', () async {
       final store = ProjectStore('${tmp.path}/projects.json');
       await store.load();

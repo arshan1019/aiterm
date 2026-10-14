@@ -171,7 +171,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                         SelectableText(
                           state.code,
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: c.text, fontSize: 30, fontWeight: FontWeight.w600, letterSpacing: 4),
+                          style: codeStyle(c.text, size: 30, weight: FontWeight.w600),
                         ),
                         const SizedBox(height: 18),
                         FilledButton.icon(
@@ -360,6 +360,6 @@ void showGitDetails(BuildContext context, String detail) {
   showAppSheet<void>(
     context,
     title: 'Details',
-    builder: (sheet) => SelectableText(detail.trim(), style: TextStyle(color: sheet.colors.text, fontSize: 11, height: 1.4)),
+    builder: (sheet) => SelectableText(detail.trim(), style: codeStyle(sheet.colors.text, size: 12)),
   );
 }

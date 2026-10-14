@@ -6,6 +6,7 @@ import '../git/git_repo.dart';
 import '../git/github_auth.dart';
 import '../shared/action_sheet.dart';
 import '../shared/folder_picker.dart';
+import '../shared/form.dart';
 import '../shared/format.dart';
 import 'project.dart';
 import 'project_actions.dart';
@@ -191,7 +192,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(shortPath(_path), style: TextStyle(color: c.text, fontSize: 13)),
+                      child: Text(shortPath(_path), style: codeStyle(c.text)),
                     ),
                     TextButton(onPressed: _busy ? null : _pickParent, child: const Text('Change')),
                   ],
@@ -230,11 +231,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
     );
   }
 
-  Widget _label(BuildContext context, String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text.toUpperCase(),
-            style: TextStyle(color: context.colors.textMuted, fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w600)),
-      );
+  Widget _label(BuildContext context, String text) => FieldLabel(text);
 
   Widget _repoList(BuildContext context) {
     final c = context.colors;

@@ -6,6 +6,7 @@ import '../git/git_actions.dart';
 import '../git/github_button.dart';
 import '../keep_alive/keep_alive.dart';
 import '../keep_alive/keep_alive_view.dart';
+import '../shared/group.dart';
 import 'setup_pipeline.dart';
 
 /// First run, as one screen and one wait: pick agents, tap Set up, and
@@ -187,6 +188,7 @@ class _StepRow extends StatelessWidget {
   }
 }
 
+/// A setup group (the shared [Group]).
 class _Card extends StatelessWidget {
   const _Card({this.title, required this.children});
 
@@ -194,27 +196,5 @@ class _Card extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Material(
-      color: c.surface,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: c.border)),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (title != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-                child: Text(title!.toUpperCase(),
-                    style: TextStyle(color: c.textMuted, fontSize: 11, letterSpacing: 1.1, fontWeight: FontWeight.w600)),
-              ),
-            ...children,
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Group(title: title, children: children);
 }

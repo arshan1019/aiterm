@@ -267,12 +267,11 @@ class _AskSheetState extends State<AskSheet> {
       child: Material(
         color: c.surfaceAlt,
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: c.border),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
         child: ListTile(
-          title: Text(isApp || !s.needsInput ? s.label : '${s.label}…', style: TextStyle(color: c.text, fontSize: 13)),
+          // Commands are literal (mono); app actions are the app talking (sans).
+          title: Text(isApp || !s.needsInput ? s.label : '${s.label}…',
+              style: isApp ? TextStyle(color: c.text, fontSize: 14) : codeStyle(c.text)),
           subtitle: Text(hint, style: TextStyle(color: c.textMuted, fontSize: 12)),
           trailing: TextButton(onPressed: () => _choose(s), child: Text(isApp ? 'Do it' : 'Insert')),
           onTap: () => _choose(s),
