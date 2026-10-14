@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../phone/phone_files.dart';
 import 'file_system_service.dart';
 
 typedef Crumb = ({String label, String path});
@@ -23,12 +24,13 @@ class FilesLocation {
 /// The Files tab's state: where we are, browser-style back/forward history,
 /// and the listing. Rooted at the shell's home folder.
 class FilesBrowser extends ChangeNotifier {
-  FilesBrowser({required String root, required this.rootfs, List<FilesLocation>? locations})
+  FilesBrowser({required String root, required this.rootfs, List<FilesLocation>? locations, PhoneFiles? phone})
       : _root = root,
         _current = root,
-        _locations = locations ?? [FilesLocation.linux(root)];
+        _locations = locations ?? [FilesLocation.linux(root)],
+        _fs = FileSystemService(phone: phone);
 
-  final _fs = FileSystemService();
+  final FileSystemService _fs;
 
   /// Alpine's root, so folders outside home show as "/ › etc".
   final String? rootfs;
@@ -74,7 +76,11 @@ class FilesBrowser extends ChangeNotifier {
 
   List<FsEntry> get entries => _showHidden ? _entries : _entries.where((e) => !e.name.startsWith('.')).toList();
 
-  String? get parent => _current == crumbs.first.path ? null : Directory(_current).parent.path;
+  String? get parent => _current == crumbs.first.path
+      ? null
+      : PhonePath.isPhone(_current)
+          ? PhonePath.parentOf(_current)
+          : Directory(_current).parent.path;
 
   /// Home-relative crumbs ("~ › src › lib"); folders outside home show from
   /// the distro root ("/ › etc").
@@ -95,9 +101,22 @@ class FilesBrowser extends ChangeNotifier {
     for (final part in _current.substring(base.length).split('/')) {
       if (part.isEmpty) continue;
       path = '$path/$part';
-      out.add((label: part, path: path));
+      out.add((label: _fs.phoneNames[path] ?? part, path: path));
     }
     return out;
+  }
+
+  /// Points [kind] at a new root (the phone: all storage, or the chosen
+  /// folders); if it's showing, goes there.
+  Future<void> setLocationRoot(LocationKind kind, String root) async {
+    final i = _locations.indexWhere((l) => l.kind == kind);
+    if (i < 0 || _locations[i].root == root) return;
+    _locations = [..._locations]..[i] = FilesLocation(kind, root, _locations[i].label);
+    if (_kind == kind) {
+      _back.clear();
+      _forward.clear();
+      await _show(root, deeper: true);
+    }
   }
 
   /// Starts over at a new root (e.g. once Alpine is installed).

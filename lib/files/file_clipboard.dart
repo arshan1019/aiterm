@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../phone/phone_files.dart';
 import 'file_system_service.dart';
 
 enum ClipMode { copy, cut }
@@ -7,7 +8,17 @@ enum ClipMode { copy, cut }
 /// Copy / Cut / Paste across locations (Linux home ↔ phone storage), so
 /// project files and assets move both ways. Paste never overwrites: a name
 /// that exists gets a numbered copy ("notes (2).txt").
+///
+/// Phone folders the user chose (`phone:` paths) copy through Android's
+/// document APIs via [phone].
 class FileClipboard extends ChangeNotifier {
+  FileClipboard({this.phone, this.tempDir});
+
+  final PhoneFiles? phone;
+
+  /// Scratch space for phone → phone copies.
+  final String? tempDir;
+
   List<FsEntry> _items = const [];
   ClipMode _mode = ClipMode.copy;
 
@@ -28,6 +39,7 @@ class FileClipboard extends ChangeNotifier {
 
   /// Pastes into folder [dest]; returns the new paths. A cut is used up.
   Future<List<String>> paste(String dest) async {
+    if (_items.any((e) => PhonePath.isPhone(e.path)) || PhonePath.isPhone(dest)) return _pastePhone(dest);
     final created = <String>[];
     for (final e in _items) {
       final isDir = e.kind == EntryKind.directory;
@@ -45,6 +57,49 @@ class FileClipboard extends ChangeNotifier {
       created.add(target);
     }
     if (_mode == ClipMode.cut) clear();
+    return created;
+  }
+
+  Future<List<String>> _pastePhone(String dest) async {
+    final phone = this.phone;
+    if (phone == null) throw const FileSystemException('Phone files are not available');
+    final fromPhone = [for (final e in _items) if (PhonePath.isPhone(e.path)) e];
+    final local = [for (final e in _items) if (!PhonePath.isPhone(e.path)) e];
+    final created = <String>[];
+    if (PhonePath.isPhone(dest)) {
+      final folder = PhonePath.parse(dest);
+      if (folder == null) throw const FileSystemException('Choose a folder to paste into');
+      if (local.isNotEmpty) created.addAll(await phone.exportTo([for (final e in local) e.path], folder));
+      if (fromPhone.isNotEmpty) {
+        // Phone → phone: through a scratch folder.
+        final tmp = await Directory(tempDir ?? Directory.systemTemp.path).createTemp('paste');
+        try {
+          final copies = await phone.importTo([for (final e in fromPhone) PhonePath.parse(e.path)!], tmp.path);
+          created.addAll(await phone.exportTo(copies, folder));
+        } finally {
+          await tmp.delete(recursive: true);
+        }
+      }
+    } else {
+      if (fromPhone.isNotEmpty) {
+        created.addAll(await phone.importTo([for (final e in fromPhone) PhonePath.parse(e.path)!], dest));
+      }
+      for (final e in local) {
+        final target = await _freeName(dest, e.name);
+        await _copy(e.path, target, e.kind == EntryKind.directory);
+        created.add(target);
+      }
+    }
+    if (_mode == ClipMode.cut) {
+      for (final e in _items) {
+        if (PhonePath.isPhone(e.path)) {
+          await phone.delete(PhonePath.parse(e.path)!);
+        } else {
+          e.kind == EntryKind.directory ? await Directory(e.path).delete(recursive: true) : await File(e.path).delete();
+        }
+      }
+      clear();
+    }
     return created;
   }
 

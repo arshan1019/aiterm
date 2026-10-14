@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../projects/project_screen.dart';
+import '../phone/share_receiver.dart';
 import 'home_shell.dart';
 import 'services.dart';
 import 'theme.dart';
@@ -26,7 +27,7 @@ class AiTermApp extends StatelessWidget {
           theme: buildTheme(dark: services.settings.dark),
           themeAnimationDuration: Motion.standard,
           themeAnimationCurve: Motion.move,
-          home: const HomeShell(),
+          home: const ShareReceiver(child: HomeShell()),
         ),
       ),
     );

@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../agents/agent_installer.dart';
+import '../phone/phone_files.dart';
 import '../platform/android_env.dart';
 import '../git/git_screen.dart';
 import '../shared/action_sheet.dart';
@@ -38,8 +40,10 @@ class _FilesScreenState extends State<FilesScreen> {
     rootfs: _services.linux.rootfs,
     locations: [
       FilesLocation(LocationKind.linux, _root, widget.projectName ?? '~'),
-      const FilesLocation.phone(_phoneRoot),
+      // Chosen folders until all-files access is known to be on.
+      const FilesLocation.phone(PhonePath.root),
     ],
+    phone: _services.phone,
   );
 
   ProjectRef? get _project => widget.project;
@@ -47,7 +51,7 @@ class _FilesScreenState extends State<FilesScreen> {
         final p? => _services.linux.hostPath(p.path),
         null => _services.linux.home,
       };
-  final _clipboard = FileClipboard();
+  late final _clipboard = FileClipboard(phone: _services.phone, tempDir: _services.paths.cacheDir);
   bool _phoneAccess = false;
   late final _lifecycle = AppLifecycleListener(onResume: _checkPhoneAccess);
 
@@ -57,6 +61,7 @@ class _FilesScreenState extends State<FilesScreen> {
     if (_project == null) _browser.load();
     _lifecycle; // re-check phone access when back from system settings
     _checkPhoneAccess();
+    _services.phone.addListener(_onPhoneChoices);
     _services.navigation.addListener(_openPending);
     if (_project == null) {
       _services.linux.addListener(_onLinuxChanged);
@@ -72,6 +77,7 @@ class _FilesScreenState extends State<FilesScreen> {
 
   @override
   void dispose() {
+    _services.phone.removeListener(_onPhoneChoices);
     _services.navigation.removeListener(_openPending);
     if (_project == null) {
       _services.linux.removeListener(_onLinuxChanged);
@@ -92,9 +98,49 @@ class _FilesScreenState extends State<FilesScreen> {
     } catch (_) {
       access = false;
     }
-    if (!mounted || access == _phoneAccess) return;
-    setState(() => _phoneAccess = access);
+    if (!mounted) return;
+    if (access != _phoneAccess) setState(() => _phoneAccess = access);
+    // All files: the whole storage; otherwise just the chosen folders.
+    await _browser.setLocationRoot(LocationKind.phone, access ? _phoneRoot : PhonePath.root);
     if (access && _browser.location.kind == LocationKind.phone) await _browser.refresh();
+  }
+
+  /// Folders or files were chosen or removed.
+  void _onPhoneChoices() {
+    if (!mounted) return;
+    setState(() {});
+    if (_browser.current == PhonePath.root) _browser.refresh();
+  }
+
+  bool get _onPhoneChoicesRoot => _browser.location.kind == LocationKind.phone && _browser.current == PhonePath.root;
+
+  Future<void> _chooseFolder() async {
+    final picked = await _services.phone.pickFolder();
+    if (picked != null && _browser.current != PhonePath.root) await _browser.open(PhonePath.root);
+  }
+
+  Future<void> _chooseFiles() async {
+    final picked = await _services.phone.pickFiles();
+    if (picked.isNotEmpty && _browser.current != PhonePath.root) await _browser.open(PhonePath.root);
+  }
+
+  /// Copies files (or a folder) picked from the phone into the folder shown:
+  /// one step from Downloads to a project.
+  Future<void> _addFromPhone({required bool folder}) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final phone = _services.phone;
+    final items = folder
+        ? [?await phone.pickFolder(keep: false)]
+        : await phone.pickFiles(keep: false);
+    if (items.isEmpty) return;
+    try {
+      final added = await phone.importTo(PhoneFiles.docsOf(items), _browser.current);
+      await _browser.refresh();
+      _touched();
+      messenger.showSnackBar(SnackBar(content: Text(added.length == 1 ? 'Added ${added.single.split('/').last}' : 'Added ${added.length} items')));
+    } on PlatformException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Couldn\'t copy from the phone')));
+    }
   }
 
   Future<void> _paste() async {
@@ -153,6 +199,13 @@ class _FilesScreenState extends State<FilesScreen> {
   Future<String?> _askName(String title, String action, {String initial = ''}) =>
       showNameDialog(context, title: title, action: action, initial: initial, hint: 'name');
 
+  void _add(String what) => switch (what) {
+        'file' => _create(false),
+        'folder' => _create(true),
+        'phone-files' => _addFromPhone(folder: false),
+        _ => _addFromPhone(folder: true),
+      };
+
   Future<void> _create(bool folder) async {
     final name = await _askName(folder ? 'New folder' : 'New file', 'Create');
     if (name != null) await _browser.create(name, folder: folder);
@@ -208,11 +261,23 @@ class _FilesScreenState extends State<FilesScreen> {
 
   void _entryActions(FsEntry e) {
     final folder = e.kind == EntryKind.directory;
+    final onPhone = PhonePath.isPhone(e.path);
+    // A folder or file the user chose: it can be copied, or un-chosen.
+    final chosen = onPhone && PhonePath.parentOf(e.path) == PhonePath.root;
+    if (chosen) {
+      final item = _services.phone.grants.where((g) => g.path == e.path).firstOrNull;
+      showActionSheet(context, title: e.name, actions: [
+        SheetAction(Icons.copy_rounded, 'Copy', () => _clipboard.copy([e])),
+        null,
+        if (item != null) SheetAction(Icons.link_off_rounded, 'Remove', () => _services.phone.forget(item), danger: true),
+      ]);
+      return;
+    }
     showActionSheet(
       context,
       title: e.name,
       actions: [
-        if (folder) ...[
+        if (folder && !onPhone) ...[
           SheetAction(Icons.terminal_rounded, 'Open terminal here', () => _openTerminalHere(e.path)),
           if (_project == null)
             for (final agent in _services.agents.installed)
@@ -259,11 +324,15 @@ class _FilesScreenState extends State<FilesScreen> {
               onOpenAgent: _project == null ? _openInAgent : null,
               onGit: _inLinux && _project == null ? _openGit : null,
               onProject: _inLinux && _project == null ? _openAsProject : null,
+              phoneChoices: _browser.location.kind == LocationKind.phone && !_phoneAccess,
+              onChooseFolder: _chooseFolder,
+              onChooseFiles: _chooseFiles,
+              onAllFiles: AndroidEnv.requestStorageAccess,
               homeLabel: _project == null ? 'Go home' : 'Project folder',
             ),
             Expanded(
-              child: _browser.location.kind == LocationKind.phone && !_phoneAccess
-                  ? _PhoneAccessPrompt(onAllow: AndroidEnv.requestStorageAccess)
+              child: _onPhoneChoicesRoot && !_phoneAccess && _services.phone.grants.isEmpty
+                  ? _PhoneAccessPrompt(onAllFiles: AndroidEnv.requestStorageAccess, onChoose: _chooseFolder)
                   : !_browser.loaded
                   ? const SizedBox.expand()
                   : AnimatedSwitcher(
@@ -295,12 +364,18 @@ class _FilesScreenState extends State<FilesScreen> {
           ],
         ),
       ),
-      floatingActionButton: PopupMenuButton<bool>(
-        onSelected: _create,
+      // Nothing can be created among the chosen folders themselves.
+      floatingActionButton: _onPhoneChoicesRoot ? null : PopupMenuButton<String>(
+        onSelected: _add,
         offset: const Offset(0, -110),
-        itemBuilder: (context) => const [
-          PopupMenuItem(value: false, child: Text('New file')),
-          PopupMenuItem(value: true, child: Text('New folder')),
+        itemBuilder: (context) => [
+          const PopupMenuItem(value: 'file', child: Text('New file')),
+          const PopupMenuItem(value: 'folder', child: Text('New folder')),
+          if (_browser.location.kind == LocationKind.linux) ...[
+            const PopupMenuDivider(),
+            const PopupMenuItem(value: 'phone-files', child: Text('Add files from phone')),
+            const PopupMenuItem(value: 'phone-folder', child: Text('Add folder from phone')),
+          ],
         ],
         child: Container(
           width: 52,
@@ -322,9 +397,17 @@ class _Header extends StatefulWidget {
     this.onGit,
     this.onProject,
     required this.homeLabel,
+    this.phoneChoices = false,
+    this.onChooseFolder,
+    this.onChooseFiles,
+    this.onAllFiles,
   });
 
   final String homeLabel;
+
+  /// Showing the chosen phone folders: offer choosing more, or all files.
+  final bool phoneChoices;
+  final VoidCallback? onChooseFolder, onChooseFiles, onAllFiles;
 
   /// Only in Linux storage (git doesn't work on the phone's storage).
   final VoidCallback? onGit, onProject;
@@ -412,12 +495,21 @@ class _HeaderState extends State<_Header> {
               final v when v.startsWith('agent:') => widget.onOpenAgent?.call(v.substring(6)),
               'git' => widget.onGit?.call(),
               'project' => widget.onProject?.call(),
-              'home' => b.open(b.root),
+              'home' => b.open(b.location.root),
+              'choose-folder' => widget.onChooseFolder?.call(),
+              'choose-files' => widget.onChooseFiles?.call(),
+              'all-files' => widget.onAllFiles?.call(),
               'hidden' => b.toggleHidden(),
               _ => b.refresh(),
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
+              if (widget.phoneChoices) ...[
+                const PopupMenuItem(value: 'choose-folder', child: Text('Choose folder')),
+                const PopupMenuItem(value: 'choose-files', child: Text('Choose files')),
+                const PopupMenuItem(value: 'all-files', child: Text('Allow all files')),
+                const PopupMenuDivider(),
+              ] else
+                const PopupMenuItem(value: 'terminal', child: Text('Open terminal here')),
               if (widget.onOpenAgent != null)
                 for (final agent in widget.agents.installed)
                   PopupMenuItem(value: 'agent:${agent.id}', child: Text('Open in ${agent.name}')),
@@ -581,36 +673,41 @@ class _LocationSwitcher extends StatelessWidget {
   }
 }
 
+/// The phone tab before anything is allowed: all files, or only the
+/// folders the user chooses.
 class _PhoneAccessPrompt extends StatelessWidget {
-  const _PhoneAccessPrompt({required this.onAllow});
+  const _PhoneAccessPrompt({required this.onAllFiles, required this.onChoose});
 
-  final VoidCallback onAllow;
+  final VoidCallback onAllFiles;
+  final VoidCallback onChoose;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.folder_shared_rounded, size: 40, color: c.accent),
-            const SizedBox(height: 12),
-            Text(
-              'Phone storage',
-              style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Allow access to move files between Linux and your phone: '
-              'downloads, photos, project assets. Linux also sees it at /sdcard.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onAllow, child: const Text('Allow access')),
-          ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Icon(Icons.folder_shared_rounded, size: 40, color: c.accent),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onChoose,
+                icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+                label: const Text('Choose folders'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: onAllFiles,
+                icon: const Icon(Icons.folder_open_rounded, size: 18),
+                label: const Text('Allow all files'),
+              ),
+            ],
+          ),
         ),
       ),
     );

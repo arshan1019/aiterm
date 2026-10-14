@@ -7,6 +7,7 @@ import '../backup/backup_controller.dart';
 import '../keep_alive/keep_alive_controller.dart';
 import '../onboarding/setup_pipeline.dart';
 import '../linux/linux_environment.dart';
+import '../phone/phone_files.dart';
 import '../platform/android_env.dart';
 import '../settings/settings.dart';
 import '../ssh/ssh_keys.dart';
@@ -80,6 +81,7 @@ class AppServices {
     // A removed project's sessions move to the Terminal tab.
     projects.addListener(_reconcileTabs);
     ssh.load().ignore();
+    phone.refresh().ignore();
     if (linux.installed) preview.start().ignore();
     _updatePresence();
   }
@@ -168,6 +170,9 @@ class AppServices {
   final Assistant assistant;
   final preview = PreviewController();
   final ssh = SshKeys(SshChannel());
+
+  /// Phone folders and files the user chose, and files shared to aiterm.
+  final phone = PhoneFiles();
   late final backup = BackupController(BackupChannel(), filesDir: paths.filesDir, appVersion: '1.0.0');
   late final KeepAliveController keepAlive;
 

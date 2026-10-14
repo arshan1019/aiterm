@@ -20,6 +20,7 @@ class MainActivity : FlutterActivity() {
     private var keepAlive: KeepAlivePlugin? = null
     private var ptyChannel: MethodChannel? = null
     private var backup: BackupPlugin? = null
+    private var phoneFiles: PhoneFilesPlugin? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -28,6 +29,12 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/ssh").setMethodCallHandler(SshPlugin())
         backup = BackupPlugin(this).also {
             MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/backup").setMethodCallHandler(it)
+        }
+
+        val phoneChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/phone")
+        phoneFiles = PhoneFilesPlugin(this, phoneChannel).also {
+            phoneChannel.setMethodCallHandler(it)
+            it.onShareIntent(intent)
         }
 
         ptyChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aiterm/pty").apply {
@@ -105,12 +112,16 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
-        backup?.onActivityResult(requestCode, resultCode, data)
+        if (backup?.onActivityResult(requestCode, resultCode, data) == true) return
+        phoneFiles?.onActivityResult(requestCode, resultCode, data)
     }
 
     /** A tapped session notification: show that tab. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        // Files shared to aiterm while it's running.
+        if (phoneFiles?.onShareIntent(intent) == true) return
         openSessionFrom(intent)
     }
 

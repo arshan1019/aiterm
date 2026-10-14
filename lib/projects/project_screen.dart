@@ -1,16 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../agents/agent_catalog.dart';
 import '../agents/agent_installer.dart';
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
-import '../files/file_clipboard.dart';
-import '../files/file_system_service.dart';
 import '../files/files_screen.dart';
 import '../git/git_repo.dart';
 import '../git/git_screen.dart';
-import '../platform/android_env.dart';
+import '../phone/phone_files.dart';
 import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/fade_indexed_stack.dart';
@@ -102,40 +101,26 @@ class _ProjectScreenState extends State<ProjectScreen> {
         final name = await showNameDialog(context, title: 'Rename project', action: 'Rename', initial: p.name);
         if (name != null) await _s.projects.rename(p, name);
       }),
-      SheetAction(Icons.smartphone_rounded, 'Copy to phone (Download)', () => _export(p)),
+      SheetAction(Icons.smartphone_rounded, 'Copy to phone', () => _export(p)),
       null,
       SheetAction(Icons.playlist_remove_rounded, 'Remove from projects', () => _remove(p)),
       SheetAction(Icons.delete_outline_rounded, 'Delete project and files', () => _delete(p), danger: true),
     ]);
   }
 
+  /// Copies the project folder to a phone folder the user picks.
   Future<void> _export(Project p) async {
     final messenger = ScaffoldMessenger.of(context);
-    var access = false;
-    try {
-      access = await AndroidEnv.storageAccess();
-    } catch (_) {}
-    if (!access) {
-      messenger.showSnackBar(SnackBar(
-        content: const Text('Allow access to phone storage first.'),
-        action: SnackBarAction(label: 'Allow', onPressed: AndroidEnv.requestStorageAccess),
-      ));
-      return;
-    }
+    final folder = await _s.phone.pickFolder(keep: false);
+    if (folder == null) return;
     messenger.showSnackBar(const SnackBar(content: Text('Copying to phone…')));
-    final clip = FileClipboard()
-      ..copy([
-        FsEntry(name: p.path.split('/').last, path: _s.linux.hostPath(p.path), kind: EntryKind.directory, size: 0, modified: DateTime.now()),
-      ]);
     try {
-      final done = await clip.paste('/storage/emulated/0/Download');
+      await _s.phone.exportTo([_s.linux.hostPath(p.path)], PhonePath.parse(folder.path)!);
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text('Copied to Download/${done.first.split('/').last}')));
-    } on FileSystemException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Copied to ${folder.name}')));
+    } on PlatformException catch (e) {
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      clip.dispose();
+      messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Couldn\'t copy')));
     }
   }
 
