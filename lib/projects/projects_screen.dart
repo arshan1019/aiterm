@@ -204,6 +204,7 @@ class _BottomActions extends StatelessWidget {
             // Side by side; stacked once large text would wrap the labels.
             : MediaQuery.textScalerOf(context).scale(14) > 21
                 ? Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [add, const SizedBox(height: 10), github],
                   )
