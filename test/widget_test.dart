@@ -690,6 +690,10 @@ void main() {
   }
 
   testWidgets('blocks: an agent as blocks, with its mode, a permission to answer, and file changes', (tester) async {
+    // A phone, not the default 800×600 test window.
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
     Directory('${dir.path}/alpine/root/app').createSync(recursive: true);
     File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -733,9 +737,9 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip('Send'));
     await pumpChat(tester);
-    expect(find.text('Add a forecast view'), findsOneWidget); // the user's block
-    expect(find.text('Plan'), findsOneWidget);
-    expect(find.text('Add the forecast view'), findsOneWidget);
+    expect(find.text('Add a forecast view', skipOffstage: false), findsOneWidget); // the user's block
+    expect(find.text('Plan', skipOffstage: false), findsOneWidget);
+    expect(find.text('Add the forecast view', skipOffstage: false), findsOneWidget);
     // Asks first: the edit, and the agent's choices.
     expect(find.text('Always allow'), findsOneWidget);
     expect(find.byTooltip('Stop'), findsOneWidget);

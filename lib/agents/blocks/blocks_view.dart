@@ -872,47 +872,68 @@ class _AskFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final media = MediaQuery.of(context);
+    // At most half the room above the keyboard, so the conversation keeps
+    // its share; content and choices each scroll inside when it's tight.
+    final room = (media.size.height - media.viewInsets.bottom) * 0.5;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      child: Material(
-        color: c.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Radii.large),
-          side: BorderSide(color: c.warning, width: 1.5),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 1),
-                    child: Icon(icon, size: 18, color: c.warning),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: literal ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: room),
+        child: Material(
+          color: c.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Radii.large),
+            side: BorderSide(color: c.warning, width: 1.5),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 18, color: c.warning)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: literal ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                  ],
+                ),
+                if (content != null)
+                  Flexible(
+                    flex: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: SingleChildScrollView(child: content),
                     ),
                   ),
-                ],
-              ),
-              if (content != null) ...[
-                const SizedBox(height: 10),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.35),
-                  child: SingleChildScrollView(child: content),
+                Flexible(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final (i, choice) in choices.indexed) ...[
+                            if (i > 0) const SizedBox(height: 8),
+                            choice,
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
-              const SizedBox(height: 12),
-              for (final (i, choice) in choices.indexed) ...[if (i > 0) const SizedBox(height: 8), choice],
-            ],
+            ),
           ),
         ),
       ),
