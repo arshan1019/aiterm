@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../agents/acp/agent_chats.dart';
 import '../agents/agent_catalog.dart';
+import '../agents/blocks/blocks_view.dart';
 import '../agents/agent_installer.dart';
 import '../app/navigation.dart';
 import '../app/services.dart';
@@ -89,8 +91,72 @@ class _ProjectScreenState extends State<ProjectScreen> {
         SheetAction(AppIcons.agent, 'Install ${agentCatalog.first.name}',
             () => _s.agents.open(agentCatalog.first.id, cwd: p.path),
             accent: true),
-      SheetAction(AppIcons.terminal, 'Terminal', () => _s.tabs.open(cwd: p.path, project: p.path)),
+      SheetAction(AppIcons.terminal, 'Terminal', () => _openTerminal(p)),
     ]);
+  }
+
+  void _openTerminal(Project p) {
+    _s.chats.show(p.path, AgentView.terminal);
+    _s.tabs.open(cwd: p.path, project: p.path);
+  }
+
+  /// The agent tab: blocks, terminals, or both with a switch between them.
+  Widget _agentArea(Project p) {
+    final chats = _s.chats.inProject(p.path);
+    final terminals = _s.tabs.inScope(p.path).isNotEmpty;
+    if (chats.isEmpty && !terminals) return _AgentLauncher(project: p, onTerminal: () => _openTerminal(p));
+    final view = chats.isEmpty ? AgentView.terminal : (terminals ? _s.chats.viewOf(p.path) : AgentView.blocks);
+    final chat = _s.chats.active(p.path);
+    return Column(
+      children: [
+        if (chats.isNotEmpty && terminals)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<AgentView>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: AgentView.blocks, icon: Icon(AppIcons.agent, size: 16), label: Text('Blocks')),
+                  ButtonSegment(value: AgentView.terminal, icon: Icon(AppIcons.terminal, size: 16), label: Text('Terminal')),
+                ],
+                selected: {view},
+                onSelectionChanged: (v) => _s.chats.show(p.path, v.first),
+              ),
+            ),
+          ),
+        Expanded(
+          // Both stay mounted, so terminals keep running behind the blocks.
+          child: IndexedStack(
+            index: view.index,
+            children: [
+              if (chat != null)
+                BlocksView(
+                  chats: chats,
+                  chat: chat,
+                  onSelect: _s.chats.select,
+                  onNew: () => _newSession(p),
+                  onTerminal: (c) => _s.agents.open(c.agent.id, cwd: p.path, terminal: true),
+                  onClose: _s.chats.close,
+                )
+              else
+                const SizedBox.shrink(),
+              if (terminals)
+                TerminalDeck(
+                  project: p.path,
+                  showing: view == AgentView.terminal && _nav.workspaceTab == WorkspaceTab.agent && _nav.shownProject?.id == p.id,
+                  onNew: () => _newSession(p),
+                  onReview: (_) => _nav.openWorkspaceTab(WorkspaceTab.changes),
+                  onPreview: (_) => _nav.openWorkspaceTab(WorkspaceTab.preview),
+                  onGitHere: (_) => _nav.openWorkspaceTab(WorkspaceTab.changes),
+                )
+              else
+                const SizedBox.shrink(),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   List<BottomTab> _tabs() {
@@ -98,7 +164,10 @@ class _ProjectScreenState extends State<ProjectScreen> {
     return [
       BottomTab('Agent', AppIcons.agent,
           // An agent here is waiting for you.
-          badge: _s.tabs.inScope(widget.project.path).any((t) => t.activity.value == SessionActivity.needsInput) ? '' : null,
+          badge: _s.tabs.inScope(widget.project.path).any((t) => t.activity.value == SessionActivity.needsInput) ||
+                  _s.chats.needsInput(widget.project.path)
+              ? ''
+              : null,
           badgeColor: context.colors.warning),
       BottomTab('Changes', AppIcons.branch, badge: changed > 0 ? '$changed' : null),
       const BottomTab('Files', AppIcons.folder),
@@ -108,16 +177,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   }
 
   Widget _content(WorkspaceTab t, Project p) => switch (t) {
-        WorkspaceTab.agent => _s.tabs.inScope(p.path).isEmpty
-            ? _AgentLauncher(project: p, onTerminal: () => _s.tabs.open(cwd: p.path, project: p.path))
-            : TerminalDeck(
-                project: p.path,
-                showing: _nav.workspaceTab == WorkspaceTab.agent && _nav.shownProject?.id == p.id,
-                onNew: () => _newSession(p),
-                onReview: (_) => _nav.openWorkspaceTab(WorkspaceTab.changes),
-                onPreview: (_) => _nav.openWorkspaceTab(WorkspaceTab.preview),
-                onGitHere: (_) => _nav.openWorkspaceTab(WorkspaceTab.changes),
-              ),
+        WorkspaceTab.agent => _agentArea(p),
         WorkspaceTab.changes => GitScreen(folder: p.path, title: p.name, embedded: true),
         WorkspaceTab.files => FilesScreen(project: widget.project, projectName: p.name),
         WorkspaceTab.preview => _PreviewTab(onAgent: () => _nav.openWorkspaceTab(WorkspaceTab.agent)),
@@ -127,7 +187,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return ListenableBuilder(
-      listenable: Listenable.merge([_s.projects, _nav, _s.tabs, _s.agents, _s.preview, ?_repo]),
+      listenable: Listenable.merge([_s.projects, _nav, _s.tabs, _s.agents, _s.preview, _s.chats, ?_repo]),
       builder: (context, _) {
         final p = _project;
         if (p == null) return const Scaffold();

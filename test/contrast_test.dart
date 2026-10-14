@@ -44,6 +44,42 @@ void main() {
     });
   }
 
+  // High contrast: WCAG AAA (7:1) for text and status, 4.5:1 for outlines,
+  // and group edges visible at 3:1.
+  for (final (name, c) in [('dark', AppColors.darkHigh), ('light', AppColors.lightHigh)]) {
+    test('high contrast $name theme meets AAA', () {
+      for (final bg in [c.bg, c.surface, c.surfaceAlt]) {
+        for (final (role, fg) in [('text', c.text), ('muted', c.textMuted), ('accent', c.accent), ('danger', c.danger),
+          ('success', c.success), ('warning', c.warning)]) {
+          expect(contrastRatio(fg, bg), greaterThanOrEqualTo(7), reason: '$role on $bg');
+        }
+        expect(contrastRatio(c.outline, bg), greaterThanOrEqualTo(4.5), reason: 'outline on $bg');
+      }
+      for (final bg in [c.bg, c.surface]) {
+        expect(contrastRatio(c.border, bg), greaterThanOrEqualTo(2.5), reason: 'group edge on $bg');
+      }
+      expect(contrastRatio(c.bg, c.accent), greaterThanOrEqualTo(7), reason: 'on accent');
+      expect(contrastRatio(c.onAccentContainer, c.accentContainer), greaterThanOrEqualTo(7), reason: 'nav pill');
+      expect(contrastRatio(c.text, c.diffAdded), greaterThanOrEqualTo(7));
+      expect(contrastRatio(c.text, c.diffRemoved), greaterThanOrEqualTo(7));
+      expect(c.highContrast, isTrue);
+    });
+  }
+
+  test('high contrast wallpaper accents stay AAA, whatever the hue', () {
+    for (var hue = 0; hue < 360; hue += 15) {
+      final seed = HSVColor.fromAHSV(1, hue.toDouble(), 0.7, 0.8).toColor();
+      for (final base in [AppColors.darkHigh, AppColors.lightHigh]) {
+        final c = base.seeded(seed);
+        for (final bg in [c.bg, c.surface]) {
+          expect(contrastRatio(c.accent, bg), greaterThanOrEqualTo(7), reason: 'accent on $bg, hue $hue');
+        }
+        expect(contrastRatio(c.bg, c.accent), greaterThanOrEqualTo(7), reason: 'on accent, hue $hue');
+        expect(contrastRatio(c.onAccentContainer, c.accentContainer), greaterThanOrEqualTo(7), reason: 'pill, hue $hue');
+      }
+    }
+  });
+
   test('wallpaper accents keep every accent pairing readable, whatever the hue', () {
     for (var hue = 0; hue < 360; hue += 15) {
       final seed = HSVColor.fromAHSV(1, hue.toDouble(), 0.7, 0.8).toColor();

@@ -46,6 +46,10 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color diffAdded;
   final Color diffRemoved;
 
+  /// High contrast: text and status colors at 7:1, control outlines at
+  /// 4.5:1, and groups get a visible edge instead of a tone step.
+  final bool highContrast;
+
   const AppColors({
     required this.bg,
     required this.surface,
@@ -62,6 +66,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.warning,
     required this.diffAdded,
     required this.diffRemoved,
+    this.highContrast = false,
   });
 
   /// "Phosphor graphite": a near-black tinted toward the accent.
@@ -81,6 +86,46 @@ class AppColors extends ThemeExtension<AppColors> {
     warning: Color(0xFFEEB154),
     diffAdded: Color(0xFF182917),
     diffRemoved: Color(0xFF391917),
+  );
+
+  /// High contrast on dark (WCAG AAA text).
+  static const darkHigh = AppColors(
+    bg: Color(0xFF0B0F0F),
+    surface: Color(0xFF111616),
+    surfaceAlt: Color(0xFF171C1C),
+    border: Color(0xFF5B6564),
+    outline: Color(0xFF9AA4A3),
+    text: Color(0xFFF2F5F5),
+    textMuted: Color(0xFFC5CDCC),
+    accent: Color(0xFF7ADDC0),
+    accentContainer: Color(0xFF0D2B22),
+    onAccentContainer: Color(0xFFB4F0DD),
+    danger: Color(0xFFFF9A90),
+    success: Color(0xFF98DB8F),
+    warning: Color(0xFFF5C878),
+    diffAdded: Color(0xFF15261A),
+    diffRemoved: Color(0xFF331616),
+    highContrast: true,
+  );
+
+  /// High contrast on light (WCAG AAA text).
+  static const lightHigh = AppColors(
+    bg: Color(0xFFFFFFFF),
+    surface: Color(0xFFFFFFFF),
+    surfaceAlt: Color(0xFFEEF2F1),
+    border: Color(0xFF8E9998),
+    outline: Color(0xFF56615F),
+    text: Color(0xFF0A1010),
+    textMuted: Color(0xFF37413F),
+    accent: Color(0xFF005440),
+    accentContainer: Color(0xFFC9EDE0),
+    onAccentContainer: Color(0xFF002A1F),
+    danger: Color(0xFF8E1F1A),
+    success: Color(0xFF1B5A22),
+    warning: Color(0xFF6E4306),
+    diffAdded: Color(0xFFD9F4D8),
+    diffRemoved: Color(0xFFFBE3E1),
+    highContrast: true,
   );
 
   static const light = AppColors(
@@ -118,6 +163,7 @@ class AppColors extends ThemeExtension<AppColors> {
         warning: warning ?? this.warning,
         diffAdded: diffAdded ?? this.diffAdded,
         diffRemoved: diffRemoved ?? this.diffRemoved,
+        highContrast: highContrast,
       );
 
   /// These colors with the accent roles taken from [seed] (the wallpaper's
@@ -128,9 +174,9 @@ class AppColors extends ThemeExtension<AppColors> {
     final palette = TonalPalette.of(Hct.fromInt(seed.toARGB32()).hue, 36);
     Color tone(int t) => Color(palette.get(t));
     return copyWith(
-      accent: tone(dark ? 76 : 42),
-      accentContainer: tone(dark ? 20 : 92),
-      onAccentContainer: tone(dark ? 86 : 20),
+      accent: tone(switch ((dark, highContrast)) { (true, false) => 76, (false, false) => 42, (true, true) => 84, (false, true) => 30 }),
+      accentContainer: tone(switch ((dark, highContrast)) { (true, false) => 20, (false, false) => 92, (true, true) => 15, (false, true) => 92 }),
+      onAccentContainer: tone(switch ((dark, highContrast)) { (true, false) => 86, (false, false) => 20, (true, true) => 92, (false, true) => 10 }),
     );
   }
 
@@ -154,6 +200,7 @@ class AppColors extends ThemeExtension<AppColors> {
       warning: l(warning, other.warning),
       diffAdded: l(diffAdded, other.diffAdded),
       diffRemoved: l(diffRemoved, other.diffRemoved),
+      highContrast: t < 0.5 ? highContrast : other.highContrast,
     );
   }
 
@@ -164,7 +211,7 @@ class AppColors extends ThemeExtension<AppColors> {
 
   @override
   bool operator ==(Object other) {
-    if (other is! AppColors) return false;
+    if (other is! AppColors || other.highContrast != highContrast) return false;
     final a = _all, b = other._all;
     for (var i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;
@@ -272,6 +319,13 @@ TextStyle codeStyle(Color color, {double size = 13, FontWeight weight = FontWeig
       fontFeatures: const [FontFeature.tabularFigures()],
     );
 
+/// A card or group's shape: tone alone sets it apart, plus an edge in high
+/// contrast.
+ShapeBorder cardShape(AppColors c, {double radius = Radii.large}) => RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+      side: c.highContrast ? BorderSide(color: c.border) : BorderSide.none,
+    );
+
 /// Radii: four values plus full (M3 shape tokens), nested concentrically.
 abstract final class Radii {
   static const small = 4.0; // checkboxes, inline code, diff hunks
@@ -306,9 +360,15 @@ TextTheme _textTheme(AppColors c) {
 }
 
 /// The app's theme. [seed] replaces the teal accent (Wallpaper colors);
-/// [compact] shortens list rows to 48/64dp (hit areas stay ≥ 48dp).
-ThemeData buildTheme({required bool dark, Color? seed, bool compact = false}) {
-  final base = dark ? AppColors.dark : AppColors.light;
+/// [compact] shortens list rows to 48/64dp (hit areas stay ≥ 48dp);
+/// [highContrast] uses the AAA palettes.
+ThemeData buildTheme({required bool dark, Color? seed, bool compact = false, bool highContrast = false}) {
+  final base = switch ((dark, highContrast)) {
+    (true, false) => AppColors.dark,
+    (false, false) => AppColors.light,
+    (true, true) => AppColors.darkHigh,
+    (false, true) => AppColors.lightHigh,
+  };
   final c = seed == null ? base : base.seeded(seed);
   final brightness = dark ? Brightness.dark : Brightness.light;
   return ThemeData(

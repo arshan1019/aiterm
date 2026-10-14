@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../assistant/assistant.dart';
 import '../assistant/needle.dart';
 import '../assistant/tool_call.dart';
+import '../agents/acp/acp_agents.dart';
+import '../agents/acp/agent_chat.dart';
+import '../agents/acp/agent_chats.dart';
+import '../agents/agent_catalog.dart';
 import '../agents/agent_installer.dart';
 import '../backup/backup_controller.dart';
 import '../keep_alive/keep_alive_controller.dart';
@@ -85,6 +89,7 @@ class AppServices {
           .firstOrNull;
       if (agent != null) _offerReview(session, agent.name, cwd).ignore();
     };
+    agents.openAsBlocks = _openAsBlocks;
     // A removed project's sessions move to the Terminal tab.
     projects.addListener(_reconcileTabs);
     ssh.load().ignore();
@@ -113,6 +118,7 @@ class AppServices {
         dark: dark,
         seed: settings.wallpaperColors ? systemAccent.value : null,
         compact: settings.compact,
+        highContrast: settings.highContrast,
       );
 
   void _refreshGit() {
@@ -129,6 +135,36 @@ class AppServices {
     await repo.refresh();
     final n = repo.status?.changes.length ?? 0;
     session.review.value = n == 0 ? null : ReviewHint('${plural(n, 'file')} changed · $agent', repo.path);
+  }
+
+  /// Agent chats as blocks (ACP), when Settings turns them on.
+  late AgentChats chats = AgentChats(File('${paths.filesDir}/agent_sessions.json'), (agent, cwd) {
+    final acp = AcpAgent.of(agent)!;
+    return AgentChat(
+      agent: acp,
+      name: AgentInstaller.recipe(agent).name,
+      cwd: cwd,
+      start: (a, cwd) => LinuxAcpTransport.start(linux, a, cwd),
+      prepare: (a, onOutput) => LinuxAcpTransport.prepare(linux, a, onOutput),
+      sessions: chats,
+      preferred: {
+        for (final option in const ['mode', 'model']) option: ?settings.agentOption(agent, option),
+      },
+      onOptionChosen: (option, value) => settings.setAgentOption(agent, option, value),
+    );
+  });
+
+  bool _openAsBlocks(AgentRecipe agent, String? cwd) {
+    if (cwd == null || linux.usesAndroidShell || !settings.blocksFor(agent.id) || AcpAgent.of(agent.id) == null) {
+      return false;
+    }
+    () async {
+      final project = await projects.usedAgent(cwd, agent.id);
+      final path = project?.path ?? cwd;
+      chats.open(agent.id, path);
+      if (project != null) showProject(project, tab: WorkspaceTab.agent);
+    }();
+    return true;
   }
 
   void _refreshAgents() {
@@ -224,6 +260,7 @@ class AppServices {
       final project = cwd == null ? null : await projects.usedAgent(cwd, agent.id);
       final scope = project?.path;
       final existing = tabs.findAgent(agent.id, scope);
+      if (scope != null) chats.show(scope, AgentView.terminal);
       if (existing == null) {
         tabs.open(title: project == null ? title : agent.name, commands: commands, cwd: cwd, project: scope, agent: agent.id);
       } else {
@@ -264,7 +301,7 @@ class AppServices {
     await tabs.reattach();
     final services = AppServices._(paths, settings, linux, tabs);
     services.keepAlive.refresh().ignore();
-    await (services.projects.load(), services._readAccent()).wait;
+    await (services.projects.load(), services._readAccent(), services.chats.load()).wait;
     services._reconcileTabs();
     return services;
   }

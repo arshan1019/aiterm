@@ -15,6 +15,10 @@ import 'package:aiterm/git/git_tools.dart';
 import 'package:aiterm/shared/form.dart';
 import 'package:aiterm/terminal/terminal_session.dart';
 import 'package:xterm/xterm.dart';
+import 'package:aiterm/agents/acp/acp_agents.dart';
+import 'package:aiterm/agents/acp/agent_chat.dart';
+import 'package:aiterm/agents/acp/agent_chats.dart';
+import 'agent_chat_test.dart' show FakeAgent, claudeOptions;
 
 // Widget tests overflow the stack inside the Acode sandbox this project is
 // developed in; they run on CI (.github/workflows/test.yml).
@@ -81,6 +85,71 @@ void main() {
       await tester.pump();
     }
     await tester.pumpAndSettle();
+  }
+
+  /// Chats whose agent is [agent] (a scripted ACP agent), wired to settings
+  /// like the real ones.
+  AgentChats fakeChats(AppServices s, FakeAgent Function() agent) {
+    late AgentChats chats;
+    chats = AgentChats(File('${dir.path}/agent_sessions.json'), (id, cwd) => AgentChat(
+          agent: AcpAgent.of(id)!,
+          name: 'Claude Code',
+          cwd: cwd,
+          start: (a, cwd) async => agent(),
+          prepare: (a, onOutput) async => null,
+          sessions: chats,
+          onOptionChosen: (option, value) => s.settings.setAgentOption(id, option, value),
+        ));
+    return chats;
+  }
+
+  /// A turn with a plan, an edit that asks first, and a reply.
+  FakeAgent scriptedClaude() => FakeAgent((a, method, p) async {
+        switch (method) {
+          case 'initialize':
+            return {'protocolVersion': 1, 'agentCapabilities': {}};
+          case 'session/new':
+            return claudeOptions;
+          case 'session/set_config_option':
+            return {};
+          case 'session/prompt':
+            a.update('s1', {
+              'sessionUpdate': 'plan',
+              'entries': [
+                {'content': 'Add the forecast view', 'priority': 'high', 'status': 'in_progress'},
+              ],
+            });
+            final edit = {
+              'toolCallId': 't1',
+              'title': 'Edit lib/app.dart',
+              'kind': 'edit',
+              'status': 'pending',
+              'content': [
+                {'type': 'diff', 'path': '/root/app/lib/app.dart', 'oldText': 'old line\n', 'newText': 'new line\n'},
+              ],
+            };
+            a.update('s1', {'sessionUpdate': 'tool_call', ...edit});
+            final answer = await a.ask('session/request_permission', {
+              'sessionId': 's1',
+              'toolCall': edit,
+              'options': [
+                {'optionId': 'allow', 'name': 'Allow', 'kind': 'allow_once'},
+                {'optionId': 'always', 'name': 'Always allow', 'kind': 'allow_always'},
+                {'optionId': 'reject', 'name': 'Reject', 'kind': 'reject_once'},
+              ],
+            });
+            final allowed = (answer['outcome'] as Map)['optionId'] == 'allow';
+            a.update('s1', {'sessionUpdate': 'tool_call_update', 'toolCallId': 't1', 'status': allowed ? 'completed' : 'failed'});
+            a.update('s1', {'sessionUpdate': 'agent_message_chunk', 'content': {'type': 'text', 'text': 'Added the **forecast** view.'}});
+            return {'stopReason': 'end_turn'};
+        }
+        return null;
+      });
+
+  Future<void> pumpChat(WidgetTester tester) async {
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 40));
+    }
   }
 
   testWidgets('first launch is one setup screen, without tabs; Skip opens the app', (tester) async {
@@ -586,6 +655,18 @@ void main() {
         services.navigation.openWorkspaceTab(tab);
         await settleIo(tester);
       }
+      // Blocks: a whole turn, waiting on a permission.
+      services.settings.blocks = true;
+      services.chats = fakeChats(services, scriptedClaude);
+      services.chats.open('claude', '/root/app');
+      await pumpChat(tester);
+      await tester.enterText(find.byType(TextField), 'Add a forecast view');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Send'));
+      await pumpChat(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'Allow'));
+      await pumpChat(tester);
+      await tester.pumpAndSettle();
       await tester.pageBack();
       await settleIo(tester);
       for (final tab in [AppTab.terminal, AppTab.files, AppTab.settings]) {
@@ -597,6 +678,91 @@ void main() {
       await tester.pump(const Duration(seconds: 3)); // the debounced tab save
     });
   }
+
+  testWidgets('blocks: an agent as blocks, with its mode, a permission to answer, and file changes', (tester) async {
+    Directory('${dir.path}/alpine/root/app').createSync(recursive: true);
+    File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    File('${dir.path}/projects.json').writeAsStringSync(
+        jsonEncode([{'id': '1', 'name': 'Weather app', 'path': '/root/app', 'created': now, 'opened': now}]));
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+    final services = (await tester.runAsync(AppServices.load))!;
+    services.gitTools = GitTools(run: (script, onLine) async => 0);
+    services.git = GitRegistry(_FakeGit());
+    services.settings.blocks = true;
+    services.chats = fakeChats(services, scriptedClaude);
+    await tester.pumpWidget(AiTermApp(services: services));
+    await settleIo(tester);
+    await tester.tap(find.text('Weather app'));
+    await settleIo(tester);
+
+    services.chats.open('claude', '/root/app');
+    await pumpChat(tester);
+    expect(find.text('Claude Code'), findsWidgets);
+    expect(find.text('Manual'), findsOneWidget); // the agent's mode, one tap away
+
+    // The mode sheet lists the agent's own modes; the choice is remembered.
+    await tester.tap(find.text('Manual'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Accept edits'));
+    await pumpChat(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('Accept edits'), findsOneWidget);
+    expect(services.settings.agentOption('claude', 'mode'), 'acceptEdits');
+
+    await tester.enterText(find.byType(TextField), 'Add a forecast view');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Send'));
+    await pumpChat(tester);
+    expect(find.text('Add a forecast view'), findsOneWidget); // the user's block
+    expect(find.text('Plan'), findsOneWidget);
+    expect(find.text('Add the forecast view'), findsOneWidget);
+    // Asks first: the edit, and the agent's choices.
+    expect(find.text('Always allow'), findsOneWidget);
+    expect(find.byTooltip('Stop'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Allow'));
+    await pumpChat(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('Always allow'), findsNothing);
+    expect(find.textContaining('view.', findRichText: true), findsOneWidget);
+    expect(find.byTooltip('Send'), findsOneWidget);
+
+    // The edit's block opens to its diff, + and − beside the colors.
+    expect(find.text('+1'), findsOneWidget);
+    expect(find.text('−1'), findsOneWidget);
+    await tester.tap(find.text('Edit lib/app.dart'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('new line', findRichText: true), findsOneWidget);
+    expect(find.textContaining('old line', findRichText: true), findsOneWidget);
+
+    // A terminal too: the tab switches between them.
+    services.tabs.open(cwd: '/root/app', project: '/root/app');
+    services.chats.show('/root/app', AgentView.terminal);
+    await tester.pumpAndSettle();
+    expect(find.text('Blocks'), findsOneWidget);
+    await tester.tap(find.text('Blocks'));
+    await tester.pumpAndSettle();
+    expect(services.chats.viewOf('/root/app'), AgentView.blocks);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
+  testWidgets('settings: agent settings turn blocks on; agents keep their own UI by default', (tester) async {
+    final services = await boot(tester);
+    expect(services.settings.blocks, isFalse);
+    services.navigation.open(AppTab.settings);
+    await tester.pumpAndSettle();
+    expect(find.text('Agent settings'), findsOneWidget);
+    await tester.ensureVisible(find.text('Blocks'));
+    await tester.tap(find.text('Blocks'));
+    await tester.pumpAndSettle();
+    expect(services.settings.blocks, isTrue);
+    expect(find.text('Show thinking'), findsOneWidget);
+    await tester.ensureVisible(find.text('High contrast'));
+    await tester.tap(find.text('High contrast'));
+    await tester.pumpAndSettle();
+    expect(services.settings.highContrast, isTrue);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
 
   testWidgets('a folder that is not a repo offers to start tracking it', (tester) async {
     File('${dir.path}/alpine/.aiterm-installed')

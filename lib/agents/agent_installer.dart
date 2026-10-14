@@ -33,6 +33,10 @@ class AgentInstaller extends ChangeNotifier {
 
   final ScriptRunner _run;
   final AgentLauncher _launch;
+
+  /// Opens the agent as blocks instead of its terminal UI when that's on
+  /// for it; true when it did.
+  bool Function(AgentRecipe agent, String? cwd)? openAsBlocks;
   final _states = <String, AgentState>{};
   String? _installing;
 
@@ -97,7 +101,9 @@ class AgentInstaller extends ChangeNotifier {
   /// through sign-in. Not installed yet: installs it first (one tap from
   /// anywhere). Dependencies a newer recipe added (e.g. procps for Codex)
   /// are installed first, so existing installs keep working.
-  Future<void> open(String id, {String? cwd}) async {
+  ///
+  /// With blocks on for the agent it opens as blocks, unless [terminal].
+  Future<void> open(String id, {String? cwd, bool terminal = false}) async {
     final agent = recipe(id);
     if (stateOf(id).status != AgentStatus.installed && !busy) {
       await install(id);
@@ -121,6 +127,7 @@ class AgentInstaller extends ChangeNotifier {
         }
       }
     }
+    if (!terminal && (openAsBlocks?.call(agent, cwd) ?? false)) return;
     final folder = cwd?.split('/').lastWhere((p) => p.isNotEmpty, orElse: () => '/');
     _launch(agent, folder == null ? agent.name : '${agent.name} · $folder', [agent.command], cwd);
   }

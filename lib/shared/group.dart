@@ -26,7 +26,7 @@ class Group extends StatelessWidget {
         Material(
           color: c.surface,
           clipBehavior: Clip.antiAlias,
-          borderRadius: BorderRadius.circular(Radii.large),
+          shape: cardShape(c),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),

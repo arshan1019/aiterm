@@ -116,7 +116,7 @@ class _PreviewChip extends StatelessWidget {
     final c = context.colors;
     return Material(
       color: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
+      shape: cardShape(c),
       child: ListTile(
         dense: true,
         leading: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.success, shape: BoxShape.circle)),
@@ -142,7 +142,7 @@ class _AgentsPrompt extends StatelessWidget {
     final c = context.colors;
     return Material(
       color: c.accent.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
+      shape: cardShape(c),
       child: InkWell(
         borderRadius: BorderRadius.circular(Radii.large),
         onTap: () => openAgents(context),
@@ -291,7 +291,7 @@ class _ProjectCardState extends State<_ProjectCard> {
     final p = widget.project;
     return Material(
       color: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
+      shape: cardShape(c),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => openProject(context, p),

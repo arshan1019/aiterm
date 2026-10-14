@@ -73,7 +73,7 @@ class _AgentCard extends StatelessWidget {
     final installing = state.status == AgentStatus.installing;
     return Material(
       color: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.large)),
+      shape: cardShape(c),
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),

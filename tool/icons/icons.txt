@@ -64,3 +64,14 @@ undo rtl
 warning
 wifiTethering=wifi_tethering
 power=power_settings_new
+article
+edit
+fileMove=drive_file_move
+language
+build
+checklist
+tune
+send
+expandMore=expand_more
+expandLess=expand_less
+thinking=psychology

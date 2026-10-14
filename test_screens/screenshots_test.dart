@@ -7,6 +7,10 @@ import 'package:aiterm/agents/agent_installer.dart';
 import 'package:aiterm/app/app.dart';
 import 'package:aiterm/app/icons.dart';
 import 'package:aiterm/settings/settings.dart';
+import 'package:aiterm/agents/acp/acp_agents.dart';
+import 'package:aiterm/agents/acp/agent_chat.dart';
+import 'package:aiterm/agents/acp/agent_chats.dart';
+import '../test/agent_chat_test.dart' show FakeAgent, claudeOptions;
 import 'package:aiterm/app/navigation.dart';
 import 'package:aiterm/app/services.dart';
 import 'package:aiterm/git/git_registry.dart';
@@ -262,6 +266,51 @@ void main() {
     await shot(tester, '21-changes-light');
   });
 
+  testWidgets('blocks', (tester) async {
+    final s = await boot(tester);
+    late AgentChats chats;
+    chats = AgentChats(File('${dir.path}/agent_sessions.json'), (id, cwd) => AgentChat(
+          agent: AcpAgent.of(id)!,
+          name: 'Claude Code',
+          cwd: cwd,
+          start: (a, cwd) async => _claude(),
+          prepare: (a, o) async => null,
+          sessions: chats,
+        ));
+    s.chats = chats;
+    s.settings.blocks = true;
+    await tester.tap(find.text('Weather app'));
+    await settle(tester);
+    chats.open('claude', '/root/app');
+    await settle(tester);
+    await tester.enterText(find.byType(TextField), 'Show a 5-day forecast');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Send'));
+    await settle(tester);
+    await shot(tester, '33-blocks-permission');
+    await tester.tap(find.widgetWithText(FilledButton, 'Allow'));
+    await settle(tester);
+    await tester.tap(find.text('Edit lib/forecast.dart'));
+    await settle(tester);
+    await shot(tester, '34-blocks-turn');
+    s.settings.theme = ThemeChoice.light;
+    await settle(tester);
+    await shot(tester, '35-blocks-light');
+  });
+
+  testWidgets('high contrast', (tester) async {
+    final s = await boot(tester);
+    s.settings.highContrast = true;
+    await settle(tester);
+    await shot(tester, '36-high-contrast-projects');
+    s.navigation.open(AppTab.settings);
+    await settle(tester);
+    await shot(tester, '37-high-contrast-settings');
+    s.settings.theme = ThemeChoice.light;
+    await settle(tester);
+    await shot(tester, '38-high-contrast-light');
+  });
+
   testWidgets('appearance options', (tester) async {
     final s = await boot(tester);
     // Wallpaper colors with a violet wallpaper.
@@ -293,6 +342,71 @@ void main() {
     await shot(tester, '32-files-compact');
   });
 }
+
+/// Claude as blocks: reads, runs the tests, asks before editing, replies.
+FakeAgent _claude() => FakeAgent((a, method, p) async {
+      switch (method) {
+        case 'initialize':
+          return {'protocolVersion': 1, 'agentCapabilities': {}};
+        case 'session/new':
+          return claudeOptions;
+        case 'session/prompt':
+          a.update('s1', {
+            'sessionUpdate': 'plan',
+            'entries': [
+              {'content': 'Read the weather screen', 'priority': 'high', 'status': 'completed'},
+              {'content': 'Add a 5-day forecast list', 'priority': 'high', 'status': 'in_progress'},
+              {'content': 'Run the tests', 'priority': 'medium', 'status': 'pending'},
+            ],
+          });
+          a.update('s1', {'sessionUpdate': 'tool_call', 'toolCallId': 'r', 'title': 'Read lib/app.dart', 'kind': 'read', 'status': 'completed'});
+          a.update('s1', {
+            'sessionUpdate': 'tool_call',
+            'toolCallId': 'x',
+            'title': 'flutter test',
+            'kind': 'execute',
+            'status': 'completed',
+            'rawInput': {'command': 'flutter test'},
+            'content': [
+              {'type': 'content', 'content': {'type': 'text', 'text': '```console\n00:02 +12: All tests passed!\n```'}},
+            ],
+          });
+          final edit = {
+            'toolCallId': 'e',
+            'title': 'Edit lib/forecast.dart',
+            'kind': 'edit',
+            'status': 'pending',
+            'content': [
+              {
+                'type': 'diff',
+                'path': '/root/app/lib/forecast.dart',
+                'oldText': 'class Forecast {\n  final int days = 3;\n}\n',
+                'newText': 'class Forecast {\n  final int days = 5;\n  final bool hourly = false;\n}\n',
+              },
+            ],
+          };
+          a.update('s1', {'sessionUpdate': 'tool_call', ...edit});
+          await a.ask('session/request_permission', {
+            'sessionId': 's1',
+            'toolCall': edit,
+            'options': [
+              {'optionId': 'allow', 'name': 'Allow', 'kind': 'allow_once'},
+              {'optionId': 'always', 'name': 'Always allow', 'kind': 'allow_always'},
+              {'optionId': 'reject', 'name': 'Reject', 'kind': 'reject_once'},
+            ],
+          });
+          a.update('s1', {'sessionUpdate': 'tool_call_update', 'toolCallId': 'e', 'status': 'completed'});
+          a.update('s1', {
+            'sessionUpdate': 'agent_message_chunk',
+            'content': {
+              'type': 'text',
+              'text': 'The forecast now shows **5 days**. Changes:\n\n- `Forecast.days` is 5\n- an `hourly` flag, off by default\n\nAll 12 tests pass.',
+            },
+          });
+          return {'stopReason': 'end_turn'};
+      }
+      return null;
+    });
 
 class _FakeGit implements GitRunner {
   @override

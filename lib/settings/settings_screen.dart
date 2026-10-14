@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../agents/acp/acp_agents.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
 import '../platform/haptics.dart';
@@ -28,7 +29,7 @@ class SettingsScreen extends StatelessWidget {
     final s = context.services;
     final c = context.colors;
     return ListenableBuilder(
-      listenable: Listenable.merge([s.settings, s.linux, s.systemAccent]),
+      listenable: Listenable.merge([s.settings, s.linux, s.systemAccent, s.agents]),
       builder: (context, _) => ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -57,6 +58,7 @@ class SettingsScreen extends StatelessWidget {
               // Android 12+ only: older phones have no wallpaper colors.
               if (s.systemAccent.value != null)
                 _Switch('Wallpaper colors', s.settings.wallpaperColors, (v) => s.settings.wallpaperColors = v),
+              _Switch('High contrast', s.settings.highContrast, (v) => s.settings.highContrast = v),
               _Switch('Compact lists', s.settings.compact, (v) => s.settings.compact = v),
             ],
           ),
@@ -111,11 +113,25 @@ class SettingsScreen extends StatelessWidget {
                   LinuxStatus.missing => 'Not installed yet. Set it up from Projects.',
                 }, style: TextStyle(color: c.textMuted, fontSize: 12)),
               ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _Section(
+            title: 'Agent settings',
+            children: [
               ListTile(
                 title: const Text('AI agents', style: TextStyle(fontSize: 14)),
                 trailing: Icon(AppIcons.chevronRight, color: c.textMuted),
                 onTap: () => openAgents(context),
               ),
+              // Off: each agent's own UI in a terminal, as it ships.
+              _Switch('Blocks', s.settings.blocks, (v) => s.settings.blocks = v),
+              if (s.settings.blocks) ...[
+                for (final a in s.agents.installed)
+                  if (AcpAgent.of(a.id) != null)
+                    _Switch(a.name, s.settings.blocksFor(a.id), (v) => s.settings.setBlocksFor(a.id, v)),
+                _Switch('Show thinking', s.settings.showThinking, (v) => s.settings.showThinking = v),
+              ],
             ],
           ),
           if (s.linux.installed && !s.linux.usesAndroidShell) ...[

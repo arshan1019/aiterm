@@ -10,11 +10,14 @@ abstract final class AppIcons {
   static const arrowBack = IconData(0xe5c4, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const arrowForward = IconData(0xe5c8, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const arrowUpward = IconData(0xe5d8, fontFamily: 'MaterialSymbols');
+  static const article = IconData(0xef42, fontFamily: 'MaterialSymbols');
   static const badge = IconData(0xea67, fontFamily: 'MaterialSymbols');
   static const book = IconData(0xe86e, fontFamily: 'MaterialSymbols');
   static const branch = IconData(0xe0b6, fontFamily: 'MaterialSymbols');
+  static const build = IconData(0xf8cd, fontFamily: 'MaterialSymbols');
   static const check = IconData(0xe668, fontFamily: 'MaterialSymbols');
   static const checkCircle = IconData(0xf0be, fontFamily: 'MaterialSymbols');
+  static const checklist = IconData(0xe6b1, fontFamily: 'MaterialSymbols');
   static const chevronRight = IconData(0xe5cc, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const circle = IconData(0xef4a, fontFamily: 'MaterialSymbols');
   static const close = IconData(0xe5cd, fontFamily: 'MaterialSymbols');
@@ -27,8 +30,12 @@ abstract final class AppIcons {
   static const description = IconData(0xe873, fontFamily: 'MaterialSymbols');
   static const diff = IconData(0xeb7d, fontFamily: 'MaterialSymbols');
   static const download = IconData(0xf090, fontFamily: 'MaterialSymbols');
+  static const edit = IconData(0xf097, fontFamily: 'MaterialSymbols');
   static const error = IconData(0xf8b6, fontFamily: 'MaterialSymbols');
+  static const expandLess = IconData(0xe5ce, fontFamily: 'MaterialSymbols');
+  static const expandMore = IconData(0xe5cf, fontFamily: 'MaterialSymbols');
   static const exportFile = IconData(0xe6b8, fontFamily: 'MaterialSymbols');
+  static const fileMove = IconData(0xe9a1, fontFamily: 'MaterialSymbols');
   static const folder = IconData(0xe2c7, fontFamily: 'MaterialSymbols');
   static const folderNew = IconData(0xe2cc, fontFamily: 'MaterialSymbols');
   static const folderOpen = IconData(0xe2c8, fontFamily: 'MaterialSymbols');
@@ -39,6 +46,7 @@ abstract final class AppIcons {
   static const keyboardLeft = IconData(0xe314, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const keyboardRight = IconData(0xe315, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const keyboardUp = IconData(0xe316, fontFamily: 'MaterialSymbols');
+  static const language = IconData(0xea07, fontFamily: 'MaterialSymbols');
   static const lightbulb = IconData(0xe90f, fontFamily: 'MaterialSymbols');
   static const linkOff = IconData(0xe16f, fontFamily: 'MaterialSymbols');
   static const lock = IconData(0xe899, fontFamily: 'MaterialSymbols');
@@ -58,6 +66,7 @@ abstract final class AppIcons {
   static const restore = IconData(0xe8ba, fontFamily: 'MaterialSymbols');
   static const save = IconData(0xf090, fontFamily: 'MaterialSymbols');
   static const search = IconData(0xef7a, fontFamily: 'MaterialSymbols');
+  static const send = IconData(0xe163, fontFamily: 'MaterialSymbols');
   static const settings = IconData(0xe8b8, fontFamily: 'MaterialSymbols');
   static const smartphone = IconData(0xe7ba, fontFamily: 'MaterialSymbols');
   static const stop = IconData(0xe047, fontFamily: 'MaterialSymbols');
@@ -65,6 +74,8 @@ abstract final class AppIcons {
   static const sync = IconData(0xe627, fontFamily: 'MaterialSymbols');
   static const tabClose = IconData(0xf745, fontFamily: 'MaterialSymbols');
   static const terminal = IconData(0xeb8e, fontFamily: 'MaterialSymbols');
+  static const thinking = IconData(0xea4a, fontFamily: 'MaterialSymbols');
+  static const tune = IconData(0xe429, fontFamily: 'MaterialSymbols');
   static const undo = IconData(0xe166, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const warning = IconData(0xf083, fontFamily: 'MaterialSymbols');
   static const wifiTethering = IconData(0xe1e2, fontFamily: 'MaterialSymbols');

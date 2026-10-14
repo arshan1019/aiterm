@@ -21,6 +21,11 @@ class Settings extends ChangeNotifier {
   bool _blackTerminal = false;
   bool _darkTerminal = false;
   bool _compact = false;
+  bool _highContrast = false;
+  bool _blocks = false;
+  Set<String> _blocksOff = {};
+  bool _showThinking = false;
+  Map<String, String> _agentOptions = {};
   double _fontSize = 14;
   bool _childLimitFixed = false;
 
@@ -37,6 +42,23 @@ class Settings extends ChangeNotifier {
 
   /// Shorter list rows (48dp instead of 56dp).
   bool get compact => _compact;
+
+  /// Text and status colors at 7:1, outlines at 4.5:1, edged groups.
+  bool get highContrast => _highContrast;
+
+  /// Agents open as blocks (their structured output, over ACP) instead of
+  /// their own terminal UI. Off: the agents' UI, as they ship it.
+  bool get blocks => _blocks;
+
+  /// Whether agent [id] opens as blocks (blocks on and not turned off for it).
+  bool blocksFor(String id) => _blocks && !_blocksOff.contains(id);
+
+  /// The agent's reasoning shows as a collapsed block.
+  bool get showThinking => _showThinking;
+
+  /// The last mode or model picked for an agent ("claude/mode" → "acceptEdits"),
+  /// applied to its next block session.
+  String? agentOption(String agent, String option) => _agentOptions['$agent/$option'];
 
   /// The Wireless debugging fix for the child-process limit succeeded.
   bool get childLimitFixed => _childLimitFixed;
@@ -58,6 +80,11 @@ class Settings extends ChangeNotifier {
       s._blackTerminal = j['blackTerminal'] as bool? ?? false;
       s._darkTerminal = j['darkTerminal'] as bool? ?? false;
       s._compact = j['compact'] as bool? ?? false;
+      s._highContrast = j['highContrast'] as bool? ?? false;
+      s._blocks = j['blocks'] as bool? ?? false;
+      s._blocksOff = {...?(j['blocksOff'] as List?)?.whereType<String>()};
+      s._showThinking = j['showThinking'] as bool? ?? false;
+      s._agentOptions = {...?(j['agentOptions'] as Map?)?.cast<String, String>()};
       s._fontSize = ((j['fontSize'] as num?)?.toDouble() ?? 14).clamp(minFontSize, maxFontSize);
       s._childLimitFixed = j['childLimitFixed'] as bool? ?? false;
     } catch (_) {
@@ -96,6 +123,35 @@ class Settings extends ChangeNotifier {
     _changed();
   }
 
+  set highContrast(bool v) {
+    if (v == _highContrast) return;
+    _highContrast = v;
+    _changed();
+  }
+
+  set blocks(bool v) {
+    if (v == _blocks) return;
+    _blocks = v;
+    _changed();
+  }
+
+  void setBlocksFor(String id, bool on) {
+    if (on ? !_blocksOff.remove(id) : !_blocksOff.add(id)) return;
+    _changed();
+  }
+
+  set showThinking(bool v) {
+    if (v == _showThinking) return;
+    _showThinking = v;
+    _changed();
+  }
+
+  void setAgentOption(String agent, String option, String value) {
+    if (_agentOptions['$agent/$option'] == value) return;
+    _agentOptions['$agent/$option'] = value;
+    _changed();
+  }
+
   void markChildLimitFixed() {
     _childLimitFixed = true;
     _changed();
@@ -125,6 +181,11 @@ class Settings extends ChangeNotifier {
       'blackTerminal': _blackTerminal,
       'darkTerminal': _darkTerminal,
       'compact': _compact,
+      'highContrast': _highContrast,
+      'blocks': _blocks,
+      'blocksOff': _blocksOff.toList(),
+      'showThinking': _showThinking,
+      'agentOptions': _agentOptions,
       'fontSize': _fontSize,
       'childLimitFixed': _childLimitFixed,
     });
