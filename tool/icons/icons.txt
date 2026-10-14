@@ -75,3 +75,4 @@ send
 expandMore=expand_more
 expandLess=expand_less
 thinking=psychology
+attach=attach_file

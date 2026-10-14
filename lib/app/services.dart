@@ -6,6 +6,7 @@ import '../assistant/tool_call.dart';
 import '../agents/acp/acp_agents.dart';
 import '../agents/acp/agent_chat.dart';
 import '../agents/acp/agent_chats.dart';
+import '../agents/acp/attachments.dart';
 import '../agents/agent_catalog.dart';
 import '../agents/agent_installer.dart';
 import '../backup/backup_controller.dart';
@@ -151,6 +152,7 @@ class AppServices {
         for (final option in const ['mode', 'model']) option: ?settings.agentOption(agent, option),
       },
       onOptionChosen: (option, value) => settings.setAgentOption(agent, option, value),
+      attachmentsDir: attachmentsDir,
     );
   });
 

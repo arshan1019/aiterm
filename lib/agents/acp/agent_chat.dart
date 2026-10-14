@@ -9,12 +9,33 @@ sealed class ChatEntry {
 
   /// Stable within the chat (list keys).
   final int id;
+
+  /// Whether its block is open; null until the user taps it (each kind has
+  /// its default). Kept here, not in the widget, so an open block stays
+  /// open while the agent streams more below it or the list scrolls.
+  bool? open;
+}
+
+/// A file sent with a message: copied into Linux at [path] (a guest path,
+/// [hostPath] on the device). Images carry their [imageData] (base64) to
+/// go inline when the agent takes images.
+class ChatAttachment {
+  const ChatAttachment({required this.name, required this.path, required this.hostPath, this.imageData, this.mimeType});
+
+  final String name;
+  final String path;
+  final String hostPath;
+  final String? imageData;
+  final String? mimeType;
+
+  bool get isImage => imageData != null;
 }
 
 /// What the user sent.
 class UserEntry extends ChatEntry {
-  UserEntry(super.id, this.text);
+  UserEntry(super.id, this.text, [this.attachments = const []]);
   String text;
+  final List<ChatAttachment> attachments;
 }
 
 /// The agent's reply (Markdown), streamed in chunks.
@@ -154,7 +175,13 @@ class AgentChat extends ChangeNotifier {
     required this._sessions,
     this._preferred = const {},
     this._onOptionChosen,
+    this.attachmentsDir,
   });
+
+  /// Where attachments are copied (a guest path), granted to the session up
+  /// front where the agent supports extra folders, so reading them asks
+  /// nothing.
+  final String? attachmentsDir;
 
   final AcpAgent agent;
   final String name;
@@ -182,7 +209,19 @@ class AgentChat extends ChangeNotifier {
   List<(String, String)> commands = const [];
   final permissions = <PermissionRequest>[];
 
-  bool get busy => state == ChatState.working;
+  /// A message sent before the session was up, going out once it is.
+  (String, List<ChatAttachment>)? _queued;
+  Map<Object?, Object?> _capabilities = const {};
+
+  /// A turn is running (or waiting for the session to go out).
+  bool get busy => state == ChatState.working || _queued != null;
+
+  /// The agent takes images inline (others get them as file links).
+  bool get acceptsImages => (_capabilities['promptCapabilities'] as Map?)?['image'] == true;
+
+  /// The message box takes messages (queued while the agent starts).
+  bool get accepting =>
+      state == ChatState.ready || state == ChatState.working || state == ChatState.starting || state == ChatState.preparing;
 
   /// Starts (or restarts) the agent and its session.
   Future<void> start() async {
@@ -217,27 +256,8 @@ class AgentChat extends ChangeNotifier {
         },
         'clientInfo': {'name': 'aiterm', 'version': '1.0.0'},
       });
-      final capabilities = (init['agentCapabilities'] as Map?) ?? const {};
-      final saved = _sessions.sessionFor(agent.id, cwd);
-      AcpParams? session;
-      if (saved != null && capabilities['loadSession'] == true) {
-        try {
-          session = await connection.request('session/load', {'sessionId': saved, 'cwd': cwd, 'mcpServers': []});
-          _sessionId = saved;
-        } on AcpError catch (e) {
-          if (e.code == AcpError.authRequired) rethrow;
-          // Gone (or unreadable): start a new one.
-        }
-      }
-      if (session == null) {
-        session = await connection.request('session/new', {'cwd': cwd, 'mcpServers': []});
-        _sessionId = session['sessionId'] as String?;
-      }
-      _sessions.remember(agent.id, cwd, _sessionId);
-      _readOptions(session);
-      state = ChatState.ready;
-      _changed();
-      await _applyPreferred();
+      _capabilities = (init['agentCapabilities'] as Map?) ?? const {};
+      await _openSession(resume: true);
     } on AcpError catch (e) {
       if (e.code == AcpError.authRequired) {
         state = ChatState.signedOut;
@@ -248,6 +268,43 @@ class AgentChat extends ChangeNotifier {
       }
     } catch (e) {
       _fail('$e');
+    }
+  }
+
+  /// Opens a session on the running agent: the remembered one when
+  /// [resume] and the agent can load it, else a new one. Then sends any
+  /// message typed meanwhile.
+  Future<void> _openSession({required bool resume}) async {
+    final connection = _connection!;
+    final saved = resume ? _sessions.sessionFor(agent.id, cwd) : null;
+    final sessionCaps = _capabilities['sessionCapabilities'];
+    final extra = attachmentsDir != null && sessionCaps is Map && sessionCaps.containsKey('additionalDirectories')
+        ? {'additionalDirectories': [attachmentsDir]}
+        : const <String, Object?>{};
+    AcpParams? session;
+    if (saved != null && _capabilities['loadSession'] == true) {
+      _sessionId = saved; // its replayed history arrives before the reply
+      try {
+        session = await connection.request('session/load', {'sessionId': saved, 'cwd': cwd, 'mcpServers': [], ...extra});
+      } on AcpError catch (e) {
+        if (e.code == AcpError.authRequired) rethrow;
+        // Gone (or unreadable): start a new one.
+      }
+    }
+    if (session == null) {
+      _sessionId = null;
+      session = await connection.request('session/new', {'cwd': cwd, 'mcpServers': [], ...extra});
+      _sessionId = session['sessionId'] as String?;
+    }
+    if (_disposed) return;
+    _sessions.remember(agent.id, cwd, _sessionId);
+    _readOptions(session);
+    state = ChatState.ready;
+    _changed();
+    await _applyPreferred();
+    if (_queued case (final text, final files)?) {
+      _queued = null;
+      await _prompt(text, files);
     }
   }
 
@@ -263,20 +320,40 @@ class AgentChat extends ChangeNotifier {
     _changed();
   }
 
-  /// Sends [text] as the next turn.
-  Future<void> send(String text) async {
+  /// Sends [text] as the next turn; while the agent is still starting it
+  /// shows at once and goes out when the session is up.
+  Future<void> send(String text, {List<ChatAttachment> attachments = const []}) async {
+    if ((text.trim().isEmpty && attachments.isEmpty) || busy || !accepting) return;
+    entries.add(UserEntry(_nextEntry++, text, attachments));
+    if (state != ChatState.ready) {
+      _queued = (text, attachments);
+      _changed();
+      return;
+    }
+    await _prompt(text, attachments);
+  }
+
+  /// The prompt's content: the text, then images inline (when the agent
+  /// takes them) and every other file as a link the agent opens itself.
+  List<Map<String, Object?>> _blocks(String text, List<ChatAttachment> files) => [
+        if (text.trim().isNotEmpty) {'type': 'text', 'text': text},
+        for (final f in files)
+          if (f.isImage && acceptsImages)
+            {'type': 'image', 'data': f.imageData, 'mimeType': f.mimeType ?? 'image/png'}
+          else
+            {'type': 'resource_link', 'uri': Uri.file(f.path).toString(), 'name': f.name, 'mimeType': ?f.mimeType},
+      ];
+
+  Future<void> _prompt(String text, [List<ChatAttachment> files = const []]) async {
     final connection = _connection;
     final session = _sessionId;
-    if (connection == null || session == null || text.trim().isEmpty || busy) return;
-    entries.add(UserEntry(_nextEntry++, text));
+    if (connection == null || session == null) return;
     state = ChatState.working;
     _changed();
     try {
       final result = await connection.request('session/prompt', {
         'sessionId': session,
-        'prompt': [
-          {'type': 'text', 'text': text},
-        ],
+        'prompt': _blocks(text, files),
       });
       final note = switch (result['stopReason']) {
         'refusal' => 'The agent declined to continue.',
@@ -310,6 +387,12 @@ class AgentChat extends ChangeNotifier {
 
   /// Stops the running turn.
   void cancel() {
+    if (_queued != null) {
+      _queued = null;
+      entries.add(NoticeEntry(_nextEntry++, 'Stopped.'));
+      _changed();
+      return;
+    }
     final session = _sessionId;
     if (session == null || !busy) return;
     _cancelPermissions();
@@ -371,12 +454,37 @@ class AgentChat extends ChangeNotifier {
     }
   }
 
-  /// A new conversation (forgets the remembered session).
+  /// A new conversation on the running agent (no restart): the old
+  /// session is closed and forgotten, and the chat is usable at once.
   Future<void> restart() async {
+    final connection = _connection;
+    final old = _sessionId;
     _sessions.remember(agent.id, cwd, null);
     entries.clear();
     _tools.clear();
-    await start();
+    _cancelPermissions();
+    _queued = null;
+    if (connection == null || connection.closed || state == ChatState.failed || state == ChatState.signedOut) {
+      return start();
+    }
+    if (busy && old != null) connection.notify('session/cancel', {'sessionId': old});
+    // Frees the old session's agent process, where the agent supports it.
+    final sessionCaps = _capabilities['sessionCapabilities'];
+    if (old != null && sessionCaps is Map && sessionCaps.containsKey('close')) {
+      connection.request('session/close', {'sessionId': old}).ignore();
+    }
+    state = ChatState.starting;
+    _changed();
+    try {
+      await _openSession(resume: false);
+    } on AcpError catch (e) {
+      if (e.code == AcpError.authRequired) {
+        state = ChatState.signedOut;
+        _changed();
+      } else if (e.code != AcpError.closed) {
+        _fail(e.message);
+      }
+    }
   }
 
   void _setOption(String id, String value) {
@@ -417,6 +525,8 @@ class AgentChat extends ChangeNotifier {
 
   void _onNotification(String method, AcpParams params) {
     if (method != 'session/update') return;
+    // A session this chat moved on from (New chat) may still be talking.
+    if (_sessionId != null && params['sessionId'] != null && params['sessionId'] != _sessionId) return;
     final u = params['update'];
     if (u is! Map) return;
     switch (u['sessionUpdate']) {

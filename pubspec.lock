@@ -91,6 +91,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_thinking_orbs:
+    dependency: "direct main"
+    description:
+      name: flutter_thinking_orbs
+      sha256: "3bd823c1a0ec9a781fb02d9bffe954d03e8e35004d8921de70c3f293624cd66c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
   http:
     dependency: "direct main"
     description:

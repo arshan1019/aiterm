@@ -11,6 +11,7 @@ abstract final class AppIcons {
   static const arrowForward = IconData(0xe5c8, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const arrowUpward = IconData(0xe5d8, fontFamily: 'MaterialSymbols');
   static const article = IconData(0xef42, fontFamily: 'MaterialSymbols');
+  static const attach = IconData(0xe226, fontFamily: 'MaterialSymbols');
   static const badge = IconData(0xea67, fontFamily: 'MaterialSymbols');
   static const book = IconData(0xe86e, fontFamily: 'MaterialSymbols');
   static const branch = IconData(0xe0b6, fontFamily: 'MaterialSymbols');

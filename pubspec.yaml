@@ -40,6 +40,7 @@ dependencies:
   webview_flutter_platform_interface: ^2.15.1
   # HCT tonal palettes for Wallpaper colors (pinned by the Flutter SDK).
   material_color_utilities: any
+  flutter_thinking_orbs: ^0.1.0
 
 dev_dependencies:
   flutter_test:

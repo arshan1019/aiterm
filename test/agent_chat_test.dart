@@ -301,6 +301,122 @@ void main() {
     expect(c.state, ChatState.ready);
   });
 
+  test('New chat reuses the running agent: no restart, the old session closed', () async {
+    var starts = 0, sessions = 0;
+    final agent = FakeAgent((a, method, p) => switch (method) {
+          'initialize' => {
+              'protocolVersion': 1,
+              'agentCapabilities': {
+                'sessionCapabilities': {'close': {}},
+              },
+            },
+          'session/new' => {'sessionId': 's${++sessions}'},
+          'session/close' => {},
+          _ => null,
+        });
+    final c = AgentChat(
+      agent: AcpAgent.of('claude')!,
+      name: 'Claude Code',
+      cwd: '/root/app',
+      start: (a, cwd) async {
+        starts++;
+        return agent;
+      },
+      prepare: (a, o) async => null,
+      sessions: MemorySessions(),
+    );
+    await c.start();
+    c.entries.add(UserEntry(99, 'old'));
+    await c.restart();
+    expect(starts, 1);
+    expect(c.entries, isEmpty);
+    expect(c.state, ChatState.ready);
+    final close = agent.sent.firstWhere((m) => m['method'] == 'session/close');
+    expect(close['params'], {'sessionId': 's1'});
+    // Updates from the old session no longer land here.
+    agent.update('s1', {'sessionUpdate': 'agent_message_chunk', 'content': {'type': 'text', 'text': 'late'}});
+    await settle();
+    expect(c.entries, isEmpty);
+  });
+
+  test('a message sent while the agent starts shows at once and goes out when it is up', () async {
+    final ready = Completer<void>();
+    final agent = FakeAgent((a, method, p) async {
+      switch (method) {
+        case 'initialize':
+          return init();
+        case 'session/new':
+          await ready.future;
+          return {'sessionId': 's1'};
+        case 'session/prompt':
+          a.update('s1', {'sessionUpdate': 'agent_message_chunk', 'content': {'type': 'text', 'text': 'Hi'}});
+          return {'stopReason': 'end_turn'};
+      }
+      return null;
+    });
+    final c = chat(agent);
+    final starting = c.start();
+    await settle();
+    expect(c.state, ChatState.starting);
+    expect(c.accepting, isTrue);
+    await c.send('Hello');
+    expect(c.entries.single, isA<UserEntry>());
+    expect(c.busy, isTrue); // shows Stop, not Send
+    expect(agent.sentMethod('session/prompt'), isFalse);
+    ready.complete();
+    await starting;
+    await settle();
+    expect(agent.sentMethod('session/prompt'), isTrue);
+    expect((c.entries.last as MessageEntry).text.toString(), 'Hi');
+    expect(c.busy, isFalse);
+  });
+
+  test('attachments: images inline when the agent takes them, other files as links; the folder is granted', () async {
+    for (final images in [true, false]) {
+      final agent = FakeAgent((a, method, p) => switch (method) {
+            'initialize' => {
+                'protocolVersion': 1,
+                'agentCapabilities': {
+                  'promptCapabilities': {'image': images},
+                  'sessionCapabilities': {'additionalDirectories': {}},
+                },
+              },
+            'session/new' => {'sessionId': 's1'},
+            'session/prompt' => {'stopReason': 'end_turn'},
+            _ => null,
+          });
+      final c = AgentChat(
+        agent: AcpAgent.of('claude')!,
+        name: 'Claude Code',
+        cwd: '/root/app',
+        start: (a, cwd) async => agent,
+        prepare: (a, o) async => null,
+        sessions: MemorySessions(),
+        attachmentsDir: '/root/.cache/aiterm/attachments',
+      );
+      await c.start();
+      const shot = ChatAttachment(
+          name: 'shot.png', path: '/root/.cache/aiterm/attachments/shot.png', hostPath: '/x/shot.png', imageData: 'AAAA', mimeType: 'image/png');
+      const doc = ChatAttachment(
+          name: 'spec v2.pdf', path: '/root/.cache/aiterm/attachments/spec v2.pdf', hostPath: '/x/spec.pdf', mimeType: 'application/pdf');
+      await c.send('Use these', attachments: [shot, doc]);
+      final session = agent.sent.firstWhere((m) => m['method'] == 'session/new');
+      expect((session['params'] as Map)['additionalDirectories'], ['/root/.cache/aiterm/attachments']);
+      final prompt = ((agent.sent.firstWhere((m) => m['method'] == 'session/prompt')['params'] as Map)['prompt'] as List);
+      expect(prompt.first, {'type': 'text', 'text': 'Use these'});
+      expect(prompt[1], images
+          ? {'type': 'image', 'data': 'AAAA', 'mimeType': 'image/png'}
+          : {'type': 'resource_link', 'uri': 'file:///root/.cache/aiterm/attachments/shot.png', 'name': 'shot.png', 'mimeType': 'image/png'});
+      expect(prompt[2], {
+        'type': 'resource_link',
+        'uri': 'file:///root/.cache/aiterm/attachments/spec%20v2.pdf',
+        'name': 'spec v2.pdf',
+        'mimeType': 'application/pdf',
+      });
+      expect((c.entries.first as UserEntry).attachments, hasLength(2));
+    }
+  });
+
   test('an agent that needs signing in says so', () async {
     final agent = FakeAgent((a, method, p) => switch (method) {
           'initialize' => init(),
