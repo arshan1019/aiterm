@@ -17,6 +17,7 @@ import 'package:aiterm/terminal/terminal_session.dart';
 import 'package:xterm/xterm.dart';
 import 'package:aiterm/agents/acp/acp_agents.dart';
 import 'package:aiterm/agents/acp/agent_chat.dart';
+import 'package:aiterm/agents/acp/acp_host.dart';
 import 'package:aiterm/agents/acp/agent_chats.dart';
 import 'agent_chat_test.dart' show FakeAgent, claudeOptions;
 
@@ -91,15 +92,24 @@ void main() {
   /// like the real ones.
   AgentChats fakeChats(AppServices s, FakeAgent Function() agent) {
     late AgentChats chats;
-    chats = AgentChats(File('${dir.path}/agent_sessions.json'), (id, cwd) => AgentChat(
-          agent: AcpAgent.of(id)!,
-          name: 'Claude Code',
-          cwd: cwd,
-          start: (a, cwd) async => agent(),
-          prepare: (a, onOutput) async => null,
-          sessions: chats,
-          onOptionChosen: (option, value) => s.settings.setAgentOption(id, option, value),
-        ));
+    chats = AgentChats(
+      File('${dir.path}/agent_sessions.json'),
+      host: (id, cwd) => AcpHost(
+        agent: AcpAgent.of(id)!,
+        cwd: cwd,
+        start: (a, cwd) async => agent(),
+        prepare: (a, onOutput) async => null,
+      ),
+      chat: (id, cwd, host, number) => AgentChat(
+        agent: host.agent,
+        name: number == 1 ? 'Claude Code' : 'Claude Code $number',
+        cwd: cwd,
+        host: host,
+        sessions: chats,
+        remembers: number == 1,
+        onOptionChosen: (option, value) => s.settings.setAgentOption(id, option, value),
+      ),
+    );
     return chats;
   }
 
@@ -709,6 +719,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Accept edits'), findsOneWidget);
     expect(services.settings.agentOption('claude', 'mode'), 'acceptEdits');
+
+    // History (top right): this agent keeps no list, and says so.
+    await tester.tap(find.byTooltip('History'));
+    await pumpChat(tester);
+    await tester.pumpAndSettle();
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('Claude Code keeps no history here'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'Add a forecast view');
     await tester.pump();

@@ -156,6 +156,8 @@ void main() {
     expect((initialize['params'] as Map)['clientCapabilities'], {
       'fs': {'readTextFile': false, 'writeTextFile': false},
       'terminal': false,
+      // Questions (AskUserQuestion) come as forms.
+      'elicitation': {'form': {}},
     });
   });
 
@@ -415,6 +417,87 @@ void main() {
       });
       expect((c.entries.first as UserEntry).attachments, hasLength(2));
     }
+  });
+
+  test('questions arrive as forms; the answer (or Skip) goes back', () async {
+    final answers = <Map<String, Object?>>[];
+    final agent = FakeAgent((a, method, p) async {
+      switch (method) {
+        case 'initialize':
+          return init();
+        case 'session/new':
+          return {'sessionId': 's1'};
+        case 'session/prompt':
+          for (var i = 0; i < 2; i++) {
+            answers.add(await a.ask('elicitation/create', {
+              'mode': 'form',
+              'sessionId': 's1',
+              'message': 'Which database?',
+              'requestedSchema': {
+                'type': 'object',
+                'properties': {
+                  'question_0': {
+                    'type': 'string',
+                    'oneOf': [
+                      {'const': 'Postgres', 'title': 'Postgres', 'description': 'Relational'},
+                      {'const': 'SQLite', 'title': 'SQLite'},
+                    ],
+                  },
+                  'question_0_custom': {'type': 'string', 'title': 'Other'},
+                },
+              },
+            }));
+          }
+          return {'stopReason': 'end_turn'};
+      }
+      return null;
+    });
+    final c = chat(agent);
+    await c.start();
+    final turn = c.send('Set up storage');
+    await settle();
+    final q = c.asks.single as QuestionRequest;
+    expect(q.message, 'Which database?');
+    expect(q.fields.map((f) => f.kind), [AskFieldKind.single, AskFieldKind.text]);
+    expect(q.fields.first.options, [('Postgres', 'Postgres', 'Relational'), ('SQLite', 'SQLite', null)]);
+    c.answerQuestion(q, {'question_0': 'SQLite'});
+    await settle();
+    c.skipQuestion(c.questions.single);
+    await turn;
+    expect(answers, [
+      {'action': 'accept', 'content': {'question_0': 'SQLite'}},
+      {'action': 'decline'},
+    ]);
+    expect(c.asks, isEmpty);
+  });
+
+  test('permission choices keep the agent\'s order (some safety checks lead with No)', () async {
+    final agent = FakeAgent((a, method, p) async {
+      switch (method) {
+        case 'initialize':
+          return init();
+        case 'session/new':
+          return {'sessionId': 's1'};
+        case 'session/prompt':
+          await a.ask('session/request_permission', {
+            'sessionId': 's1',
+            'toolCall': {'toolCallId': 't1', 'title': 'rm -rf node_modules', 'kind': 'execute'},
+            'options': [
+              {'optionId': 'no', 'name': 'No', 'kind': 'reject_once'},
+              {'optionId': 'yes', 'name': 'Yes', 'kind': 'allow_once'},
+            ],
+          });
+          return {'stopReason': 'end_turn'};
+      }
+      return null;
+    });
+    final c = chat(agent);
+    await c.start();
+    final turn = c.send('Clean up');
+    await settle();
+    expect(c.permissions.single.choices.map((o) => o.name), ['No', 'Yes']);
+    c.answer(c.permissions.single, c.permissions.single.choices.first);
+    await turn;
   });
 
   test('an agent that needs signing in says so', () async {

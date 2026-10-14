@@ -5,6 +5,7 @@ import '../assistant/needle.dart';
 import '../assistant/tool_call.dart';
 import '../agents/acp/acp_agents.dart';
 import '../agents/acp/agent_chat.dart';
+import '../agents/acp/acp_host.dart';
 import '../agents/acp/agent_chats.dart';
 import '../agents/acp/attachments.dart';
 import '../agents/agent_catalog.dart';
@@ -138,23 +139,33 @@ class AppServices {
     session.review.value = n == 0 ? null : ReviewHint('${plural(n, 'file')} changed · $agent', repo.path);
   }
 
-  /// Agent chats as blocks (ACP), when Settings turns them on.
-  late AgentChats chats = AgentChats(File('${paths.filesDir}/agent_sessions.json'), (agent, cwd) {
-    final acp = AcpAgent.of(agent)!;
-    return AgentChat(
-      agent: acp,
-      name: AgentInstaller.recipe(agent).name,
+  /// Agent chats as blocks (ACP), when Settings turns them on: any number
+  /// per agent per project, sharing one agent process.
+  late AgentChats chats = AgentChats(
+    File('${paths.filesDir}/agent_sessions.json'),
+    host: (agent, cwd) => AcpHost(
+      agent: AcpAgent.of(agent)!,
       cwd: cwd,
       start: (a, cwd) => LinuxAcpTransport.start(linux, a, cwd),
       prepare: (a, onOutput) => LinuxAcpTransport.prepare(linux, a, onOutput),
-      sessions: chats,
-      preferred: {
-        for (final option in const ['mode', 'model']) option: ?settings.agentOption(agent, option),
-      },
-      onOptionChosen: (option, value) => settings.setAgentOption(agent, option, value),
-      attachmentsDir: attachmentsDir,
-    );
-  });
+    ),
+    chat: (agent, cwd, host, number) {
+      final name = AgentInstaller.recipe(agent).name;
+      return AgentChat(
+        agent: host.agent,
+        name: number == 1 ? name : '$name $number',
+        cwd: cwd,
+        host: host,
+        sessions: chats,
+        remembers: number == 1,
+        preferred: {
+          for (final option in const ['mode', 'model']) option: ?settings.agentOption(agent, option),
+        },
+        onOptionChosen: (option, value) => settings.setAgentOption(agent, option, value),
+        attachmentsDir: attachmentsDir,
+      );
+    },
+  );
 
   bool _openAsBlocks(AgentRecipe agent, String? cwd) {
     if (cwd == null || linux.usesAndroidShell || !settings.blocksFor(agent.id) || AcpAgent.of(agent.id) == null) {

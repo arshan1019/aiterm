@@ -13,6 +13,7 @@ import '../../shared/markdown_view.dart';
 import '../../shared/sheet.dart';
 import '../acp/agent_chat.dart';
 import '../acp/attachments.dart';
+import 'history_screen.dart';
 
 import 'dart:io';
 
@@ -58,7 +59,11 @@ class BlocksView extends StatelessWidget {
               onClose: onClose,
             ),
             Expanded(child: _body(context)),
-            if (chat.permissions.firstOrNull case final request?) _PermissionCard(chat: chat, request: request),
+            if (chat.asks.firstOrNull case final ask?)
+              switch (ask) {
+                PermissionRequest() => _PermissionCard(key: ObjectKey(ask), chat: chat, request: ask),
+                QuestionRequest() => _QuestionCard(key: ObjectKey(ask), chat: chat, request: ask),
+              },
             _Composer(key: ValueKey(chat), chat: chat),
           ],
         ),
@@ -230,6 +235,11 @@ class _ChatBar extends StatelessWidget {
               icon: const Icon(AppIcons.tune, size: 18),
               label: Text(mode.valueName),
             ),
+          IconButton(
+            tooltip: 'History',
+            icon: const Icon(AppIcons.history),
+            onPressed: () => openChatHistory(context, cwd: chat.cwd, agent: chat.agent.id),
+          ),
           IconButton(tooltip: 'New', icon: const Icon(AppIcons.add), onPressed: onNew),
           IconButton(tooltip: 'Chat actions', icon: const Icon(AppIcons.moreVert), onPressed: () => _menu(context)),
         ],
@@ -340,7 +350,7 @@ class _EntriesState extends State<_Entries> {
       for (final e in chat.entries)
         if (e is! ThoughtEntry || thinking) e,
     ];
-    final working = chat.busy && chat.permissions.isEmpty;
+    final working = chat.busy && chat.asks.isEmpty;
     final items = [if (working) null, ...shown.reversed];
     final ids = [for (final e in items) e?.id ?? 'working'];
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -845,23 +855,23 @@ class _NoticeBlock extends StatelessWidget {
   }
 }
 
-/// The agent asks before a tool runs: what it wants to do, and its choices.
-class _PermissionCard extends StatelessWidget {
-  const _PermissionCard({required this.chat, required this.request});
-  final AgentChat chat;
-  final PermissionRequest request;
+/// The frame every ask shares: a block pinned above the message box with a
+/// warning edge (it needs you), a header, scrollable content (capped, so
+/// the choices stay in reach), then the choices, always last, full width,
+/// one per row.
+class _AskFrame extends StatelessWidget {
+  const _AskFrame({required this.icon, required this.title, this.literal = false, this.content, required this.choices});
+  final IconData icon;
+  final String title;
+
+  /// The title is a command or path (mono).
+  final bool literal;
+  final Widget? content;
+  final List<Widget> choices;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final tool = request.tool;
-    final allow = request.choices.where((o) => o.allows).toList();
-    final reject = request.choices.where((o) => !o.allows).toList();
-    void pick(PermissionChoice choice) {
-      choice.allows ? Haptics.confirm() : Haptics.reject();
-      chat.answer(request, choice);
-    }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: Material(
@@ -876,32 +886,290 @@ class _PermissionCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(tool == null ? AppIcons.lock : _kindIcon(tool.kind), size: 18, color: c.warning),
-                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(icon, size: 18, color: c.warning),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      tool?.title.isNotEmpty == true ? tool!.title : 'Permission',
-                      maxLines: 3,
+                      title,
+                      maxLines: 4,
                       overflow: TextOverflow.ellipsis,
-                      style: tool?.command != null ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
+                      style: literal ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
                 ],
               ),
+              if (content != null) ...[
+                const SizedBox(height: 10),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.35),
+                  child: SingleChildScrollView(child: content),
+                ),
+              ],
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              for (final (i, choice) in choices.indexed) ...[if (i > 0) const SizedBox(height: 8), choice],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A full-width choice: the agent's preferred one filled, the rest outlined,
+/// declines in the danger color.
+Widget _choice(
+  BuildContext context,
+  String label,
+  VoidCallback onPressed, {
+  bool primary = false,
+  bool decline = false,
+}) {
+  final c = context.colors;
+  final style = ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size.fromHeight(48)),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
+    alignment: Alignment.center,
+    foregroundColor: decline && !primary ? WidgetStatePropertyAll(c.danger) : null,
+  );
+  final text = Text(label, textAlign: TextAlign.center);
+  return primary
+      ? FilledButton(style: style, onPressed: onPressed, child: text)
+      : OutlinedButton(style: style, onPressed: onPressed, child: text);
+}
+
+/// The agent asks before a tool runs: what it wants to do (the command,
+/// the edit, the plan), then its choices in its own order.
+class _PermissionCard extends StatelessWidget {
+  const _PermissionCard({super.key, required this.chat, required this.request});
+  final AgentChat chat;
+  final PermissionRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final tool = request.tool;
+    void pick(PermissionChoice choice) {
+      choice.allows ? Haptics.confirm() : Haptics.reject();
+      chat.answer(request, choice);
+    }
+
+    final texts = [
+      for (final t in tool?.content ?? const <ToolContent>[])
+        if (t is ToolText) t.text,
+    ];
+    final diffs = [
+      for (final d in tool?.content ?? const <ToolContent>[])
+        if (d is ToolDiff) d,
+    ];
+    final command = tool?.command;
+    final title = tool?.title.isNotEmpty == true ? tool!.title : 'Permission';
+    return _AskFrame(
+      icon: tool == null ? AppIcons.lock : _kindIcon(tool.kind),
+      title: title,
+      literal: command != null && command == title,
+      content: texts.isEmpty && diffs.isEmpty && (command == null || command == title)
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (command != null && command != title) CodeBox(command),
+                for (final d in diffs) ...[
+                  const SizedBox(height: 6),
+                  _DiffBox(path: d.path, lines: lineDiff(d.oldText, d.newText)),
+                ],
+                for (final t in texts) ...[const SizedBox(height: 6), MarkdownView(t)],
+              ],
+            ),
+      choices: [
+        for (final (i, o) in request.choices.indexed)
+          _choice(context, o.name, () => pick(o), primary: i == 0, decline: !o.allows),
+      ],
+    );
+  }
+}
+
+/// The agent asks a question (Claude's AskUserQuestion): pick an answer,
+/// or type your own. A single pick-one question answers on tap.
+class _QuestionCard extends StatefulWidget {
+  const _QuestionCard({super.key, required this.chat, required this.request});
+  final AgentChat chat;
+  final QuestionRequest request;
+
+  @override
+  State<_QuestionCard> createState() => _QuestionCardState();
+}
+
+class _QuestionCardState extends State<_QuestionCard> {
+  final _picked = <String, Set<String>>{};
+  final _typed = <String, TextEditingController>{};
+
+  @override
+  void dispose() {
+    for (final t in _typed.values) {
+      t.dispose();
+    }
+    super.dispose();
+  }
+
+  List<AskField> get _choices => [
+    for (final f in widget.request.fields)
+      if (f.kind != AskFieldKind.text) f,
+  ];
+
+  /// One pick-one question: a tap is the answer.
+  bool get _instant => _choices.length == 1 && _choices.single.kind == AskFieldKind.single;
+
+  Map<String, Object?> _content() => {
+    for (final f in widget.request.fields)
+      if (f.kind == AskFieldKind.text)
+        if (_typed[f.key]?.text.trim() case final t? when t.isNotEmpty) f.key: t else ...{}
+      else if (_picked[f.key] case final p? when p.isNotEmpty)
+        f.key: f.kind == AskFieldKind.multi ? p.toList() : p.first,
+  };
+
+  void _submit() {
+    Haptics.confirm();
+    widget.chat.answerQuestion(widget.request, _content());
+  }
+
+  void _tap(AskField f, String value) {
+    Haptics.tick();
+    setState(() {
+      final set = _picked.putIfAbsent(f.key, () => <String>{});
+      if (f.kind == AskFieldKind.multi) {
+        set.contains(value) ? set.remove(value) : set.add(value);
+      } else {
+        set
+          ..clear()
+          ..add(value);
+      }
+    });
+    if (_instant) _submit();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final request = widget.request;
+    final single = request.fields.length <= 2 && _choices.length == 1;
+    final answered = _content().isNotEmpty;
+    return _AskFrame(
+      icon: AppIcons.help,
+      title: request.message.isEmpty ? 'Question' : request.message,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final f in request.fields) ...[
+            if (!single && (f.title ?? f.description) != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Text(f.description ?? f.title!, style: Theme.of(context).textTheme.titleSmall),
+              ),
+            if (f.kind == AskFieldKind.text)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: TextField(
+                  controller: _typed.putIfAbsent(
+                    f.key,
+                    () => TextEditingController()..addListener(() => setState(() {})),
+                  ),
+                  minLines: 1,
+                  maxLines: 4,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(hintText: f.title ?? 'Your answer'),
+                ),
+              )
+            else
+              for (final (value, label, description) in f.options)
+                _Option(
+                  label: label,
+                  description: description,
+                  multi: f.kind == AskFieldKind.multi,
+                  selected: _picked[f.key]?.contains(value) ?? false,
+                  onTap: () => _tap(f, value),
+                ),
+          ],
+        ],
+      ),
+      choices: [
+        if (!_instant || answered) _choice(context, 'Answer', answered ? _submit : () {}, primary: answered),
+        TextButton(
+          style: TextButton.styleFrom(minimumSize: const Size.fromHeight(48), foregroundColor: c.textMuted),
+          onPressed: () {
+            Haptics.tick();
+            widget.chat.skipQuestion(request);
+          },
+          child: const Text('Skip'),
+        ),
+      ],
+    );
+  }
+}
+
+/// One answer to pick: a radio (pick one) or a check (pick several), the
+/// label and its explanation, the whole row tappable.
+class _Option extends StatelessWidget {
+  const _Option({
+    required this.label,
+    this.description,
+    required this.multi,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final String? description;
+  final bool multi, selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Material(
+        color: selected ? c.accentContainer : c.surfaceAlt,
+        borderRadius: BorderRadius.circular(Radii.medium),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(Radii.medium),
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
                 children: [
-                  for (final (i, o) in allow.indexed)
-                    i == 0
-                        ? FilledButton(onPressed: () => pick(o), child: Text(o.name))
-                        : OutlinedButton(onPressed: () => pick(o), child: Text(o.name)),
-                  for (final o in reject) TextButton(onPressed: () => pick(o), child: Text(o.name)),
+                  Icon(
+                    multi
+                        ? (selected ? AppIcons.checkBox : AppIcons.checkBoxBlank)
+                        : (selected ? AppIcons.radioOn : AppIcons.radioOff),
+                    fill: selected ? 1 : 0,
+                    size: 20,
+                    color: selected ? c.onAccentContainer : c.textMuted,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(label, style: TextStyle(color: selected ? c.onAccentContainer : c.text, fontSize: 15)),
+                        if (description case final d?)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              d,
+                              style: TextStyle(color: selected ? c.onAccentContainer : c.textMuted, fontSize: 13),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1066,37 +1334,35 @@ class _ComposerState extends State<_Composer> {
                               focusedBorder: InputBorder.none,
                               disabledBorder: InputBorder.none,
                               isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                              // 24dp line + 12 + 12: as tall as the buttons.
+                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: chat.busy
-                              ? IconButton(
-                                  tooltip: 'Stop',
-                                  style: _roundButton(background: c.text, foreground: c.bg, c: c),
-                                  onPressed: () {
-                                    Haptics.tick();
-                                    chat.cancel();
-                                  },
-                                  icon: const Icon(AppIcons.stop, fill: 1, size: 20),
-                                )
-                              : IconButton(
-                                  tooltip: 'Send',
-                                  // Mint either way: the bright accent on dark,
-                                  // the tonal pair on light.
-                                  style: dark
-                                      ? _roundButton(background: c.accent, foreground: c.bg, c: c)
-                                      : _roundButton(
-                                          background: c.accentContainer,
-                                          foreground: c.onAccentContainer,
-                                          c: c,
-                                        ),
-                                  onPressed: canSend ? _send : null,
-                                  icon: const Icon(AppIcons.arrowUpward, size: 22),
-                                ),
-                        ),
+                        chat.busy
+                            ? IconButton(
+                                tooltip: 'Stop',
+                                style: _roundButton(background: c.text, foreground: c.bg, c: c),
+                                onPressed: () {
+                                  Haptics.tick();
+                                  chat.cancel();
+                                },
+                                icon: const Icon(AppIcons.stop, fill: 1, size: 20),
+                              )
+                            : IconButton(
+                                tooltip: 'Send',
+                                // Mint either way: the bright accent on dark,
+                                // the tonal pair on light.
+                                style: dark
+                                    ? _roundButton(background: c.accent, foreground: c.bg, c: c)
+                                    : _roundButton(
+                                        background: c.accentContainer,
+                                        foreground: c.onAccentContainer,
+                                        c: c,
+                                      ),
+                                onPressed: canSend ? _send : null,
+                                icon: const Icon(AppIcons.arrowUpward, size: 22),
+                              ),
                       ],
                     ),
                   ],
@@ -1200,7 +1466,7 @@ class _ChatHaptics extends StatefulWidget {
 }
 
 class _ChatHapticsState extends State<_ChatHaptics> {
-  late var _asks = widget.chat.permissions.length;
+  late var _asks = widget.chat.asks.length;
   late var _busy = widget.chat.busy;
   late var _failed = widget.chat.state == ChatState.failed;
 
@@ -1216,7 +1482,7 @@ class _ChatHapticsState extends State<_ChatHaptics> {
     if (old.chat != widget.chat) {
       old.chat.removeListener(_changed);
       widget.chat.addListener(_changed);
-      _asks = widget.chat.permissions.length;
+      _asks = widget.chat.asks.length;
       _busy = widget.chat.busy;
       _failed = widget.chat.state == ChatState.failed;
     }
@@ -1235,7 +1501,7 @@ class _ChatHapticsState extends State<_ChatHaptics> {
 
   void _changed() {
     final chat = widget.chat;
-    final asks = chat.permissions.length, busy = chat.busy, failed = chat.state == ChatState.failed;
+    final asks = chat.asks.length, busy = chat.busy, failed = chat.state == ChatState.failed;
     final seen = _seen;
     if (seen) {
       if (asks > _asks) {

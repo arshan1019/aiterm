@@ -84,9 +84,14 @@ class _ProjectScreenState extends State<ProjectScreen> {
     final installed = _s.agents.installed;
     showActionSheet(context, title: 'New in ${p.name}', actions: [
       for (final a in installed)
-        SheetAction(AppIcons.agent, _s.tabs.findAgent(a.id, p.path) == null ? a.name : 'Back to ${a.name}',
-            () => _s.agents.open(a.id, cwd: p.path),
-            accent: true),
+        // Blocks: another chat each time (several Claude chats at once);
+        // the agent's own UI: back to its tab.
+        if (_s.settings.blocksFor(a.id))
+          SheetAction(AppIcons.agent, 'New ${a.name} chat', () => _s.chats.open(a.id, p.path, fresh: true), accent: true)
+        else
+          SheetAction(AppIcons.agent, _s.tabs.findAgent(a.id, p.path) == null ? a.name : 'Back to ${a.name}',
+              () => _s.agents.open(a.id, cwd: p.path),
+              accent: true),
       if (installed.isEmpty)
         SheetAction(AppIcons.agent, 'Install ${agentCatalog.first.name}',
             () => _s.agents.open(agentCatalog.first.id, cwd: p.path),

@@ -9,6 +9,7 @@ import 'package:aiterm/app/icons.dart';
 import 'package:aiterm/settings/settings.dart';
 import 'package:aiterm/agents/acp/acp_agents.dart';
 import 'package:aiterm/agents/acp/agent_chat.dart';
+import 'package:aiterm/agents/acp/acp_host.dart';
 import 'package:aiterm/agents/acp/agent_chats.dart';
 import '../test/agent_chat_test.dart' show FakeAgent, claudeOptions;
 import 'package:aiterm/app/navigation.dart';
@@ -269,14 +270,23 @@ void main() {
   testWidgets('blocks', (tester) async {
     final s = await boot(tester);
     late AgentChats chats;
-    chats = AgentChats(File('${dir.path}/agent_sessions.json'), (id, cwd) => AgentChat(
-          agent: AcpAgent.of(id)!,
-          name: 'Claude Code',
-          cwd: cwd,
-          start: (a, cwd) async => _claude(),
-          prepare: (a, o) async => null,
-          sessions: chats,
-        ));
+    chats = AgentChats(
+      File('${dir.path}/agent_sessions.json'),
+      host: (id, cwd) => AcpHost(
+        agent: AcpAgent.of(id)!,
+        cwd: cwd,
+        start: (a, cwd) async => _claude(),
+        prepare: (a, o) async => null,
+      ),
+      chat: (id, cwd, host, number) => AgentChat(
+        agent: host.agent,
+        name: number == 1 ? 'Claude Code' : 'Claude Code $number',
+        cwd: cwd,
+        host: host,
+        sessions: chats,
+        remembers: number == 1,
+      ),
+    );
     s.chats = chats;
     s.settings.blocks = true;
     await tester.tap(find.text('Weather app'));
@@ -296,6 +306,10 @@ void main() {
     s.settings.theme = ThemeChoice.light;
     await settle(tester);
     await shot(tester, '35-blocks-light');
+    s.settings.theme = ThemeChoice.dark;
+    await tester.tap(find.byTooltip('History'));
+    await settle(tester);
+    await shot(tester, '39-history');
   });
 
   testWidgets('high contrast', (tester) async {
@@ -347,9 +361,26 @@ void main() {
 FakeAgent _claude() => FakeAgent((a, method, p) async {
       switch (method) {
         case 'initialize':
-          return {'protocolVersion': 1, 'agentCapabilities': {}};
+          return {
+            'protocolVersion': 1,
+            'agentCapabilities': {
+              'sessionCapabilities': {'list': {}},
+            },
+          };
         case 'session/new':
           return claudeOptions;
+        case 'session/list':
+          final now = DateTime.now().toUtc();
+          String ago(Duration d) => now.subtract(d).toIso8601String();
+          return {
+            'sessions': [
+              {'sessionId': 'a', 'cwd': '/root/app', 'title': 'Show a 5-day forecast', 'updatedAt': ago(const Duration(minutes: 5))},
+              {'sessionId': 'b', 'cwd': '/root/app', 'title': 'Fix the city search crash', 'updatedAt': ago(const Duration(hours: 3))},
+              {'sessionId': 'c', 'cwd': '/root/app', 'title': 'Add hourly temperatures', 'updatedAt': ago(const Duration(days: 1, hours: 2))},
+              {'sessionId': 'd', 'cwd': '/root/app', 'title': 'Write widget tests for the forecast list', 'updatedAt': ago(const Duration(days: 4))},
+              {'sessionId': 'e', 'cwd': '/root/app', 'title': 'Set up the weather API client', 'updatedAt': ago(const Duration(days: 40))},
+            ],
+          };
         case 'session/prompt':
           a.update('s1', {
             'sessionUpdate': 'plan',

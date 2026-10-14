@@ -18,6 +18,8 @@ abstract final class AppIcons {
   static const branch = IconData(0xe0b6, fontFamily: 'MaterialSymbols');
   static const build = IconData(0xf8cd, fontFamily: 'MaterialSymbols');
   static const check = IconData(0xe668, fontFamily: 'MaterialSymbols');
+  static const checkBox = IconData(0xe9de, fontFamily: 'MaterialSymbols');
+  static const checkBoxBlank = IconData(0xe835, fontFamily: 'MaterialSymbols');
   static const checkCircle = IconData(0xf0be, fontFamily: 'MaterialSymbols');
   static const checklist = IconData(0xe6b1, fontFamily: 'MaterialSymbols');
   static const chevronRight = IconData(0xe5cc, fontFamily: 'MaterialSymbols', matchTextDirection: true);
@@ -42,6 +44,7 @@ abstract final class AppIcons {
   static const folderNew = IconData(0xe2cc, fontFamily: 'MaterialSymbols');
   static const folderOpen = IconData(0xe2c8, fontFamily: 'MaterialSymbols');
   static const folderShared = IconData(0xe2c9, fontFamily: 'MaterialSymbols');
+  static const help = IconData(0xe8fd, fontFamily: 'MaterialSymbols');
   static const history = IconData(0xe8b3, fontFamily: 'MaterialSymbols');
   static const home = IconData(0xe9b2, fontFamily: 'MaterialSymbols');
   static const keyboardDown = IconData(0xe313, fontFamily: 'MaterialSymbols');
@@ -59,6 +62,8 @@ abstract final class AppIcons {
   static const power = IconData(0xf8c7, fontFamily: 'MaterialSymbols');
   static const project = IconData(0xe617, fontFamily: 'MaterialSymbols');
   static const pushPin = IconData(0xf10d, fontFamily: 'MaterialSymbols');
+  static const radioOff = IconData(0xe836, fontFamily: 'MaterialSymbols');
+  static const radioOn = IconData(0xe837, fontFamily: 'MaterialSymbols');
   static const redo = IconData(0xe15a, fontFamily: 'MaterialSymbols', matchTextDirection: true);
   static const refresh = IconData(0xe5d5, fontFamily: 'MaterialSymbols');
   static const remove = IconData(0xe15b, fontFamily: 'MaterialSymbols');

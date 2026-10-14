@@ -77,3 +77,8 @@ expandLess=expand_less
 thinking=psychology
 attach=attach_file
 arrowDownward=arrow_downward
+help
+checkBox=check_box
+checkBoxBlank=check_box_outline_blank
+radioOn=radio_button_checked
+radioOff=radio_button_unchecked

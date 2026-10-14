@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app/icons.dart';
 import '../app/theme.dart';
 
 /// One destination of a [BottomTabs] bar.
@@ -75,6 +76,65 @@ class _FillIcon extends StatelessWidget {
         tween: Tween(end: filled ? 1 : 0),
         duration: Motion.standard,
         curve: Motion.move,
-        builder: (context, fill, _) => Icon(icon, fill: fill),
+        builder: (context, fill, _) => icon == AppIcons.terminal ? _TerminalGlyph(fill: fill) : Icon(icon, fill: fill),
       );
+}
+
+/// Material Symbols' terminal glyph has no filled form, unlike the other
+/// tabs' icons; drawn from its own outline (24dp grid), the frame fills in
+/// and `>_` takes the selection pill's color as [fill] goes to 1.
+class _TerminalGlyph extends StatelessWidget {
+  const _TerminalGlyph({required this.fill});
+  final double fill;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = IconTheme.of(context);
+    final size = icon.size ?? 24;
+    final color = icon.color ?? context.colors.text;
+    final cutout = Theme.of(context).navigationBarTheme.indicatorColor ?? context.colors.accentContainer;
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(painter: _TerminalPainter(fill: fill, color: color, cutout: cutout)),
+    );
+  }
+}
+
+class _TerminalPainter extends CustomPainter {
+  _TerminalPainter({required this.fill, required this.color, required this.cutout});
+  final double fill;
+  final Color color, cutout;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 24);
+    final paint = Paint()..isAntiAlias = true;
+    final outer = RRect.fromLTRBR(2, 4, 22, 20, const Radius.circular(2));
+    const inner = Rect.fromLTRB(4, 8, 20, 18);
+    // The frame and title bar.
+    paint.color = color;
+    canvas.drawPath(Path.combine(PathOperation.difference, Path()..addRRect(outer), Path()..addRect(inner)), paint);
+    // The screen, filling in.
+    if (fill > 0) {
+      paint.color = color.withValues(alpha: color.a * fill);
+      canvas.drawRect(inner, paint);
+    }
+    // ">_", from ink to cut-out.
+    paint.color = Color.lerp(color, cutout, fill)!;
+    canvas.drawPath(
+      Path()
+        ..moveTo(7.5, 17)
+        ..lineTo(6.1, 15.6)
+        ..lineTo(8.675, 13)
+        ..lineTo(6.075, 10.4)
+        ..lineTo(7.5, 9)
+        ..lineTo(11.5, 13)
+        ..close(),
+      paint,
+    );
+    canvas.drawRect(const Rect.fromLTRB(12, 15, 18, 17), paint);
+  }
+
+  @override
+  bool shouldRepaint(_TerminalPainter old) => old.fill != fill || old.color != color || old.cutout != cutout;
 }

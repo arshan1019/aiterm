@@ -24,6 +24,7 @@ Goal: top-tier performance, at least 60 fps (8 ms frames on 120 Hz phones), and 
 
 ## Agents and blocks
 
+- [ ] **Try questions and history live with Claude** on a phone: questions (AskUserQuestion forms), plan approvals, several chats in one project, and History (`session/list`, then `session/load`). They're covered by tests against a scripted agent, built from the adapter's source.
 - [ ] **Test ACP live with Codex and Gemini** on a phone. Claude was tested live against the real adapter (handshake, modes, models, one turn); Codex (`codex-acp`) and Gemini (`gemini --acp`) follow the same protocol but haven't been run. See [docs/DESIGN.md, Status](docs/DESIGN.md#status-october-2026).
 - [ ] **Blocks for plain shell commands,** using OSC 133 command marks. Not started; you asked for agent blocks first.
 

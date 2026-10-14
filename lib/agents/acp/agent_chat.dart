@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'acp_agents.dart';
 import 'acp_connection.dart';
+import 'acp_host.dart';
 
 /// One unit of a chat, shown as a block.
 sealed class ChatEntry {
@@ -116,12 +117,73 @@ class PermissionChoice {
   bool get allows => kind.startsWith('allow');
 }
 
-/// The agent asks before a tool call runs.
-class PermissionRequest {
-  PermissionRequest(this.tool, this.choices, this._answer);
-  final ToolEntry? tool;
-  final List<PermissionChoice> choices;
+/// Something the agent is waiting on you for, oldest first ([seq]).
+sealed class AgentAsk {
+  AgentAsk(this.seq, this._answer);
+  final int seq;
   final Completer<Object?> _answer;
+}
+
+/// The agent asks before a tool call runs.
+class PermissionRequest extends AgentAsk {
+  PermissionRequest(this.tool, this.choices, Completer<Object?> answer, {int seq = 0}) : super(seq, answer);
+  final ToolEntry? tool;
+
+  /// In the agent's order: its preferred answer first (some safety checks
+  /// lead with No).
+  final List<PermissionChoice> choices;
+}
+
+enum AskFieldKind { single, multi, text }
+
+/// One question in an agent's form (ACP elicitation): pick one, pick
+/// several, or type.
+class AskField {
+  const AskField(this.key, this.kind, {this.title, this.description, this.options = const []});
+  final String key;
+  final AskFieldKind kind;
+  final String? title;
+  final String? description;
+
+  /// (value, label, description).
+  final List<(String, String, String?)> options;
+}
+
+/// The agent asks you something (Claude's AskUserQuestion): a message and
+/// fields; nothing is required, so Skip is always fine.
+class QuestionRequest extends AgentAsk {
+  QuestionRequest(this.message, this.fields, Completer<Object?> answer, {required int seq}) : super(seq, answer);
+  final String message;
+  final List<AskField> fields;
+
+  /// Parses an ACP form's `requestedSchema` (an object of properties).
+  static List<AskField> fieldsOf(Object? schema) {
+    final props = schema is Map ? schema['properties'] : null;
+    if (props is! Map) return const [];
+    List<(String, String, String?)> options(Object? list) => [
+          for (final o in (list is List ? list : const []).whereType<Map>())
+            if (o['const'] != null)
+              ('${o['const']}', (o['title'] as String?) ?? '${o['const']}', o['description'] as String?),
+        ];
+    return [
+      for (final MapEntry(:key, :value) in props.entries)
+        if (value is Map)
+          switch (value) {
+            {'type': 'array'} => AskField('$key', AskFieldKind.multi,
+                title: value['title'] as String?,
+                description: value['description'] as String?,
+                options: options((value['items'] as Map?)?['anyOf'] ?? (value['items'] as Map?)?['oneOf'])),
+            _ when value['oneOf'] is List || value['enum'] is List => AskField('$key', AskFieldKind.single,
+                title: value['title'] as String?,
+                description: value['description'] as String?,
+                options: value['oneOf'] is List
+                    ? options(value['oneOf'])
+                    : [for (final e in value['enum'] as List) ('$e', '$e', null)]),
+            _ => AskField('$key', AskFieldKind.text,
+                title: value['title'] as String?, description: value['description'] as String?),
+          },
+    ];
+  }
 }
 
 /// A setting the agent offers for the session: mode (how much it asks)
@@ -164,19 +226,31 @@ abstract class ChatSessions {
   void remember(String agent, String cwd, String? sessionId);
 }
 
-/// An agent as blocks: its ACP session in [cwd], turned into entries.
-class AgentChat extends ChangeNotifier {
+/// An agent as blocks: one ACP session in [cwd], turned into entries. The
+/// agent process ([host]) may be shared with other chats in the folder.
+class AgentChat extends ChangeNotifier implements AcpSessionHandler {
   AgentChat({
     required this.agent,
     required this.name,
     required this.cwd,
-    required this._start,
-    required this._prepare,
+    AcpHost? host,
+    AcpStarter? start,
+    AcpPreparer? prepare,
     required this._sessions,
     this._preferred = const {},
     this._onOptionChosen,
     this.attachmentsDir,
-  });
+    this.remembers = true,
+  })  : host = host ?? AcpHost(agent: agent, cwd: cwd, start: start!, prepare: prepare!),
+        _ownsHost = host == null;
+
+  /// The agent process this chat's session runs on.
+  final AcpHost host;
+  final bool _ownsHost;
+
+  /// This chat picks up (and keeps) the folder's remembered session; extra
+  /// chats with the same agent start fresh.
+  final bool remembers;
 
   /// Where attachments are copied (a guest path), granted to the session up
   /// front where the agent supports extra folders, so reading them asks
@@ -186,13 +260,10 @@ class AgentChat extends ChangeNotifier {
   final AcpAgent agent;
   final String name;
   final String cwd;
-  final AcpStarter _start;
-  final AcpPreparer _prepare;
   final ChatSessions _sessions;
   final Map<String, String> _preferred;
   final void Function(String option, String value)? _onOptionChosen;
 
-  AcpConnection? _connection;
   String? _sessionId;
   var _nextEntry = 0;
   var _disposed = false;
@@ -208,56 +279,49 @@ class AgentChat extends ChangeNotifier {
   /// Slash commands the agent offers: (name, description).
   List<(String, String)> commands = const [];
   final permissions = <PermissionRequest>[];
+  final questions = <QuestionRequest>[];
+  var _askSeq = 0;
+
+  /// Everything waiting on the user, oldest first.
+  List<AgentAsk> get asks => [...permissions, ...questions]..sort((a, b) => a.seq.compareTo(b.seq));
 
   /// A message sent before the session was up, going out once it is.
   (String, List<ChatAttachment>)? _queued;
-  Map<Object?, Object?> _capabilities = const {};
 
   /// A turn is running (or waiting for the session to go out).
   bool get busy => state == ChatState.working || _queued != null;
 
+  /// The ACP session this chat is on (null while it opens one).
+  String? get sessionId => _sessionId;
+
   /// The agent takes images inline (others get them as file links).
-  bool get acceptsImages => (_capabilities['promptCapabilities'] as Map?)?['image'] == true;
+  bool get acceptsImages => (host.capabilities['promptCapabilities'] as Map?)?['image'] == true;
 
   /// The message box takes messages (queued while the agent starts).
   bool get accepting =>
       state == ChatState.ready || state == ChatState.working || state == ChatState.starting || state == ChatState.preparing;
 
-  /// Starts (or restarts) the agent and its session.
-  Future<void> start() async {
-    await _connection?.close();
-    _connection = null;
+  /// The session this chat opens; null: the remembered one (or a new one).
+  String? _load;
+
+  /// Starts the agent (or joins it, when another chat already runs it)
+  /// and opens this chat's session: [load] (a past chat from History), or
+  /// the remembered one.
+  Future<void> start({String? load}) async {
+    if (load != null) _load = load;
     state = ChatState.preparing;
     detail = null;
     _changed();
-    final problem = await _prepare(agent, (line) {
-      detail = line;
-      _changed();
-    });
-    if (_disposed) return;
-    if (problem != null) return _fail(problem);
-    state = ChatState.starting;
-    detail = null;
-    _changed();
     try {
-      final transport = await _start(agent, cwd);
-      final connection = AcpConnection(transport, onNotification: _onNotification, onRequest: _onRequest);
-      _connection = connection;
-      transport.exitCode.then((_) {
-        if (_connection == connection && !_disposed && state != ChatState.failed && state != ChatState.signedOut) {
-          _fail(_lastLog(transport) ?? 'The agent stopped.');
-        }
+      await host.ensure(onProgress: (line) {
+        detail = line;
+        _changed();
       });
-      final init = await connection.request('initialize', {
-        'protocolVersion': 1,
-        'clientCapabilities': {
-          'fs': {'readTextFile': false, 'writeTextFile': false},
-          'terminal': false,
-        },
-        'clientInfo': {'name': 'aiterm', 'version': '1.0.0'},
-      });
-      _capabilities = (init['agentCapabilities'] as Map?) ?? const {};
-      await _openSession(resume: true);
+      if (_disposed) return;
+      state = ChatState.starting;
+      detail = null;
+      _changed();
+      await _openSession(resume: remembers || _load != null);
     } on AcpError catch (e) {
       if (e.code == AcpError.authRequired) {
         state = ChatState.signedOut;
@@ -267,37 +331,50 @@ class AgentChat extends ChangeNotifier {
         _fail(e.message);
       }
     } catch (e) {
-      _fail('$e');
+      _fail(e is String ? e : '$e');
     }
+  }
+
+  @override
+  void onUpdate(AcpParams params) => _onNotification('session/update', params);
+
+  @override
+  Future<Object?> onRequest(String method, AcpParams params) => _onRequest(method, params);
+
+  @override
+  void onHostExit(String reason) {
+    if (!_disposed && state != ChatState.failed && state != ChatState.signedOut) _fail(reason);
   }
 
   /// Opens a session on the running agent: the remembered one when
   /// [resume] and the agent can load it, else a new one. Then sends any
   /// message typed meanwhile.
   Future<void> _openSession({required bool resume}) async {
-    final connection = _connection!;
-    final saved = resume ? _sessions.sessionFor(agent.id, cwd) : null;
-    final sessionCaps = _capabilities['sessionCapabilities'];
-    final extra = attachmentsDir != null && sessionCaps is Map && sessionCaps.containsKey('additionalDirectories')
+    final saved = resume ? (_load ?? _sessions.sessionFor(agent.id, cwd)) : null;
+    _load = null;
+    final extra = attachmentsDir != null && host.can('additionalDirectories')
         ? {'additionalDirectories': [attachmentsDir]}
         : const <String, Object?>{};
-    AcpParams? session;
-    if (saved != null && _capabilities['loadSession'] == true) {
-      _sessionId = saved; // its replayed history arrives before the reply
-      try {
-        session = await connection.request('session/load', {'sessionId': saved, 'cwd': cwd, 'mcpServers': [], ...extra});
-      } on AcpError catch (e) {
-        if (e.code == AcpError.authRequired) rethrow;
-        // Gone (or unreadable): start a new one.
+    final session = await host.opening(this, () async {
+      if (saved != null && host.capabilities['loadSession'] == true) {
+        _sessionId = saved; // its replayed history arrives before the reply
+        host.attach(saved, this);
+        try {
+          return await host.request('session/load', {'sessionId': saved, 'cwd': cwd, 'mcpServers': [], ...extra});
+        } on AcpError catch (e) {
+          host.detach(saved, this);
+          if (e.code == AcpError.authRequired) rethrow;
+          // Gone (or unreadable): start a new one.
+        }
       }
-    }
-    if (session == null) {
       _sessionId = null;
-      session = await connection.request('session/new', {'cwd': cwd, 'mcpServers': [], ...extra});
-      _sessionId = session['sessionId'] as String?;
-    }
+      final created = await host.request('session/new', {'cwd': cwd, 'mcpServers': [], ...extra});
+      _sessionId = created['sessionId'] as String?;
+      if (_sessionId != null) host.attach(_sessionId!, this);
+      return created;
+    });
     if (_disposed) return;
-    _sessions.remember(agent.id, cwd, _sessionId);
+    if (remembers) _sessions.remember(agent.id, cwd, _sessionId);
     _readOptions(session);
     state = ChatState.ready;
     _changed();
@@ -306,11 +383,6 @@ class AgentChat extends ChangeNotifier {
       _queued = null;
       await _prompt(text, files);
     }
-  }
-
-  String? _lastLog(AcpTransport t) {
-    final lines = t.log.trim().split('\n').where((l) => l.trim().isNotEmpty).toList();
-    return lines.isEmpty ? null : lines.last;
   }
 
   void _fail(String why) {
@@ -345,13 +417,12 @@ class AgentChat extends ChangeNotifier {
       ];
 
   Future<void> _prompt(String text, [List<ChatAttachment> files = const []]) async {
-    final connection = _connection;
     final session = _sessionId;
-    if (connection == null || session == null) return;
+    if (session == null) return;
     state = ChatState.working;
     _changed();
     try {
-      final result = await connection.request('session/prompt', {
+      final result = await host.request('session/prompt', {
         'sessionId': session,
         'prompt': _blocks(text, files),
       });
@@ -396,7 +467,7 @@ class AgentChat extends ChangeNotifier {
     final session = _sessionId;
     if (session == null || !busy) return;
     _cancelPermissions();
-    _connection?.notify('session/cancel', {'sessionId': session});
+    host.notify('session/cancel', {'sessionId': session});
     _changed();
   }
 
@@ -409,6 +480,20 @@ class AgentChat extends ChangeNotifier {
     _changed();
   }
 
+  /// Answers [request]'s form with [content] (field key → value).
+  void answerQuestion(QuestionRequest request, Map<String, Object?> content) {
+    if (!questions.remove(request)) return;
+    request._answer.complete({'action': 'accept', 'content': content});
+    _changed();
+  }
+
+  /// Leaves [request] unanswered (the agent carries on without it).
+  void skipQuestion(QuestionRequest request) {
+    if (!questions.remove(request)) return;
+    request._answer.complete({'action': 'decline'});
+    _changed();
+  }
+
   void _cancelPermissions() {
     for (final p in permissions) {
       p._answer.complete({
@@ -416,19 +501,22 @@ class AgentChat extends ChangeNotifier {
       });
     }
     permissions.clear();
+    for (final q in questions) {
+      q._answer.complete({'action': 'cancel'});
+    }
+    questions.clear();
   }
 
   /// Picks [value] for [option] (mode or model), and remembers it.
   Future<void> choose(ChatOption option, String value) async {
-    final connection = _connection;
     final session = _sessionId;
-    if (connection == null || session == null || option.value == value) return;
+    if (session == null || option.value == value) return;
     try {
       if (option.legacyMode) {
-        await connection.request('session/set_mode', {'sessionId': session, 'modeId': value});
+        await host.request('session/set_mode', {'sessionId': session, 'modeId': value});
         _setOption(option.id, value);
       } else {
-        final result = await connection.request(
+        final result = await host.request(
           'session/set_config_option',
           {'sessionId': session, 'configId': option.id, 'value': value},
         );
@@ -457,22 +545,19 @@ class AgentChat extends ChangeNotifier {
   /// A new conversation on the running agent (no restart): the old
   /// session is closed and forgotten, and the chat is usable at once.
   Future<void> restart() async {
-    final connection = _connection;
     final old = _sessionId;
-    _sessions.remember(agent.id, cwd, null);
+    if (remembers) _sessions.remember(agent.id, cwd, null);
     entries.clear();
     _tools.clear();
+    final wasBusy = busy;
     _cancelPermissions();
     _queued = null;
-    if (connection == null || connection.closed || state == ChatState.failed || state == ChatState.signedOut) {
-      return start();
+    if (!host.alive || state == ChatState.failed || state == ChatState.signedOut) return start();
+    if (old != null) {
+      if (wasBusy) host.notify('session/cancel', {'sessionId': old});
+      _closeSession(old);
     }
-    if (busy && old != null) connection.notify('session/cancel', {'sessionId': old});
-    // Frees the old session's agent process, where the agent supports it.
-    final sessionCaps = _capabilities['sessionCapabilities'];
-    if (old != null && sessionCaps is Map && sessionCaps.containsKey('close')) {
-      connection.request('session/close', {'sessionId': old}).ignore();
-    }
+    _sessionId = null;
     state = ChatState.starting;
     _changed();
     try {
@@ -485,6 +570,12 @@ class AgentChat extends ChangeNotifier {
         _fail(e.message);
       }
     }
+  }
+
+  /// Lets go of session [id]; frees its agent process where the agent can.
+  void _closeSession(String id) {
+    host.detach(id, this);
+    if (host.alive && host.can('close')) host.request('session/close', {'sessionId': id}).ignore();
   }
 
   void _setOption(String id, String value) {
@@ -642,6 +733,15 @@ class AgentChat extends ChangeNotifier {
   }
 
   Future<Object?> _onRequest(String method, AcpParams params) {
+    if (method == 'elicitation/create') {
+      if (params['mode'] != 'form') return Future.value({'action': 'decline'});
+      final answer = Completer<Object?>();
+      questions.add(QuestionRequest((params['message'] as String?) ?? '', QuestionRequest.fieldsOf(params['requestedSchema']),
+          answer,
+          seq: _askSeq++));
+      _changed();
+      return answer.future;
+    }
     if (method != 'session/request_permission') {
       return Future.error(const AcpError(AcpError.methodNotFound, 'Not supported'));
     }
@@ -654,7 +754,7 @@ class AgentChat extends ChangeNotifier {
               (o['kind'] as String?) ?? 'allow_once'),
     ];
     final answer = Completer<Object?>();
-    permissions.add(PermissionRequest(tool, choices, answer));
+    permissions.add(PermissionRequest(tool, choices, answer, seq: _askSeq++));
     _changed();
     return answer.future;
   }
@@ -676,7 +776,8 @@ class AgentChat extends ChangeNotifier {
     _disposed = true;
     _notify?.cancel();
     _cancelPermissions();
-    _connection?.close();
+    if (_sessionId case final id?) _closeSession(id);
+    if (_ownsHost) host.dispose();
     super.dispose();
   }
 }

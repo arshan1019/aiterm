@@ -293,6 +293,7 @@ Android: "less is more"; clear clicks, never buzzy ("given the choice of buzzy o
 | Moment | Haptic | Why |
 |---|---|---|
 | A switch flipped | TOGGLE_ON / TOGGLE_OFF | The system's own pattern for switches |
+| The agent asks a question | Attention (a firm click) | Like a permission request: it needs you |
 | Send, pick a mode, open a block, attachments added, a "/" command picked | A tick | A small confirmation of a choice |
 | The agent asks permission | Attention (a firm click) | The one moment that needs you |
 | A turn finishes / allowed / committed | CONFIRM | Something finished well |
@@ -317,11 +318,17 @@ Rules: haptics fire only while that screen is visible and the app is in front. T
 | A large dark accent circle reads as a black blob in light mode | Your on-device test | Send is tonal mint (`accentContainer`) in light mode and the bright accent in dark |
 | A pending turn needs a living, honest indicator | Composer guides (pulsing, shimmer); [thinking-orbs](https://pub.dev/packages/flutter_thinking_orbs) (MIT, a port of Jakub Antalik's orbs) | A monochrome thinking orb whose motion matches the activity; a still frame when animations are off |
 | Streaming must not shake what you're reading | Your on-device test | Replies parse once; a layer per block; the rows you're reading hold still; an arrow returns you to the latest |
+| A request card must keep one shape whatever the agent sends: long option labels, a plan to read, No first | Your on-device test; Claude's adapter source (option order carries its default; plan approvals carry the plan) | One ask frame: header, capped scrollable content, then full-width choices one per row in the agent's order; preferred filled, declines in danger |
+| Questions need a real form, or Claude's AskUserQuestion fails | ACP elicitation; the adapter needs `elicitation.form` | Options as tappable radio or check rows with descriptions, an "Other" box, Skip; one pick-one question answers on tap |
+| Attach, text and Send must share one line | Your on-device test | 48 dp each: 24 dp text line plus 12 + 12 padding, a 48 dp attach button, and a 40 dp send circle with a 48 dp touch area |
+| History reads best as a dated list with search | Chrome's history (your reference); our list, loading, empty-state and error rules | Grouped rows by date (Today, Yesterday, Previous 7 days, months); search past 8 chats; skeleton rows after 400 ms; errors inline with Try again; empty state is one action, "New ⟨agent⟩ chat" |
+| A second chat shouldn't cost a second agent process on a phone | ACP sessions over one connection | One adapter per agent per project hosts every chat with it |
 
 ### Engineering lessons that shaped the experience
 
 | Learned | Applied |
 |---|---|
+| Material Symbols' terminal glyph has no filled form (folder and settings do) | The selected Terminal tab paints the glyph's own outline, filled, with `>_` cut out in the selection pill's color, animated like the others |
 | Debug builds don't tree-shake icon fonts; the full Material Symbols set would add about 30 MB | `tool/icons/generate.py` subsets the variable font to the app's icons (about 100 KB) and generates `AppIcons` |
 | `gh auth login` is reliable without a terminal; scraping its prompts wasn't | Sign-in runs on plain pipes and reads the code and URL |
 | git and executables break on the phone's FUSE storage | Projects live in Linux; phone files come in by import |
