@@ -72,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
                 title: const Text('Linux', style: TextStyle(fontSize: 14)),
                 subtitle: Text(switch (s.linux.status) {
                   _ when s.linux.usesAndroidShell => "Using Android's shell for this session.",
-                  LinuxStatus.ready => 'Alpine Linux via proot. Install packages with apk.',
+                  LinuxStatus.ready => 'Alpine Linux',
                   LinuxStatus.installing => 'Installing…',
                   LinuxStatus.missing => 'Not installed yet. Set it up from Projects.',
                 }, style: TextStyle(color: c.textMuted, fontSize: 12)),
@@ -86,8 +86,6 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ListTile(
                 title: const Text('AI agents', style: TextStyle(fontSize: 14)),
-                subtitle: Text('Install or open Claude Code, Gemini CLI, Codex CLI',
-                    style: TextStyle(color: c.textMuted, fontSize: 12)),
                 trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
                 onTap: () => openAgents(context),
               ),
@@ -109,10 +107,7 @@ class SettingsScreen extends StatelessWidget {
             children: [
               ListTile(
                 title: const Text('aiterm', style: TextStyle(fontSize: 14)),
-                subtitle: Text(
-                  'AI coding agents on your phone: projects, git, terminal and files.',
-                  style: TextStyle(color: c.textMuted, fontSize: 12),
-                ),
+                subtitle: Text('Version 1.0.0', style: TextStyle(color: c.textMuted, fontSize: 12)),
               ),
             ],
           ),
@@ -197,7 +192,6 @@ class _GitHubSection extends StatelessWidget {
             if (user == null)
               ListTile(
                 title: const Text('Sign in to GitHub', style: TextStyle(fontSize: 14)),
-                subtitle: Text('Clone, push and pull without passwords', style: TextStyle(color: c.textMuted, fontSize: 12)),
                 trailing: TextButton(onPressed: () => signInToGitHub(context), child: const Text('Sign in')),
               )
             else ...[
@@ -209,7 +203,6 @@ class _GitHubSection extends StatelessWidget {
             ],
             ListTile(
               title: const Text('Commit name & email', style: TextStyle(fontSize: 14)),
-              subtitle: Text('Shown on every commit you make', style: TextStyle(color: c.textMuted, fontSize: 12)),
               trailing: Icon(Icons.chevron_right_rounded, color: c.textMuted),
               onTap: () => _identity(context),
             ),
@@ -266,14 +259,6 @@ class _SshSection extends StatelessWidget {
       builder: (context, _) => _Section(
         title: 'SSH keys',
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-            child: Text(
-              'Stored in Android\'s keystore and never leave it. ssh and git in Linux use them '
-              'after your fingerprint or screen lock.',
-              style: TextStyle(color: c.textMuted, fontSize: 12, height: 1.4),
-            ),
-          ),
           for (final key in keys.keys)
             ListTile(
               title: Text(key.name, style: const TextStyle(fontSize: 14)),
@@ -350,14 +335,6 @@ class _BackupSection extends StatelessWidget {
       builder: (context, _) => _Section(
         title: 'Backup',
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-            child: Text(
-              'Everything in Linux (installed tools, your files) plus settings and tabs, '
-              'in one file. Save it to your phone or Google Drive; restore it on any phone.',
-              style: TextStyle(color: c.textMuted, fontSize: 12, height: 1.4),
-            ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
             child: Row(

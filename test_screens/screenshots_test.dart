@@ -143,8 +143,8 @@ void main() {
     await settle(tester);
     await tester.tap(find.byType(FloatingActionButton));
     await settle(tester);
-    await shot(tester, '05-new-project-sheet');
-    await tester.tap(find.text('Clone a repository'));
+    await shot(tester, '05-add-project-sheet');
+    await tester.tap(find.text('Clone repository'));
     await settle(tester);
     await shot(tester, '06-new-project-clone');
   });

@@ -13,24 +13,25 @@ import 'project_service.dart';
 import 'project_store.dart';
 import 'templates.dart';
 
-/// Where new projects go unless the user picks another folder.
+enum NewProjectKind { create, clone }
 
-enum NewProjectKind { empty, template, clone }
+/// The ways to add a project, as every code tool offers them (New, Clone,
+/// Open): one level, one verb each, the same list in the empty state and
+/// behind the Add project button.
+List<(IconData, String, void Function(BuildContext))> get addProjectActions => [
+      (Icons.create_new_folder_outlined, 'New project', (c) => _push(c, NewProjectKind.create)),
+      (Icons.cloud_download_outlined, 'Clone repository', (c) => _push(c, NewProjectKind.clone)),
+      (Icons.smartphone_rounded, 'Import from phone', importProjectFromPhone),
+      (Icons.folder_open_rounded, 'Open Linux folder', openLinuxFolderAsProject),
+    ];
 
-/// "New project": empty, from a template, clone, or an existing folder.
-void showNewProject(BuildContext context) {
-  void push(NewProjectKind kind) => Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => NewProjectScreen(kind: kind),
-      ));
-  showActionSheet(context, title: 'New project', actions: [
-    SheetAction(Icons.create_new_folder_outlined, 'Empty project', () => push(NewProjectKind.empty), accent: true),
-    SheetAction(Icons.dashboard_customize_outlined, 'From a template', () => push(NewProjectKind.template)),
-    SheetAction(Icons.cloud_download_outlined, 'Clone a repository', () => push(NewProjectKind.clone)),
-    null,
-    SheetAction(Icons.folder_open_rounded, 'Open a folder in Linux', () => openLinuxFolderAsProject(context)),
-    SheetAction(Icons.smartphone_rounded, 'Open a folder on phone', () => openPhoneFolderAsProject(context)),
-  ]);
-}
+void _push(BuildContext context, NewProjectKind kind) =>
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => NewProjectScreen(kind: kind)));
+
+void showAddProject(BuildContext context) => showActionSheet(context, title: 'Add project', actions: [
+      for (final (i, (icon, label, run)) in addProjectActions.indexed)
+        SheetAction(icon, label, () => run(context), accent: i == 0),
+    ]);
 
 class NewProjectScreen extends StatefulWidget {
   const NewProjectScreen({super.key, required this.kind});
@@ -46,7 +47,8 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
   final _name = TextEditingController();
   final _url = TextEditingController();
   String _parent = projectsFolder;
-  ProjectTemplate _template = projectTemplates.first;
+  /// Null: an empty project.
+  ProjectTemplate? _template;
   bool _busy = false;
   String? _error;
 
@@ -107,11 +109,12 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
     });
     final svc = _s.projectService;
     try {
-      final Project p = switch (widget.kind) {
-        NewProjectKind.empty => await svc.createEmpty(name: _name.text.trim(), path: _path),
-        NewProjectKind.template => await svc.createFromTemplate(_template, name: _name.text.trim(), path: _path),
-        NewProjectKind.clone => await svc.clone(_url.text.trim(), path: _path),
-      };
+      final template = _template;
+      final Project p = _clone
+          ? await svc.clone(_url.text.trim(), path: _path)
+          : template == null
+              ? await svc.createEmpty(name: _name.text.trim(), path: _path)
+              : await svc.createFromTemplate(template, name: _name.text.trim(), path: _path);
       // The form gives way to the new project (back goes to Projects).
       _s.showProject(p);
     } on GitError catch (e) {
@@ -141,11 +144,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final title = switch (widget.kind) {
-      NewProjectKind.empty => 'Empty project',
-      NewProjectKind.template => 'From a template',
-      NewProjectKind.clone => 'Clone a repository',
-    };
+    final title = _clone ? 'Clone repository' : 'New project';
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: Column(
@@ -154,24 +153,6 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
-                if (widget.kind == NewProjectKind.template) ...[
-                  _label(context, 'Template'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final t in projectTemplates)
-                        ChoiceChip(
-                          label: Text(t.name),
-                          selected: t == _template,
-                          onSelected: (_) => setState(() => _template = t),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(_template.description, style: TextStyle(color: c.textMuted, fontSize: 12)),
-                  const SizedBox(height: 20),
-                ],
                 if (_clone) ...[
                   _label(context, 'Repository'),
                   TextField(
@@ -184,10 +165,24 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                   _label(context, 'Name'),
                   TextField(
                     controller: _name,
-                    autofocus: widget.kind == NewProjectKind.empty,
+                    autofocus: true,
                     textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(hintText: 'e.g. Weather app'),
                     onSubmitted: (_) => _ready ? _create() : null,
+                  ),
+                  const SizedBox(height: 20),
+                  _label(context, 'Start from'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final t in [null, ...projectTemplates])
+                        ChoiceChip(
+                          label: Text(t?.name ?? 'Empty'),
+                          selected: t == _template,
+                          onSelected: (_) => setState(() => _template = t),
+                        ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 20),

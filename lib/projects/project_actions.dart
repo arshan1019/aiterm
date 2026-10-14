@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../phone/phone_files.dart';
-import '../platform/android_env.dart';
 import '../shared/action_sheet.dart';
 import '../shared/folder_picker.dart';
 import '../shared/form.dart';
@@ -22,7 +21,7 @@ void showProjectActions(BuildContext context, Project p, {bool showOpen = true})
       final name = await showNameDialog(context, title: 'Rename project', action: 'Rename', initial: p.name);
       if (name != null) await s.projects.rename(p, name);
     }),
-    SheetAction(Icons.smartphone_rounded, 'Copy to phone', () => _export(context, p)),
+    SheetAction(Icons.ios_share_rounded, 'Export to phone', () => _export(context, p)),
     null,
     SheetAction(Icons.playlist_remove_rounded, 'Remove from projects', () => _remove(context, p)),
     SheetAction(Icons.delete_outline_rounded, 'Delete project and files', () => _delete(context, p), danger: true),
@@ -40,11 +39,11 @@ Future<void> _export(BuildContext context, Project p) async {
   final messenger = ScaffoldMessenger.of(context);
   final folder = await s.phone.pickFolder(keep: false);
   if (folder == null) return;
-  messenger.showSnackBar(const SnackBar(content: Text('Copying to phone…')));
+  messenger.showSnackBar(const SnackBar(content: Text('Exporting…')));
   try {
     await s.phone.exportTo([s.linux.hostPath(p.path)], PhonePath.parse(folder.path)!);
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text('Copied to ${folder.name}')));
+    messenger.showSnackBar(SnackBar(content: Text('Exported to ${folder.name}')));
   } on PlatformException catch (e) {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Couldn\'t copy')));
@@ -82,14 +81,6 @@ Future<void> _delete(BuildContext context, Project p) async {
   } on FileSystemException catch (_) {}
 }
 
-/// "Open a folder": one in Linux, or one on the phone.
-void showOpenFolder(BuildContext context) {
-  showActionSheet(context, title: 'Open a folder', actions: [
-    SheetAction(Icons.terminal_rounded, 'Folder in Linux', () => openLinuxFolderAsProject(context)),
-    SheetAction(Icons.smartphone_rounded, 'Folder on phone', () => openPhoneFolderAsProject(context)),
-  ]);
-}
-
 Future<void> openLinuxFolderAsProject(BuildContext context) async {
   final s = context.services;
   final path = await pickLinuxFolder(context, title: 'Open a folder', action: 'Open');
@@ -97,35 +88,15 @@ Future<void> openLinuxFolderAsProject(BuildContext context) async {
   s.showProject(await s.projectService.openExisting(path));
 }
 
-/// A project from phone storage: worked on where it is (with all-files
-/// access, Linux sees the phone at /sdcard), or copied into Linux, where
-/// every tool works (phone storage has no symlinks or executables).
-Future<void> openPhoneFolderAsProject(BuildContext context) async {
-  var allFiles = false;
-  try {
-    allFiles = await AndroidEnv.storageAccess();
-  } catch (_) {}
-  if (!context.mounted) return;
-  showActionSheet(context, title: 'Folder on phone', actions: [
-    if (allFiles) SheetAction(Icons.smartphone_rounded, 'Open in place', () => _openInPlace(context), accent: true),
-    SheetAction(Icons.download_rounded, 'Copy into Linux', () => _copyIn(context), accent: !allFiles),
-    if (!allFiles) SheetAction(Icons.folder_open_rounded, 'Allow all files to open in place', AndroidEnv.requestStorageAccess),
-  ]);
-}
-
-Future<void> _openInPlace(BuildContext context) async {
-  final s = context.services;
-  final path = await pickLinuxFolder(context, title: 'Folder on phone', start: '/sdcard', action: 'Open');
-  if (path == null) return;
-  s.showProject(await s.projectService.openExisting(path));
-}
-
-Future<void> _copyIn(BuildContext context) async {
+/// Copies a phone folder (picked with Android's picker) into Linux, where
+/// every tool works, and opens it. The phone copy stays as it was; Export to
+/// phone sends the project back.
+Future<void> importProjectFromPhone(BuildContext context) async {
   final s = context.services;
   final messenger = ScaffoldMessenger.of(context);
   final folder = await s.phone.pickFolder(keep: false);
   if (folder == null) return;
-  messenger.showSnackBar(SnackBar(content: Text('Copying ${folder.name}…')));
+  messenger.showSnackBar(SnackBar(content: Text('Importing ${folder.name}…')));
   try {
     final parent = s.linux.hostPath(projectsFolder);
     await Directory(parent).create(recursive: true);

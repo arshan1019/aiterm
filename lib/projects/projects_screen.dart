@@ -88,11 +88,11 @@ class _Projects extends StatelessWidget {
         builder: (context, _) => s.projects.projects.isEmpty
             ? const SizedBox.shrink()
             : FloatingActionButton.extended(
-        onPressed: () => showNewProject(context),
+        onPressed: () => showAddProject(context),
         backgroundColor: c.accent,
         foregroundColor: c.bg,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('New project'),
+        label: const Text('Add project'),
       ),
       ),
     );
@@ -103,11 +103,11 @@ class _Projects extends StatelessWidget {
 void openAgentInProject(BuildContext context, String id) {
   final s = context.services;
   final projects = s.projects.projects;
-  if (projects.isEmpty) return showNewProject(context);
+  if (projects.isEmpty) return showAddProject(context);
   showActionSheet(context, title: 'Open ${AgentInstaller.recipe(id).name} in', actions: [
     for (final p in projects.take(6)) SheetAction(Icons.folder_rounded, p.name, () => s.agents.open(id, cwd: p.path)),
     null,
-    SheetAction(Icons.add_rounded, 'New project', () => showNewProject(context)),
+    SheetAction(Icons.add_rounded, 'Add project', () => showAddProject(context)),
   ]);
 }
 
@@ -176,34 +176,32 @@ class _AgentsPrompt extends StatelessWidget {
   }
 }
 
+/// No projects yet: the ways to add one, right there (the same list as the
+/// Add project button).
 class _Empty extends StatelessWidget {
   const _Empty();
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final actions = addProjectActions;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 48, 12, 0),
+      padding: const EdgeInsets.fromLTRB(8, 40, 8, 0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Icon(Icons.folder_special_outlined, size: 44, color: c.accent),
           const SizedBox(height: 12),
-          Text('Start a project', style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          Text(
-            'A project is a folder for your code. Agents, terminals and git all work inside it. '
-            'Start fresh, use a template, or clone from GitHub.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: () => showNewProject(context),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Create your first project'),
-          ),
-          const SizedBox(height: 4),
-          TextButton(onPressed: () => showOpenFolder(context), child: const Text('Or open a folder you already have')),
+          Text('No projects yet',
+              textAlign: TextAlign.center, style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 24),
+          for (final (i, (icon, label, run)) in actions.indexed) ...[
+            if (i == 0)
+              FilledButton.icon(onPressed: () => run(context), icon: Icon(icon, size: 18), label: Text(label))
+            else
+              OutlinedButton.icon(onPressed: () => run(context), icon: Icon(icon, size: 18), label: Text(label)),
+            const SizedBox(height: 10),
+          ],
         ],
       ),
     );

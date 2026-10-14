@@ -41,11 +41,6 @@ class _AgentList extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          Text(
-            'Install with one tap. Sign in the first time you open one, in a project.',
-            style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 20),
           for (final agent in agentCatalog) ...[
             _AgentCard(agent: agent, installer: installer),
             const SizedBox(height: 12),
@@ -104,7 +99,7 @@ class _AgentCard extends StatelessWidget {
                       children: [
                         Text(agent.name, style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 2),
-                        Text('${agent.vendor} · ${agent.tagline}',
+                        Text(agent.vendor,
                             style: TextStyle(color: c.textMuted, fontSize: 12)),
                       ],
                     ),

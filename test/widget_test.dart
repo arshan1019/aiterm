@@ -44,6 +44,9 @@ void main() {
 
   tearDown(() => dir.deleteSync(recursive: true));
 
+  /// A destination of the bottom navigation bar showing now.
+  Finder navTab(String label) => find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+
   /// Starts the app; [home] false switches to the terminal tab, which most
   /// tests drive (agents is the home tab).
   Future<AppServices> boot(WidgetTester tester, {bool home = false}) async {
@@ -51,7 +54,7 @@ void main() {
     await tester.pumpWidget(AiTermApp(services: services));
     await tester.pumpAndSettle();
     if (!home) {
-      await tester.tap(find.text('terminal'));
+      await tester.tap(navTab('Terminal'));
       await tester.pumpAndSettle();
     }
     return services;
@@ -70,9 +73,9 @@ void main() {
 
   testWidgets('first launch shows the tabs and Linux setup', (tester) async {
     await boot(tester);
-    expect(find.text('terminal'), findsOneWidget);
-    expect(find.text('files'), findsOneWidget);
-    expect(find.text('settings'), findsOneWidget);
+    expect(navTab('Terminal'), findsOneWidget);
+    expect(navTab('Files'), findsOneWidget);
+    expect(navTab('Settings'), findsOneWidget);
     expect(find.text('Set up aiterm'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
@@ -81,11 +84,11 @@ void main() {
     await boot(tester);
 
     // Android's shell lives in Settings, out of the way of first-run setup.
-    await tester.tap(find.text('settings'));
+    await tester.tap(navTab('Settings'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Use'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('terminal'));
+    await tester.tap(navTab('Terminal'));
     await tester.pumpAndSettle();
     expect(find.text('shell'), findsOneWidget);
 
@@ -100,13 +103,13 @@ void main() {
     await tester.tap(find.text('Pin'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('settings'));
+    await tester.tap(navTab('Settings'));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('terminal'));
+    await tester.tap(navTab('Terminal'));
     await tester.pumpAndSettle();
 
     // Close the unpinned tab via its close button.
@@ -142,10 +145,10 @@ void main() {
     expect(find.text('Open'), findsOneWidget);
 
     // Switching screens with the toolbar up must hide it cleanly.
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await tester.pumpAndSettle();
     expect(find.text('Open'), findsNothing);
-    await tester.tap(find.text('terminal'));
+    await tester.tap(navTab('Terminal'));
     await tester.pumpAndSettle();
 
     // Show the toolbar again, then close the tab underneath it.
@@ -170,7 +173,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Files: into a folder and back, then open the text file.
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await settleIo(tester);
     await tester.tap(find.text('proj'));
     await settleIo(tester);
@@ -233,7 +236,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Files: new folder via the dialog.
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await settleIo(tester);
     await tester.tap(find.byIcon(Icons.add_rounded).last);
     await tester.pumpAndSettle();
@@ -253,7 +256,7 @@ void main() {
     final services = await boot(tester);
     await settleIo(tester);
 
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await settleIo(tester);
     await tester.tap(find.byTooltip('Folder actions'));
     await tester.pumpAndSettle();
@@ -265,7 +268,7 @@ void main() {
     expect(services.tabs.active.cwd, '/root');
 
     // Each row has a visible actions button; nothing needs a long-press.
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await settleIo(tester);
     await tester.tap(find.byTooltip('Actions').first);
     await tester.pumpAndSettle();
@@ -278,11 +281,11 @@ void main() {
 
   testWidgets('switching tabs or screens does not pop the keyboard up', (tester) async {
     await boot(tester);
-    await tester.tap(find.text('settings'));
+    await tester.tap(navTab('Settings'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Use'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('terminal'));
+    await tester.tap(navTab('Terminal'));
     await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isFalse, reason: 'not on first show');
 
@@ -292,9 +295,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isFalse, reason: 'not on tab switch');
 
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('terminal'));
+    await tester.tap(navTab('Terminal'));
     await tester.pumpAndSettle();
     expect(tester.testTextInput.isVisible, isFalse, reason: 'not when returning to the terminal');
 
@@ -307,7 +310,7 @@ void main() {
 
   testWidgets('home is Projects; first launch sets up Linux there', (tester) async {
     await boot(tester, home: true);
-    expect(find.text('projects'), findsOneWidget);
+    expect(navTab('Projects'), findsOneWidget);
     // First launch: one setup screen, agents picked up front.
     expect(find.text('Set up aiterm'), findsOneWidget);
     for (final name in ['Claude Code', 'Gemini CLI', 'Codex CLI']) {
@@ -323,7 +326,7 @@ void main() {
       ..writeAsStringSync('x');
     final services = await boot(tester, home: true);
     expect(services.navigation.tab.name, 'projects');
-    expect(find.text('Start a project'), findsOneWidget);
+    expect(find.text('No projects yet'), findsOneWidget);
     expect(find.text('Set up an AI agent'), findsOneWidget);
 
     await tester.tap(find.text('Agents'));
@@ -332,17 +335,16 @@ void main() {
       expect(find.text(name), findsOneWidget);
     }
     expect(find.text('Install'), findsNWidgets(3));
-    expect(find.textContaining('Sign in the first time'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Create your first project'));
-    await tester.pumpAndSettle();
-    for (final way in ['Empty project', 'From a template', 'Clone a repository', 'Open a folder in Linux', 'Open a folder on phone']) {
+    // The ways to add a project, one verb each, right in the empty state.
+    for (final way in ['New project', 'Clone repository', 'Import from phone', 'Open Linux folder']) {
       expect(find.text(way), findsOneWidget);
     }
-    await tester.tap(find.text('From a template'));
+    await tester.tap(find.text('New project'));
     await tester.pumpAndSettle();
+    expect(find.text('Empty'), findsOneWidget); // templates are a choice on the same screen
     expect(find.text('Node.js'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Weather app');
     await tester.pump();
@@ -374,11 +376,12 @@ void main() {
     await tester.tap(find.text('Weather app'));
     await settleIo(tester);
     // A project is a workspace with its own tabs; it opens on agent.
-    for (final t in ['agent', 'changes 2', 'files', 'preview']) {
-      expect(find.text(t), findsOneWidget);
+    for (final t in ['Agent', 'Changes', 'Files', 'Preview']) {
+      expect(navTab(t), findsOneWidget);
     }
+    expect(navTab('2'), findsOneWidget); // the changes badge
     expect(find.text('Install Claude Code'), findsOneWidget); // no agent yet: one tap to get one
-    await tester.tap(find.text('changes 2'));
+    await tester.tap(navTab('Changes'));
     await settleIo(tester);
 
     expect(find.text('CHANGES · 2'), findsOneWidget);
@@ -398,7 +401,7 @@ void main() {
     expect(find.text('Committed'), findsNothing);
 
     // Files: the project's own folder, without leaving the project.
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await settleIo(tester);
     expect(find.text('main.dart'), findsOneWidget);
     expect(services.navigation.shownProject?.id, '1');
@@ -419,13 +422,13 @@ void main() {
     await tester.binding.handlePopRoute();
     await settleIo(tester);
     expect(services.navigation.atTabs, isTrue); // back on the project list
-    await tester.tap(find.text('terminal'));
+    await tester.tap(navTab('Terminal'));
     await settleIo(tester);
     expect(find.text('shell'), findsOneWidget);
     expect(find.text('app'), findsNothing);
 
     // Coming back to the project finds its session where it was.
-    await tester.tap(find.text('projects'));
+    await tester.tap(navTab('Projects'));
     await settleIo(tester);
     await tester.tap(find.text('Weather app'));
     await settleIo(tester);
@@ -502,7 +505,7 @@ void main() {
     messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
     await boot(tester);
     await settleIo(tester);
-    await tester.tap(find.text('files'));
+    await tester.tap(navTab('Files'));
     await settleIo(tester);
 
     // Phone without permission: choose folders or allow all files, side by side.

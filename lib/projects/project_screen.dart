@@ -11,7 +11,7 @@ import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/fade_indexed_stack.dart';
 import '../shared/format.dart';
-import '../shared/text_tabs.dart';
+import '../shared/bottom_tabs.dart';
 import '../terminal/terminal_deck.dart';
 import 'project.dart';
 import 'project_actions.dart';
@@ -91,14 +91,15 @@ class _ProjectScreenState extends State<ProjectScreen> {
     ]);
   }
 
-  String _label(WorkspaceTab t) {
+  List<BottomTab> _tabs() {
     final changed = _repo?.status?.changes.length ?? 0;
-    return switch (t) {
-      WorkspaceTab.agent => 'agent',
-      WorkspaceTab.changes => changed > 0 ? 'changes $changed' : 'changes',
-      WorkspaceTab.files => 'files',
-      WorkspaceTab.preview => _s.preview.livePorts.isEmpty ? 'preview' : 'preview ●',
-    };
+    return [
+      const BottomTab('Agent', Icons.auto_awesome_outlined, Icons.auto_awesome_rounded),
+      BottomTab('Changes', Icons.call_split_outlined, Icons.call_split_rounded, badge: changed > 0 ? '$changed' : null),
+      const BottomTab('Files', Icons.folder_outlined, Icons.folder_rounded),
+      BottomTab('Preview', Icons.wifi_tethering_outlined, Icons.wifi_tethering_rounded,
+          badge: _s.preview.livePorts.isEmpty ? null : ''),
+    ];
   }
 
   Widget _content(WorkspaceTab t, Project p) => switch (t) {
@@ -154,22 +155,15 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 IconButton(tooltip: 'Project actions', icon: const Icon(Icons.more_vert_rounded), onPressed: () => showProjectActions(context, p, showOpen: false)),
               ],
             ),
-            body: Column(
+            bottomNavigationBar: BottomTabs(
+              tabs: _tabs(),
+              selected: tab.index,
+              onSelect: (i) => _nav.openWorkspaceTab(WorkspaceTab.values[i]),
+            ),
+            body: FadeIndexedStack(
+              index: tab.index,
               children: [
-                TextTabs<WorkspaceTab>(
-                  tabs: WorkspaceTab.values,
-                  label: _label,
-                  selected: tab,
-                  onSelect: _nav.openWorkspaceTab,
-                ),
-                Expanded(
-                  child: FadeIndexedStack(
-                    index: tab.index,
-                    children: [
-                      for (final t in WorkspaceTab.values) _built.contains(t) ? _content(t, p) : const SizedBox.shrink(),
-                    ],
-                  ),
-                ),
+                for (final t in WorkspaceTab.values) _built.contains(t) ? _content(t, p) : const SizedBox.shrink(),
               ],
             ),
           ),
@@ -203,23 +197,16 @@ class _AgentLauncher extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 32, 20, 32),
           children: [
             Icon(Icons.auto_awesome_rounded, size: 36, color: c.accent),
-            const SizedBox(height: 12),
-            Text(
-              main == null ? 'Work on ${project.name} with AI' : 'Start ${main.name} in ${project.name}',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: c.text, fontSize: 17, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              busy.isNotEmpty
-                  ? '${busy.first.name}: ${installer.stateOf(busy.first.id).step ?? 'Installing'}…'
-                  : main == null
-                      ? 'Install a coding agent. It works in this project\'s folder; review its changes in the changes tab.'
-                      : 'It works in this project\'s folder. Review what it changes in the changes tab.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
-            ),
             const SizedBox(height: 20),
+            // Only state is worth words here: an install in progress.
+            if (busy.isNotEmpty) ...[
+              Text(
+                '${busy.first.name}: ${installer.stateOf(busy.first.id).step ?? 'Installing'}…',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (main == null) ...[
               FilledButton.icon(
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
@@ -288,13 +275,7 @@ class _PreviewTabState extends State<_PreviewTab> {
             children: [
               Icon(Icons.wifi_tethering_rounded, size: 40, color: c.textMuted),
               const SizedBox(height: 12),
-              Text('Nothing to preview yet', style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Text(
-                'Start a dev server (ask the agent, or run e.g. npm run dev). It shows up here as soon as it\'s listening.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.4),
-              ),
+              Text('No server running', style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),
               OutlinedButton(onPressed: widget.onAgent, child: const Text('Go to agent')),
             ],

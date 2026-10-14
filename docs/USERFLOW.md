@@ -206,7 +206,7 @@ The first projects build had two hierarchies fighting each other: the top tabs (
 
 ```mermaid
 flowchart TB
-  subgraph Shell["App: top tabs (tabs are not history)"]
+  subgraph Shell["App: bottom tabs (tabs are not history)"]
     P["projects*"]
     T["terminal: shells outside projects"]
     F["files: Linux home + phone"]
@@ -221,10 +221,11 @@ flowchart TB
   P -->|"tap a project"| A
   C -->|"tap a file"| D["Diff page"]
   WF -->|"tap a text file"| E["Editor page"]
-  P -->|"New project"| N["New project form"]
+  P -->|"New project / Clone"| N["New project form"]
   N -->|"Create: form replaced by"| A
   P -->|"Agents"| AG["Agents page"]
   F -->|"Open as project / Open in agent"| A
+  P -->|"Import from phone (copied into Linux)"| A
   T -->|"Git changes here"| G["Git page (folder outside projects)"]
 ```
 
@@ -260,7 +261,24 @@ The app bar's ← in a workspace is "up": it leaves the project directly. Switch
 
 The last row is deliberate: a project always opens over the project list, wherever it was opened from, so back from a project is always the same place.
 
-## 7. Screen by screen
+## 7. Design principles we follow
+
+Where each rule comes from, so changes can be checked against it.
+
+| Rule | Source | In aiterm |
+|---|---|---|
+| Navigation in thumb reach: titles at the top, things you tap at the bottom | Samsung One UI (viewing area / interaction area); Apple HIG tab bars; Material 3 navigation bar; Wroblewski, *Mobile First* | App tabs and a project's tabs are bottom bars with icons and labels, hidden while typing |
+| 3–5 top-level destinations, each with an icon and a label | Material 3, Apple HIG | Projects · Terminal · Files · Settings; Agent · Changes · Files · Preview |
+| One primary action per screen | Material 3 FAB guidance | Projects: Add project; a project's agent tab: Open ⟨agent⟩ |
+| Few choices, one level deep, one verb each | Hick's law; Android Studio (New Project · Open · Get from VCS), GitHub Desktop (Create · Clone · Add) | Add project: New project · Clone repository · Import from phone · Open Linux folder (the same list in the empty state) |
+| Self-evident labels; omit needless words | Krug, *Don't Make Me Think*; Microsoft writing style (sentence case, verb buttons) | No explanatory captions; buttons say what they do; sentence case |
+| Prevent errors rather than explain them | Nielsen's heuristics (error prevention) | Phone folders are imported into Linux, where every tool works, instead of opened in place on storage without symlinks or executables |
+| Consistency and standards | Nielsen; Norman, *The Design of Everyday Things* (mapping, signifiers) | Import / Export as a pair; one dialog layout (AppDialog); one button shape; destructive actions in red and confirmed |
+| Empty states show the way in | Nielsen Norman Group, empty states | "No projects yet" with the four ways to add one |
+| Visible feedback for every action | Norman (feedback); Nielsen (system status) | Progress for installs and copies; results stay in place (git outcome card) |
+| Touch targets at least 44 pt / 48 dp | Apple HIG, Material 3 | Buttons 44 dp tall; terminal tabs 44 dp with a full-size close target |
+
+## 8. Screen by screen
 
 The single most important action per screen, and what is demoted.
 
@@ -274,7 +292,7 @@ The single most important action per screen, and what is demoted.
 | **Files** | Browse / open | ⋮ actions, Linux/Phone, paste bar | Nothing |
 | **Settings** | GitHub, Keep alive | SSH keys, Appearance | Android shell, Backup → Advanced |
 
-## 8. Implementation plan
+## 9. Implementation plan
 
 In order of impact; each step ships with tests (unit for models, widget on CI).
 
@@ -287,7 +305,7 @@ In order of impact; each step ships with tests (unit for models, widget on CI).
 5. **Preview always findable (F11).** Project page shows a live ● on Preview when a port is up; Projects card shows it too.
 6. **Inline git outcomes and suggested messages (F10, F12).** Commit-bar result card (identity, auth, pull first, publish, pushed + View on GitHub); "Suggest" generates a message from the staged diff. *Tests:* each error kind renders its card; suggestion uses staged paths and stats.
 
-## 9. How we measure it
+## 10. How we measure it
 
 | Measure | Today (build #29) | Target |
 |---|---|---|

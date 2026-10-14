@@ -139,7 +139,7 @@ class _FilesScreenState extends State<FilesScreen> {
       final added = await phone.importTo(PhoneFiles.docsOf(items), _browser.current);
       await _browser.refresh();
       _touched();
-      messenger.showSnackBar(SnackBar(content: Text(added.length == 1 ? 'Added ${added.single.split('/').last}' : 'Added ${added.length} items')));
+      messenger.showSnackBar(SnackBar(content: Text(added.length == 1 ? 'Imported ${added.single.split('/').last}' : 'Imported ${added.length} items')));
     } on PlatformException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Couldn\'t copy from the phone')));
     }
@@ -380,8 +380,8 @@ class _FilesScreenState extends State<FilesScreen> {
           const PopupMenuItem(value: 'folder', child: Text('New folder')),
           if (_browser.location.kind == LocationKind.linux) ...[
             const PopupMenuDivider(),
-            const PopupMenuItem(value: 'phone-files', child: Text('Add files from phone')),
-            const PopupMenuItem(value: 'phone-folder', child: Text('Add folder from phone')),
+            const PopupMenuItem(value: 'phone-files', child: Text('Import files from phone')),
+            const PopupMenuItem(value: 'phone-folder', child: Text('Import folder from phone')),
           ],
         ],
         child: Container(

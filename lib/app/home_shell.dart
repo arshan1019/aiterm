@@ -4,14 +4,15 @@ import '../files/files_screen.dart';
 import '../projects/projects_screen.dart';
 import '../settings/settings_screen.dart';
 import '../shared/fade_indexed_stack.dart';
-import '../shared/text_tabs.dart';
+import '../shared/bottom_tabs.dart';
 import '../terminal/terminal_screen.dart';
 import 'navigation.dart';
 import 'services.dart';
 import 'theme.dart';
 
-/// The top-level layout: a row of text tabs over the four screens. All
-/// screens stay mounted, so terminals keep running and Files keeps its place.
+/// The top-level layout: the four screens, with their tabs at the bottom.
+/// All screens stay mounted, so terminals keep running and Files keeps its
+/// place.
 class HomeShell extends StatelessWidget {
   const HomeShell({super.key});
 
@@ -33,17 +34,24 @@ class HomeShell extends StatelessWidget {
           if (!didPop && !nav.handleBack()) SystemNavigator.pop();
         },
         child: Scaffold(
+          bottomNavigationBar: ListenableBuilder(
+            listenable: nav,
+            builder: (context, _) => BottomTabs(
+              tabs: const [
+                BottomTab('Projects', Icons.folder_special_outlined, Icons.folder_special_rounded),
+                BottomTab('Terminal', Icons.terminal_outlined, Icons.terminal_rounded),
+                BottomTab('Files', Icons.folder_outlined, Icons.folder_rounded),
+                BottomTab('Settings', Icons.settings_outlined, Icons.settings_rounded),
+              ],
+              selected: nav.tab.index,
+              onSelect: (i) => nav.open(AppTab.values[i]),
+            ),
+          ),
           body: SafeArea(
+            bottom: false,
             child: ListenableBuilder(
               listenable: nav,
-              builder: (context, _) => Column(
-                children: [
-                  TextTabs<AppTab>(tabs: AppTab.values, label: (t) => t.name, selected: nav.tab, onSelect: nav.open),
-                  Expanded(
-                    child: FadeIndexedStack(index: nav.tab.index, rise: 6, children: _screens),
-                  ),
-                ],
-              ),
+              builder: (context, _) => FadeIndexedStack(index: nav.tab.index, rise: 6, children: _screens),
             ),
           ),
         ),

@@ -42,28 +42,20 @@ class _SetupViewState extends State<SetupView> {
     final c = context.colors;
     return [
       Text('Set up aiterm', style: TextStyle(color: c.text, fontSize: 20, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 8),
-      Text(
-        'Installs a small Linux system on your phone (no root needed), then git and the coding agents you pick. '
-        'It takes a few minutes; you can use your phone meanwhile.',
-        style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.45),
-      ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 20),
       _Card(
-        title: 'Agents to install',
+        title: 'Agents',
         children: [
           for (final a in agentCatalog)
             CheckboxListTile(
               value: _agents.contains(a.id),
               onChanged: (on) => setState(() => on == true ? _agents.add(a.id) : _agents.remove(a.id)),
               title: Text(a.name, style: const TextStyle(fontSize: 14)),
-              subtitle: Text('${a.vendor} · ${a.tagline}', style: TextStyle(color: c.textMuted, fontSize: 12)),
+              subtitle: Text(a.vendor, style: TextStyle(color: c.textMuted, fontSize: 12)),
             ),
         ],
       ),
-      const SizedBox(height: 8),
-      Text('You can add or remove agents later.', style: TextStyle(color: c.textMuted, fontSize: 12)),
-      const SizedBox(height: 16),
+      const SizedBox(height: 20),
       FilledButton(
         onPressed: () => context.services.setup.start([for (final a in agentCatalog) if (_agents.contains(a.id)) a.id]),
         child: const Text('Set up'),
@@ -94,13 +86,8 @@ class _SetupViewState extends State<SetupView> {
           children: [
             if (s.keepAlive.steps.isNotEmpty && !allDone(s.keepAlive.steps)) ...[
               _Card(
-                title: 'While you wait: keep agents running',
+                title: 'Keep agents running',
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                    child: Text('Android stops long tasks in the background unless these are allowed.',
-                        style: TextStyle(color: c.textMuted, fontSize: 12, height: 1.4)),
-                  ),
                   KeepAliveSteps(controller: s.keepAlive),
                 ],
               ),
@@ -118,8 +105,6 @@ class _SetupViewState extends State<SetupView> {
                   else
                     ListTile(
                       title: const Text('Sign in to GitHub', style: TextStyle(fontSize: 14)),
-                      subtitle: Text('To clone your repositories and push changes. Optional.',
-                          style: TextStyle(color: c.textMuted, fontSize: 12)),
                       trailing: TextButton(onPressed: () => signInToGitHub(context), child: const Text('Sign in')),
                     ),
                 ],

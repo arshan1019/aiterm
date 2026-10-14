@@ -30,7 +30,6 @@ class KeepAliveSteps extends StatelessWidget {
           for (final step in controller.steps)
             ListTile(
               title: Text(step.title, style: const TextStyle(fontSize: 14)),
-              subtitle: Text(step.detail, style: TextStyle(color: c.textMuted, fontSize: 12, height: 1.35)),
               trailing: AnimatedSwitcher(
                 duration: Motion.standard,
                 child: step.done
@@ -91,11 +90,6 @@ void showKeepAlive(BuildContext context) {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
               child: Text('Keep agents running',
                   style: TextStyle(color: sheet.colors.text, fontSize: 17, fontWeight: FontWeight.w600)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-              child: Text('Android stops long-running work in the background unless these are allowed.',
-                  style: TextStyle(color: sheet.colors.textMuted, fontSize: 13, height: 1.4)),
             ),
             KeepAliveSteps(controller: controller),
           ],

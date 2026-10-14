@@ -15,7 +15,7 @@ class TabStrip extends StatefulWidget {
   final ValueChanged<TerminalSession> onMenu;
   final VoidCallback onNew;
 
-  static const height = 38.0;
+  static const height = 44.0;
 
   @override
   State<TabStrip> createState() => _TabStripState();
@@ -158,8 +158,8 @@ class _Tab extends StatelessWidget {
                         behavior: HitTestBehavior.opaque,
                         onTap: onClose,
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(6, 6, 4, 6),
-                          child: Icon(Icons.close_rounded, size: 14, color: c.textMuted),
+                          padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+                          child: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
                         ),
                       )
                     : const SizedBox(width: 6, height: 26),
