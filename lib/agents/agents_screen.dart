@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../shared/sheet.dart';
 import '../onboarding/setup_view.dart';
 import '../projects/projects_screen.dart';
 import 'agent_catalog.dart';
@@ -58,18 +59,10 @@ class _AgentCard extends StatelessWidget {
   final AgentInstaller installer;
 
   void _details(BuildContext context, AgentState state) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheet) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.7),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: SelectableText(state.log, style: TextStyle(color: sheet.colors.text, fontSize: 11, height: 1.4)),
-          ),
-        ),
-      ),
+    showAppSheet<void>(
+      context,
+      title: '${agent.name} install log',
+      builder: (sheet) => SelectableText(state.log, style: TextStyle(color: sheet.colors.text, fontSize: 11, height: 1.4)),
     );
   }
 

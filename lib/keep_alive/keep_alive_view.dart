@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../shared/sheet.dart';
 import 'keep_alive.dart';
 import 'keep_alive_controller.dart';
 
@@ -77,24 +78,10 @@ class KeepAliveSteps extends StatelessWidget {
 void showKeepAlive(BuildContext context) {
   final controller = context.services.keepAlive;
   controller.refresh().ignore();
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (sheet) => SafeArea(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Text('Keep agents running',
-                  style: TextStyle(color: sheet.colors.text, fontSize: 17, fontWeight: FontWeight.w600)),
-            ),
-            KeepAliveSteps(controller: controller),
-          ],
-        ),
-      ),
-    ),
+  showAppSheet<void>(
+    context,
+    title: 'Keep agents running',
+    inset: false,
+    builder: (_) => KeepAliveSteps(controller: controller),
   );
 }

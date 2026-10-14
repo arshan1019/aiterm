@@ -129,12 +129,8 @@ class _AskSheetState extends State<AskSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: AnimatedSize(
+    // Title, insets and the lift above the keyboard come from AppSheet.
+    return AnimatedSize(
             duration: Motion.standard,
             curve: Motion.move,
             alignment: Alignment.topCenter,
@@ -142,11 +138,6 @@ class _AskSheetState extends State<AskSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'What do you want to do?',
-                  style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(child: _field(c)),
@@ -188,10 +179,7 @@ class _AskSheetState extends State<AskSheet> {
                 ],
               ],
             ),
-          ),
-        ),
-      ),
-    );
+          );
   }
 
   Widget _field(AppColors c) => TextField(

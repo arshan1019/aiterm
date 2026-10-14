@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../shared/sheet.dart';
 import '../platform/android_env.dart';
 import 'git_repo.dart';
 import 'git_tools.dart';
@@ -88,10 +89,17 @@ Future<bool> signInToGitHub(BuildContext context) async {
   final s = context.services;
   if (s.github.user != null) return true;
   if (!await ensureGitTools(context) || !context.mounted) return false;
-  final ok = await showModalBottomSheet<bool>(
-        context: context,
-        isDismissible: false,
-        enableDrag: false,
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  final ok = await showAppSheet<bool>(
+        context,
+        title: 'Sign in with GitHub',
+        leading: Image.asset(
+          dark ? 'assets/github/GitHub_Invertocat_White.png' : 'assets/github/GitHub_Invertocat_Black.png',
+          width: 24,
+          height: 24,
+          excludeFromSemantics: true,
+        ),
+        dismissible: false,
         builder: (_) => _SignInSheet(auth: s.github),
       ) ??
       false;
@@ -148,31 +156,13 @@ class _SignInSheetState extends State<_SignInSheet> {
       listenable: widget.auth,
       builder: (context, _) {
         final state = widget.auth.state;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
-            child: AnimatedSize(
+        return AnimatedSize(
               duration: Motion.standard,
               curve: Motion.move,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Image.asset(
-                        Theme.of(context).brightness == Brightness.dark
-                            ? 'assets/github/GitHub_Invertocat_White.png'
-                            : 'assets/github/GitHub_Invertocat_Black.png',
-                        width: 24,
-                        height: 24,
-                        excludeFromSemantics: true,
-                      ),
-                      const SizedBox(width: 12),
-                      Text('Sign in with GitHub', style: TextStyle(color: c.text, fontSize: 17, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
                   ...switch (state) {
                     AwaitingCode() => [
                         Text('Copy this code, then paste it on the GitHub page that opens.',
@@ -214,9 +204,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                   TextButton(onPressed: _cancel, child: Text('Cancel', style: TextStyle(color: c.textMuted))),
                 ],
               ),
-            ),
-          ),
-        );
+            );
       },
     );
   }
@@ -369,17 +357,9 @@ Future<bool> _confirm(BuildContext context, String title, String message, String
 
 /// git's own output, for when the plain-language message isn't enough.
 void showGitDetails(BuildContext context, String detail) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    builder: (sheet) => SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.6),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: SelectableText(detail.trim(), style: TextStyle(color: sheet.colors.text, fontSize: 11, height: 1.4)),
-        ),
-      ),
-    ),
+  showAppSheet<void>(
+    context,
+    title: 'Details',
+    builder: (sheet) => SelectableText(detail.trim(), style: TextStyle(color: sheet.colors.text, fontSize: 11, height: 1.4)),
   );
 }

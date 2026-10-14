@@ -48,3 +48,5 @@ app.*.map.json
 .widget_preview/
 test_screens/shots/
 editor/node_modules/
+research_notes/
+reports/

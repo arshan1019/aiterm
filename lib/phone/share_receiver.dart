@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../app/navigation.dart';
 import '../app/services.dart';
 import '../app/theme.dart';
+import '../shared/sheet.dart';
 import '../shared/format.dart';
 import '../git/github_button.dart';
 import 'phone_files.dart';
@@ -48,9 +49,10 @@ class _ShareReceiverState extends State<ShareReceiver> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Set up aiterm first, then share again.')));
       return;
     }
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
+    showAppSheet<void>(
+      context,
+      title: items.length == 1 ? 'Add ${items.single.name} to' : 'Add ${plural(items.length, 'file')} to',
+      inset: false,
       builder: (sheet) => _ShareSheet(items: items),
     );
   }
@@ -81,25 +83,8 @@ class _ShareSheet extends StatelessWidget {
     final s = context.services;
     final c = context.colors;
     final projects = s.projects.projects;
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.7),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Text(
-                items.length == 1 ? 'Add ${items.single.name} to' : 'Add ${plural(items.length, 'file')} to',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
+    return Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   for (final p in projects)
                     ListTile(
@@ -115,11 +100,6 @@ class _ShareSheet extends StatelessWidget {
                     onTap: () => _addTo(context, '/root', () => s.navigation.showFolder('/root')),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+              );
   }
 }

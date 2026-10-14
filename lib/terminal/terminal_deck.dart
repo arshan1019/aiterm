@@ -10,6 +10,7 @@ import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/fade_indexed_stack.dart';
 import '../shared/name_dialog.dart';
+import '../shared/sheet.dart';
 import 'terminal_session.dart';
 import 'widgets/extra_keys_bar.dart';
 import 'widgets/tab_strip.dart';
@@ -79,9 +80,9 @@ class _TerminalDeckState extends State<TerminalDeck> {
   }
 
   void _openAsk(TerminalSession session) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
+    showAppSheet<void>(
+      context,
+      title: 'What do you want to do?',
       builder: (_) =>
           AskSheet(alpine: !_services.linux.usesAndroidShell, onInsert: session.insert, onAppAction: _services.perform),
     );
