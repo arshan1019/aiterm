@@ -300,13 +300,17 @@ class _KeyRow extends StatelessWidget {
   final ValueChanged<String> onKey;
   final ValueChanged<String> onText;
 
-  static const _keys = [('tab', '⇥'), ('left', '←'), ('up', '↑'), ('down', '↓'), ('right', '→')];
+  static const _keys = [('tab', '⇥', 'Tab'), ('left', '←', 'Left'), ('up', '↑', 'Up'), ('down', '↓', 'Down'), ('right', '→', 'Right')];
   static const _symbols = ['{', '}', '(', ')', '[', ']', '<', '>', ';', '=', '"', "'", '/', '\\', '|', '&', '\$', '#'];
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    Widget key(String label, VoidCallback onTap) => InkWell(
+    Widget key(String label, VoidCallback onTap, [String? spoken]) => Semantics(
+          button: true,
+          label: spoken ?? label,
+          excludeSemantics: spoken != null,
+          child: InkWell(
           onTap: onTap,
           child: Container(
             constraints: const BoxConstraints(minWidth: 40),
@@ -314,6 +318,7 @@ class _KeyRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 6),
             child: Text(label, style: TextStyle(color: c.text, fontSize: 15)),
           ),
+        ),
         );
     return Container(
       height: 42,
@@ -321,7 +326,7 @@ class _KeyRow extends StatelessWidget {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          for (final (name, label) in _keys) key(label, () => onKey(name)),
+          for (final (name, label, spoken) in _keys) key(label, () => onKey(name), spoken),
           Container(width: 0.5, margin: const EdgeInsets.symmetric(vertical: 10), color: c.border),
           for (final s in _symbols) key(s, () => onText(s)),
         ],

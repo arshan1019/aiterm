@@ -10,7 +10,12 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color bg;
   final Color surface;
   final Color surfaceAlt;
+  /// Decorative edges: cards, dividers.
   final Color border;
+
+  /// Edges that identify a control (text fields, outlined buttons,
+  /// checkboxes): 3:1 against the surfaces, as WCAG 1.4.11 asks.
+  final Color outline;
   final Color text;
   final Color textMuted;
   final Color accent;
@@ -21,6 +26,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.surface,
     required this.surfaceAlt,
     required this.border,
+    required this.outline,
     required this.text,
     required this.textMuted,
     required this.accent,
@@ -32,6 +38,7 @@ class AppColors extends ThemeExtension<AppColors> {
     surface: Color(0xFF17181C),
     surfaceAlt: Color(0xFF1F2125),
     border: Color(0xFF2A2C31),
+    outline: Color(0xFF6A6E77),
     text: Color(0xFFE6E7EA),
     textMuted: Color(0xFF8A8D96),
     accent: Color(0xFF5EC4A8),
@@ -43,9 +50,10 @@ class AppColors extends ThemeExtension<AppColors> {
     surface: Color(0xFFFFFFFF),
     surfaceAlt: Color(0xFFEFEFF1),
     border: Color(0xFFDDDEE1),
+    outline: Color(0xFF868A93),
     text: Color(0xFF17181C),
-    textMuted: Color(0xFF6B6E76),
-    accent: Color(0xFF2E8B74),
+    textMuted: Color(0xFF64676F),
+    accent: Color(0xFF1F7A64),
     danger: Color(0xFFC0392B),
   );
 
@@ -61,6 +69,7 @@ class AppColors extends ThemeExtension<AppColors> {
       surface: l(surface, other.surface),
       surfaceAlt: l(surfaceAlt, other.surfaceAlt),
       border: l(border, other.border),
+      outline: l(outline, other.outline),
       text: l(text, other.text),
       textMuted: l(textMuted, other.textMuted),
       accent: l(accent, other.accent),
@@ -75,13 +84,14 @@ class AppColors extends ThemeExtension<AppColors> {
       other.surface == surface &&
       other.surfaceAlt == surfaceAlt &&
       other.border == border &&
+      other.outline == outline &&
       other.text == text &&
       other.textMuted == textMuted &&
       other.accent == accent &&
       other.danger == danger;
 
   @override
-  int get hashCode => Object.hash(bg, surface, surfaceAlt, border, text, textMuted, accent, danger);
+  int get hashCode => Object.hash(bg, surface, surfaceAlt, border, outline, text, textMuted, accent, danger);
 }
 
 /// Shared animation timing, so every transition in the app feels related.
@@ -124,7 +134,7 @@ ThemeData buildTheme({required bool dark}) {
       surface: c.surface,
       onSurface: c.text,
       surfaceContainerHighest: c.surfaceAlt,
-      outline: c.border,
+      outline: c.outline,
       outlineVariant: c.border,
     ),
     textTheme: (dark ? Typography.whiteMountainView : Typography.blackMountainView).apply(
@@ -180,7 +190,11 @@ ThemeData buildTheme({required bool dark}) {
       filled: true,
       fillColor: c.surfaceAlt,
       hintStyle: TextStyle(color: c.textMuted),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+      // A visible edge identifies the field (WCAG 1.4.11); focus thickens it.
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.outline)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.outline)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.accent, width: 2)),
+      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: c.danger)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
     // One button shape everywhere: 10px corners, 44px tall.
@@ -201,7 +215,7 @@ ThemeData buildTheme({required bool dark}) {
         disabledForegroundColor: c.textMuted,
         minimumSize: const Size(64, 44),
         padding: const EdgeInsets.symmetric(horizontal: 18),
-        side: BorderSide(color: c.border),
+        side: BorderSide(color: c.outline),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     ),
@@ -221,7 +235,7 @@ ThemeData buildTheme({required bool dark}) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),
     checkboxTheme: CheckboxThemeData(
-      side: BorderSide(color: c.textMuted, width: 1.5),
+      side: BorderSide(color: c.outline, width: 1.5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     ),
     chipTheme: ChipThemeData(

@@ -475,6 +475,45 @@ void main() {
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
+  testWidgets('main screens meet the accessibility guidelines (tap targets, labels, contrast)', (tester) async {
+    Directory('${dir.path}/alpine/root/app').createSync(recursive: true);
+    File('${dir.path}/alpine/root/app/main.dart').writeAsStringSync('void main() {}');
+    File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    File('${dir.path}/projects.json').writeAsStringSync(
+        jsonEncode([{'id': '1', 'name': 'Weather app', 'path': '/root/app', 'created': now, 'opened': now}]));
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+    final services = (await tester.runAsync(AppServices.load))!;
+    services.gitTools = GitTools(run: (script, onLine) async => 0);
+    await services.gitTools.refresh();
+    services.git = GitRegistry(_FakeGit());
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(AiTermApp(services: services));
+    await settleIo(tester);
+
+    Future<void> check(String screen) async {
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline), reason: '$screen: 48dp targets');
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline), reason: '$screen: labels');
+      await expectLater(tester, meetsGuideline(textContrastGuideline), reason: '$screen: contrast');
+    }
+
+    await check('Projects');
+    await tester.tap(find.text('Weather app'));
+    await settleIo(tester);
+    await check('project agent tab');
+    await tester.tap(navTab('Changes'));
+    await settleIo(tester);
+    await check('project changes tab');
+    await tester.tap(navTab('Files'));
+    await settleIo(tester);
+    await check('project files tab');
+    services.navigation.open(AppTab.settings);
+    await settleIo(tester);
+    await check('Settings');
+    semantics.dispose();
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
   testWidgets('a folder that is not a repo offers to start tracking it', (tester) async {
     File('${dir.path}/alpine/.aiterm-installed')
       ..createSync(recursive: true)

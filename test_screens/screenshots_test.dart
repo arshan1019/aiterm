@@ -226,6 +226,21 @@ void main() {
     await shot(tester, '19-agents');
   });
 
+  testWidgets('large text', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final s = await boot(tester);
+    await shot(tester, '25-large-projects');
+    await tester.tap(find.text('Weather app'));
+    await settle(tester);
+    s.navigation.openWorkspaceTab(WorkspaceTab.changes);
+    await settle(tester);
+    await shot(tester, '26-large-changes');
+    s.navigation.open(AppTab.settings);
+    await settle(tester);
+    await shot(tester, '27-large-settings');
+  });
+
   testWidgets('light theme', (tester) async {
     final s = await boot(tester);
     s.settings.dark = false;

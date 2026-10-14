@@ -461,9 +461,9 @@ class _HeaderState extends State<_Header> {
       ),
       child: Row(
         children: [
-          _NavButton(icon: Icons.arrow_back_rounded, onTap: b.canGoBack ? b.back : null),
-          _NavButton(icon: Icons.arrow_forward_rounded, onTap: b.canGoForward ? b.forward : null),
-          _NavButton(icon: Icons.arrow_upward_rounded, onTap: b.canGoUp ? b.up : null),
+          _NavButton(icon: Icons.arrow_back_rounded, tooltip: 'Back', onTap: b.canGoBack ? b.back : null),
+          _NavButton(icon: Icons.arrow_forward_rounded, tooltip: 'Forward', onTap: b.canGoForward ? b.forward : null),
+          _NavButton(icon: Icons.arrow_upward_rounded, tooltip: 'Up a folder', onTap: b.canGoUp ? b.up : null),
           const SizedBox(width: 4),
           Expanded(
             child: ListView.builder(
@@ -536,9 +536,10 @@ class _HeaderState extends State<_Header> {
 }
 
 class _NavButton extends StatelessWidget {
-  const _NavButton({required this.icon, required this.onTap});
+  const _NavButton({required this.icon, required this.tooltip, required this.onTap});
 
   final IconData icon;
+  final String tooltip;
   final VoidCallback? onTap;
 
   @override
@@ -547,6 +548,7 @@ class _NavButton extends StatelessWidget {
     return SizedBox(
       width: 38,
       child: IconButton(
+        tooltip: tooltip,
         iconSize: 19,
         onPressed: onTap,
         icon: AnimatedOpacity(

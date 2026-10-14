@@ -21,8 +21,8 @@ class ExtraKeysBar extends StatelessWidget {
     final m = session.modifiers;
     Widget text(String label, VoidCallback onPress) => _Key(label: label, onPress: onPress);
     Widget key(String label, TerminalKey k) => _Key(label: label, onPress: () => session.sendKey(k));
-    Widget arrow(IconData icon, TerminalKey k) =>
-        _Key(icon: icon, repeat: true, onPress: () => session.sendKey(k));
+    Widget arrow(IconData icon, String name, TerminalKey k) =>
+        _Key(icon: icon, name: name, repeat: true, onPress: () => session.sendKey(k));
 
     return ColoredBox(
       color: c.surface,
@@ -38,6 +38,7 @@ class ExtraKeysBar extends StatelessWidget {
                   valueListenable: session.state,
                   builder: (context, state, _) => _Key(
                     icon: Icons.auto_awesome_rounded,
+                    name: 'Ask the assistant',
                     accent: true,
                     onPress: state == SessionState.running ? onAsk : null,
                   ),
@@ -46,15 +47,15 @@ class ExtraKeysBar extends StatelessWidget {
                 text('/', () => session.sendText('/')),
                 text('-', () => session.sendText('-')),
                 text('|', () => session.sendText('|')),
-                arrow(Icons.keyboard_arrow_up_rounded, TerminalKey.arrowUp),
+                arrow(Icons.keyboard_arrow_up_rounded, 'Up', TerminalKey.arrowUp),
               ]),
               _row([
                 key('TAB', TerminalKey.tab),
                 _Key(label: 'CTRL', active: m.ctrl || m.volumeCtrl, onPress: m.toggleCtrl),
                 _Key(label: 'ALT', active: m.alt, onPress: m.toggleAlt),
-                arrow(Icons.keyboard_arrow_left_rounded, TerminalKey.arrowLeft),
-                arrow(Icons.keyboard_arrow_down_rounded, TerminalKey.arrowDown),
-                arrow(Icons.keyboard_arrow_right_rounded, TerminalKey.arrowRight),
+                arrow(Icons.keyboard_arrow_left_rounded, 'Left', TerminalKey.arrowLeft),
+                arrow(Icons.keyboard_arrow_down_rounded, 'Down', TerminalKey.arrowDown),
+                arrow(Icons.keyboard_arrow_right_rounded, 'Right', TerminalKey.arrowRight),
               ]),
             ],
           ),
@@ -70,9 +71,15 @@ class ExtraKeysBar extends StatelessWidget {
 }
 
 class _Key extends StatefulWidget {
-  const _Key({this.label, this.icon, required this.onPress, this.active = false, this.accent = false, this.repeat = false});
+  const _Key({this.label, this.icon, this.name, required this.onPress, this.active = false, this.accent = false, this.repeat = false});
 
   final String? label;
+
+  /// What a screen reader says ("Escape", "Up"); defaults to the label.
+  final String? name;
+
+  static const _spoken = {'ESC': 'Escape', 'TAB': 'Tab', 'CTRL': 'Control', 'ALT': 'Alt', '/': 'Slash', '-': 'Dash', '|': 'Pipe'};
+  String get spokenName => name ?? _spoken[label] ?? label ?? '';
   final IconData? icon;
   final VoidCallback? onPress;
   final bool active;
@@ -126,7 +133,16 @@ class _KeyState extends State<_Key> {
         : _down
             ? c.surfaceAlt
             : c.surface;
-    return Listener(
+    // Keys react to pointer down (for repeat); screen readers activate them
+    // through these semantics instead.
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      toggled: widget.label == 'CTRL' || widget.label == 'ALT' ? widget.active : null,
+      label: widget.spokenName,
+      onTap: widget.onPress,
+      excludeSemantics: true,
+      child: Listener(
       onPointerDown: (_) => _press(),
       onPointerUp: (_) => _release(),
       onPointerCancel: (_) => _release(),
@@ -150,6 +166,7 @@ class _KeyState extends State<_Key> {
                   ),
                 ),
         ),
+      ),
       ),
     );
   }

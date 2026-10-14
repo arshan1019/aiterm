@@ -617,7 +617,10 @@ class _ChangeRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(4, 0, 0, 0),
         child: Row(
           children: [
-            Checkbox(value: staged, onChanged: (_) => onToggle()),
+            Semantics(
+              label: '${staged ? 'Unstage' : 'Stage'} ${change.path}',
+              child: Checkbox(value: staged, onChanged: (_) => onToggle()),
+            ),
             SizedBox(
               width: 18,
               child: Text(letter, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),

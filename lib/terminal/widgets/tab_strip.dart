@@ -154,13 +154,19 @@ class _Tab extends StatelessWidget {
                 duration: Motion.standard,
                 curve: Motion.move,
                 child: closable
-                    ? GestureDetector(
+                    ? Semantics(
+                        button: true,
+                        label: 'Close ${session.title}',
+                        onTap: onClose,
+                        excludeSemantics: true,
+                        child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: onClose,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
                           child: Icon(Icons.close_rounded, size: 16, color: c.textMuted),
                         ),
+                      ),
                       )
                     : const SizedBox(width: 6, height: 26),
               ),
