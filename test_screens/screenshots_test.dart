@@ -22,6 +22,11 @@ void main() {
 
   setUpAll(() async {
     Future<ByteData> bytes(String path) async => ByteData.sublistView(File(path).readAsBytesSync());
+    await (FontLoader('IBMPlexSans')
+          ..addFont(bytes('assets/fonts/IBMPlexSans-Regular.ttf'))
+          ..addFont(bytes('assets/fonts/IBMPlexSans-Medium.ttf'))
+          ..addFont(bytes('assets/fonts/IBMPlexSans-SemiBold.ttf')))
+        .load();
     await (FontLoader('JetBrainsMono')
           ..addFont(bytes('assets/fonts/JetBrainsMono-Regular.ttf'))
           ..addFont(bytes('assets/fonts/JetBrainsMono-Bold.ttf')))
