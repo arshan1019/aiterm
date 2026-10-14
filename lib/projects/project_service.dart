@@ -69,9 +69,13 @@ class ProjectService {
     return store.add(name: name ?? path.split('/').last, path: path);
   }
 
-  /// Makes an existing folder a project (git or not).
-  Future<Project> openExisting(String path, {String? name}) async =>
-      store.byPath(path) ?? await store.add(name: name ?? path.split('/').last, path: path);
+  /// Makes an existing folder a project (git or not). On phone storage,
+  /// which keeps no file modes, git is told not to track them (as git does
+  /// itself for repos it creates there).
+  Future<Project> openExisting(String path, {String? name}) async {
+    if (onPhoneStorage(path) && await isRepo(path)) await git.run(path, ['config', 'core.fileMode', 'false']);
+    return store.byPath(path) ?? await store.add(name: name ?? path.split('/').last, path: path);
+  }
 
   Future<bool> isRepo(String path) async {
     final r = await git.run(path, ['rev-parse', '--show-toplevel']);

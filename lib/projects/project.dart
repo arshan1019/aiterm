@@ -1,3 +1,12 @@
+/// Where new projects go by default (as the shell sees it).
+const projectsFolder = '/root/projects';
+
+/// [path] (as the shell sees it) is on the phone's shared storage, which
+/// Linux sees at /sdcard with all-files access. It works, but has no
+/// symlinks, executables or file modes.
+bool onPhoneStorage(String path) =>
+    path == '/sdcard' || path.startsWith('/sdcard/') || path.startsWith('/storage/') || path.startsWith('/mnt/sdcard/');
+
 class Project {
   const Project({required this.id, required this.name, required this.path, required this.createdAt, required this.lastOpened, this.agentId});
 

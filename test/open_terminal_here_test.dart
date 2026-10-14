@@ -27,6 +27,20 @@ void main() {
     expect(linux.guestPath('/storage/emulated/0/Download'), '/sdcard/Download');
   });
 
+  test("phone storage, bound into Linux, maps back to the phone's own path", () async {
+    File('${dir.path}/alpine/.aiterm-installed')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('x');
+    final linux = env();
+    await linux.load();
+    expect(linux.hostPath('/sdcard/Projects/site'), '/storage/emulated/0/Projects/site');
+    expect(linux.hostPath('/sdcard'), '/storage/emulated/0');
+    expect(linux.hostPath('/mnt/sdcard/x'), '/storage/emulated/0/x');
+    expect(linux.hostPath('/storage/emulated/0/x'), '/storage/emulated/0/x');
+    expect(linux.hostPath('/sdcardx'), '${dir.path}/alpine/sdcardx');
+    expect(linux.hostPath('/root/app'), '${dir.path}/alpine/root/app');
+  });
+
   test("with Android's shell the host path is the shell's path", () async {
     final linux = env();
     await linux.load();

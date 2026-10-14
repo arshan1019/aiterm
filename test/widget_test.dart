@@ -338,7 +338,7 @@ void main() {
 
     await tester.tap(find.text('Create your first project'));
     await tester.pumpAndSettle();
-    for (final way in ['Empty project', 'From a template', 'Clone a repository', 'Open a folder in Linux']) {
+    for (final way in ['Empty project', 'From a template', 'Clone a repository', 'Open a folder in Linux', 'Open a folder on phone']) {
       expect(find.text(way), findsOneWidget);
     }
     await tester.tap(find.text('From a template'));
@@ -430,6 +430,45 @@ void main() {
     await tester.tap(find.text('Weather app'));
     await settleIo(tester);
     expect(find.text('app'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
+  testWidgets('each project card manages its project: rename, remove, delete', (tester) async {
+    Directory('${dir.path}/alpine/root/app').createSync(recursive: true);
+    Directory('${dir.path}/alpine/root/old').createSync(recursive: true);
+    File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    File('${dir.path}/projects.json').writeAsStringSync(jsonEncode([
+      {'id': '1', 'name': 'Weather app', 'path': '/root/app', 'created': now, 'opened': now},
+      {'id': '2', 'name': 'Old thing', 'path': '/root/old', 'created': now, 'opened': now - 1000},
+    ]));
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+    final services = await boot(tester, home: true);
+    await settleIo(tester);
+
+    await tester.tap(find.byTooltip('Project actions').first);
+    await tester.pumpAndSettle();
+    for (final action in ['Open', 'Rename', 'Copy to phone', 'Remove from projects', 'Delete project and files']) {
+      expect(find.text(action), findsOneWidget);
+    }
+    await tester.tap(find.text('Rename'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Forecast');
+    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+    await settleIo(tester);
+    expect(find.text('Forecast'), findsOneWidget);
+
+    // Delete asks first, then removes the project and its folder.
+    await tester.tap(find.byTooltip('Project actions').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete project and files'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('can\'t be undone'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await settleIo(tester);
+    expect(find.text('Old thing'), findsNothing);
+    expect(services.projects.projects.map((p) => p.name), ['Forecast']);
+    expect(Directory('${dir.path}/alpine/root/old').existsSync(), isFalse);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 

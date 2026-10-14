@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../agents/agent_catalog.dart';
 import '../agents/agent_installer.dart';
 import '../app/navigation.dart';
@@ -9,16 +7,14 @@ import '../app/theme.dart';
 import '../files/files_screen.dart';
 import '../git/git_repo.dart';
 import '../git/git_screen.dart';
-import '../phone/phone_files.dart';
 import '../preview/preview_screen.dart';
 import '../shared/action_sheet.dart';
 import '../shared/fade_indexed_stack.dart';
-import '../shared/form.dart';
 import '../shared/format.dart';
-import '../shared/name_dialog.dart';
 import '../shared/text_tabs.dart';
 import '../terminal/terminal_deck.dart';
 import 'project.dart';
+import 'project_actions.dart';
 import 'projects_screen.dart';
 
 /// Opens [project]'s workspace over Projects (and remembers it as most
@@ -95,62 +91,6 @@ class _ProjectScreenState extends State<ProjectScreen> {
     ]);
   }
 
-  void _menu(Project p) {
-    showActionSheet(context, title: p.name, actions: [
-      SheetAction(Icons.drive_file_rename_outline_rounded, 'Rename', () async {
-        final name = await showNameDialog(context, title: 'Rename project', action: 'Rename', initial: p.name);
-        if (name != null) await _s.projects.rename(p, name);
-      }),
-      SheetAction(Icons.smartphone_rounded, 'Copy to phone', () => _export(p)),
-      null,
-      SheetAction(Icons.playlist_remove_rounded, 'Remove from projects', () => _remove(p)),
-      SheetAction(Icons.delete_outline_rounded, 'Delete project and files', () => _delete(p), danger: true),
-    ]);
-  }
-
-  /// Copies the project folder to a phone folder the user picks.
-  Future<void> _export(Project p) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final folder = await _s.phone.pickFolder(keep: false);
-    if (folder == null) return;
-    messenger.showSnackBar(const SnackBar(content: Text('Copying to phone…')));
-    try {
-      await _s.phone.exportTo([_s.linux.hostPath(p.path)], PhonePath.parse(folder.path)!);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text('Copied to ${folder.name}')));
-    } on PlatformException catch (e) {
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Couldn\'t copy')));
-    }
-  }
-
-  /// Leaves the list; its sessions move to the Terminal tab.
-  Future<void> _remove(Project p) async {
-    final ok = await _confirm('Remove “${p.name}”?',
-        'It leaves the list. Its folder ${shortPath(p.path)} stays as it is, and its terminals move to the Terminal tab.', 'Remove');
-    if (!ok || !mounted) return;
-    Navigator.pop(context);
-    await _s.projects.remove(p);
-  }
-
-  Future<void> _delete(Project p) async {
-    final ok = await _confirm('Delete “${p.name}”?',
-        'The folder ${shortPath(p.path)} and everything in it, including unpushed commits, will be deleted, and its terminals closed. This can\'t be undone.',
-        'Delete');
-    if (!ok || !mounted) return;
-    Navigator.pop(context);
-    for (final t in _s.tabs.inScope(p.path)) {
-      _s.tabs.close(t);
-    }
-    await _s.projects.remove(p);
-    try {
-      await Directory(_s.linux.hostPath(p.path)).delete(recursive: true);
-    } on FileSystemException catch (_) {}
-  }
-
-  Future<bool> _confirm(String title, String message, String action) =>
-      confirmAction(context, title: title, message: message, action: action, danger: action == 'Delete');
-
   String _label(WorkspaceTab t) {
     final changed = _repo?.status?.changes.length ?? 0;
     return switch (t) {
@@ -211,7 +151,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
                 ],
               ),
               actions: [
-                IconButton(tooltip: 'Project actions', icon: const Icon(Icons.more_vert_rounded), onPressed: () => _menu(p)),
+                IconButton(tooltip: 'Project actions', icon: const Icon(Icons.more_vert_rounded), onPressed: () => showProjectActions(context, p, showOpen: false)),
               ],
             ),
             body: Column(

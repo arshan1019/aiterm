@@ -10,6 +10,7 @@ import '../shared/format.dart';
 import '../onboarding/setup_view.dart';
 import 'new_project.dart';
 import 'project.dart';
+import 'project_actions.dart';
 import 'project_screen.dart';
 
 /// Home: the user's projects. Each opens a workspace where agents,
@@ -202,7 +203,7 @@ class _Empty extends StatelessWidget {
             label: const Text('Create your first project'),
           ),
           const SizedBox(height: 4),
-          TextButton(onPressed: () => openFolderAsProject(context), child: const Text('Or open a folder you already have')),
+          TextButton(onPressed: () => showOpenFolder(context), child: const Text('Or open a folder you already have')),
         ],
       ),
     );
@@ -253,7 +254,7 @@ class _ProjectCardState extends State<_ProjectCard> {
       child: InkWell(
         onTap: () => openProject(context, p),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
           child: Row(
             children: [
               Expanded(
@@ -265,8 +266,18 @@ class _ProjectCardState extends State<_ProjectCard> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: c.text, fontSize: 15, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 3),
-                    Text(shortPath(p.path),
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.textMuted, fontSize: 12)),
+                    Row(
+                      children: [
+                        if (onPhoneStorage(p.path)) ...[
+                          Icon(Icons.smartphone_rounded, size: 13, color: c.textMuted),
+                          const SizedBox(width: 4),
+                        ],
+                        Flexible(
+                          child: Text(shortPath(p.path),
+                              maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: c.textMuted, fontSize: 12)),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 6),
                     if (_s.tabs.tabs.where((t) => t.project == p.path && t.agent != null).firstOrNull case final tab?) ...[
                       Row(children: [
@@ -283,7 +294,11 @@ class _ProjectCardState extends State<_ProjectCard> {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: c.textMuted),
+              IconButton(
+                tooltip: 'Project actions',
+                icon: Icon(Icons.more_vert_rounded, color: c.textMuted),
+                onPressed: () => showProjectActions(context, p),
+              ),
             ],
           ),
         ),

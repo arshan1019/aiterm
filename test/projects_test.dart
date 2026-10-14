@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/git/git_runner.dart';
 import 'package:aiterm/git/git_tools.dart';
+import 'package:aiterm/projects/project.dart';
 import 'package:aiterm/projects/project_service.dart';
 import 'package:aiterm/projects/project_store.dart';
 import 'package:aiterm/projects/templates.dart';
@@ -19,6 +20,13 @@ void main() {
   tearDown(() => tmp.deleteSync(recursive: true));
 
   ProjectService service(ProjectStore store) => ProjectService(store: store, git: git, hostPath: (p) => p);
+
+  test('projects on phone storage are recognised (Linux sees it at /sdcard)', () {
+    expect(onPhoneStorage('/sdcard/Projects/site'), isTrue);
+    expect(onPhoneStorage('/storage/emulated/0/x'), isTrue);
+    expect(onPhoneStorage('/root/projects/site'), isFalse);
+    expect(onPhoneStorage('/sdcardish'), isFalse);
+  });
 
   group('store', () {
     test('an agent opened in a folder makes it a recent project and is remembered', () async {

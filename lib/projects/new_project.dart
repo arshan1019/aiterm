@@ -8,12 +8,12 @@ import '../shared/action_sheet.dart';
 import '../shared/folder_picker.dart';
 import '../shared/format.dart';
 import 'project.dart';
+import 'project_actions.dart';
 import 'project_service.dart';
 import 'project_store.dart';
 import 'templates.dart';
 
 /// Where new projects go unless the user picks another folder.
-const projectsFolder = '/root/projects';
 
 enum NewProjectKind { empty, template, clone }
 
@@ -27,15 +27,9 @@ void showNewProject(BuildContext context) {
     SheetAction(Icons.dashboard_customize_outlined, 'From a template', () => push(NewProjectKind.template)),
     SheetAction(Icons.cloud_download_outlined, 'Clone a repository', () => push(NewProjectKind.clone)),
     null,
-    SheetAction(Icons.folder_open_rounded, 'Open a folder in Linux', () => openFolderAsProject(context)),
+    SheetAction(Icons.folder_open_rounded, 'Open a folder in Linux', () => openLinuxFolderAsProject(context)),
+    SheetAction(Icons.smartphone_rounded, 'Open a folder on phone', () => openPhoneFolderAsProject(context)),
   ]);
-}
-
-Future<void> openFolderAsProject(BuildContext context) async {
-  final s = context.services;
-  final path = await pickLinuxFolder(context, title: 'Open a folder', action: 'Open');
-  if (path == null || !context.mounted) return;
-  s.showProject(await s.projectService.openExisting(path));
 }
 
 class NewProjectScreen extends StatefulWidget {

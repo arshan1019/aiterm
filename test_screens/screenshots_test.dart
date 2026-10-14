@@ -136,6 +136,11 @@ void main() {
   testWidgets('projects list and new project', (tester) async {
     await boot(tester);
     await shot(tester, '04-projects');
+    await tester.tap(find.byTooltip('Project actions').first);
+    await settle(tester);
+    await shot(tester, '24-project-actions');
+    await tester.tapAt(const Offset(200, 100));
+    await settle(tester);
     await tester.tap(find.byType(FloatingActionButton));
     await settle(tester);
     await shot(tester, '05-new-project-sheet');

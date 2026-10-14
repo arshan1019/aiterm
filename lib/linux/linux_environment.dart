@@ -262,9 +262,17 @@ class LinuxEnvironment extends ChangeNotifier {
   /// path, or null if it can't be shown.
   String hostPath(String guestPath) {
     if (guestPath.isEmpty || guestPath == '~') return home;
-    if (guestPath.startsWith('/') && installed && !_androidShell) return '$rootfs$guestPath';
+    if (guestPath.startsWith('/') && installed && !_androidShell) {
+      // Phone storage is bound in (see _prootSpec), not inside the rootfs.
+      for (final (mount, host) in const [('/sdcard', _phoneStorage), ('/mnt/sdcard', _phoneStorage), ('/storage', '/storage')]) {
+        if (guestPath == mount || guestPath.startsWith('$mount/')) return '$host${guestPath.substring(mount.length)}';
+      }
+      return '$rootfs$guestPath';
+    }
     return '$home/${guestPath.replaceFirst(RegExp(r'^~/'), '')}';
   }
+
+  static const _phoneStorage = '/storage/emulated/0';
 
   /// The inverse of [hostPath]: where the shell sees host folder [host].
   String guestPath(String host) {
