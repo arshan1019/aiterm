@@ -25,6 +25,14 @@ class _SetupViewState extends State<SetupView> {
   final _agents = {agentCatalog.first.id};
 
   @override
+  void initState() {
+    super.initState();
+    // Linux downloads while agents are being picked (no wait on Set up).
+    final s = context.services;
+    if (s.prefetchLinux) s.setup.warmUp();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final s = context.services;
     return ListenableBuilder(

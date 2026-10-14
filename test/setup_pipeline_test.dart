@@ -100,4 +100,24 @@ void main() {
     await p.start([]);
     expect(p.canSkip, isFalse);
   });
+
+  test('Linux starts downloading as soon as setup shows; Set up picks it up without a second install', () async {
+    p.warmUp();
+    p.warmUp(); // once only
+    expect(ran, ['linux']);
+    expect(p.active, isFalse); // still the intro: nothing to show yet
+    await p.start(['claude']);
+    expect(ran, ['linux', 'tools', 'claude']);
+    expect(p.steps.first.state, SetupState.done);
+  });
+
+  test('a warm-up that failed is retried by Set up', () async {
+    failures['linux'] = 'offline';
+    p.warmUp();
+    await pumpEventQueue();
+    failures.clear();
+    await p.start([]);
+    expect(ran, ['linux', 'linux', 'tools']);
+    expect(p.active, isFalse);
+  });
 }

@@ -42,6 +42,10 @@ class SetupPipeline extends ChangeNotifier {
   bool _running = false;
   bool _left = true;
 
+  /// Linux downloading early (see [warmUp]), and its latest progress.
+  Future<void>? _early;
+  (String, double?)? _earlyProgress;
+
   bool get running => _running;
 
   /// Setup is on screen: running, or finished with something to retry.
@@ -52,6 +56,24 @@ class SetupPipeline extends ChangeNotifier {
   /// Leaving with failures is fine once Linux works (agents can be
   /// installed later from their page).
   bool get canSkip => !_running && failed && steps.isNotEmpty && steps.first.state == SetupState.done;
+
+  /// Starts the Linux download as soon as setup shows, while the user
+  /// picks agents (Termux-style: no waiting on a question first). [start]
+  /// picks it up; a failed warm-up is simply installed again.
+  void warmUp() {
+    if (_early != null || linuxReady()) return;
+    _early = installLinux((status, progress) {
+      _earlyProgress = (status, progress);
+      final linux = steps.where((s) => s.id == 'linux' && s.state == SetupState.running).firstOrNull;
+      if (linux != null) {
+        linux
+          ..detail = status
+          ..progress = progress;
+        notifyListeners();
+      }
+    });
+    _early!.catchError((Object _) {}).ignore();
+  }
 
   Future<void> start(List<String> agents) {
     steps = [
@@ -101,6 +123,21 @@ class SetupPipeline extends ChangeNotifier {
       switch (step.id) {
         case 'linux':
           if (linuxReady()) return null;
+          if (_early case final early?) {
+            _early = null;
+            if (_earlyProgress case (final status, final progress)) {
+              step
+                ..detail = status
+                ..progress = progress;
+              notifyListeners();
+            }
+            try {
+              await early;
+              return null;
+            } catch (_) {
+              // The early attempt failed: install again below.
+            }
+          }
           await installLinux((status, progress) {
             step
               ..detail = status

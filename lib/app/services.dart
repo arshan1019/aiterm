@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import '../assistant/assistant.dart';
 import '../assistant/needle.dart';
@@ -216,6 +217,10 @@ class AppServices {
       showSession(tabs.active);
     },
   );
+
+  /// Start downloading Linux as soon as first-run setup shows. Off under
+  /// `flutter test`, where nothing may hit the network.
+  final prefetchLinux = !Platform.environment.containsKey('FLUTTER_TEST');
 
   /// First run: Linux, git tools and the chosen agents in one go.
   late SetupPipeline setup = SetupPipeline(

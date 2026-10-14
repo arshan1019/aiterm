@@ -277,6 +277,10 @@ Where each rule comes from, so changes can be checked against it.
 | Empty states show the way in | Nielsen Norman Group, empty states | "No projects yet" with the four ways to add one |
 | Visible feedback for every action | Norman (feedback); Nielsen (system status) | Progress for installs and copies; results stay in place (git outcome card) |
 | Touch targets at least 44 pt / 48 dp | Apple HIG, Material 3 | Buttons 44 dp tall; terminal tabs 44 dp with a full-size close target |
+| Onboarding is fast, optional, once | Apple HIG (onboarding); developer-tool time-to-first-value studies | First launch: one full-screen setup with Skip, no tabs behind it; never shown again once Linux is set up |
+| Don't make people wait on a question | Termux (bootstraps on first launch without asking); Laws of UX: Doherty threshold | Linux starts downloading the moment setup shows, while agents are being picked |
+| No account wall | Developer onboarding research; Replit/Working Copy | GitHub sign-in is optional (a button on Projects); agents sign in inside their own tab |
+| Familiar patterns; the app absorbs complexity | Laws of UX: Jakob's law, Tesler's law | Bottom tabs and standard icons; git, gh and keep-alive set up by the app, not the user |
 
 ## 8. Screen by screen
 
