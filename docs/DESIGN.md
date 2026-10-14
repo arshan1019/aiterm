@@ -153,6 +153,8 @@ Expressive fast spatial (ζ 0.6, bounce about 0.4) sits at Apple's "too exaggera
 
 ### Haptics: native constants, scaled to frequency and importance
 
+*As built: see "Haptics, as built" under [What we learned and applied](#what-we-learned-and-applied).*
+
 Android's rules are "less is more," "favor rich and clear haptics over buzzy haptics," predefined `HapticFeedbackConstants` before anything custom, and "given the choice of buzzy haptics or no haptics… choose no haptics" ([Android haptics principles](https://developer.android.com/develop/ui/views/haptics/haptics-principles)). Flutter's `HapticFeedback` covers only part of the constant set ([haptic_feedback.dart](https://github.com/flutter/flutter/blob/master/packages/flutter/lib/src/services/haptic_feedback.dart)). Add one `MethodChannel('aiterm/haptics')` that calls `View.performHapticFeedback` with an API-level fallback table, so user settings always apply ([HapticFeedbackConstants](https://developer.android.com/reference/android/view/HapticFeedbackConstants)).
 
 | Interaction | Constant (API) | Flutter fallback |
@@ -181,7 +183,7 @@ Write in sentence case everywhere: "New session", "Clone repo". Fluent and Googl
 | Sheets (shared frame) | One frame: overlay surface, 20dp top corners, optional 32×4dp handle ([SheetBottomTokens.kt](https://github.com/androidx/androidx/blob/androidx-main/compose/material3/material3/src/commonMain/kotlin/androidx/compose/material3/tokens/SheetBottomTokens.kt)), a titleMedium title row with a visible Close (×) at the trailing edge, and system Back dismisses. Max width 640dp, a half-height detent expanding to full, content clear of the nav-bar inset, rising above the IME. One level only: replace content inside the sheet, never stack. Mostly-form content goes to a full screen instead ([NN/g](https://www.nngroup.com/articles/bottom-sheet/)). |
 | Dialogs | Only for irreversible or remote-destructive actions. The title states the action and the body states the consequence with real numbers: "Force-push `main` to origin? This overwrites 3 remote commits." Buttons: a danger-filled action named by its verb ("Force push") and "Cancel". 20dp radius, scrim, no shadow. Reversible actions (discard hunk, close session, delete scratch file, archive conversation) act at once and show "Discarded 1 hunk · Undo" ([NN/g](https://www.nngroup.com/articles/confirmation-dialog/)). |
 | Buttons | Height ≥48dp hit area (visual 40–44dp allowed with `MaterialTapTargetSize.padded`), 8dp radius, labelLarge. One filled accent button per screen. Secondary is tonal (containerHigh fill) or text. Outlined only where a 3:1 edge is needed. Use split buttons for "Commit ▾" (amend, sign-off) and connected button groups for view toggles such as Changes/History ([M3 button groups](https://m3.material.io/components/button-groups/overview)). Loading buttons keep their label and add an inline indicator ([Vercel guidelines](https://vercel.com/design/guidelines)). |
-| Inputs | Container fill, outline edge at 3:1, 2dp accent edge on focus, 8dp radius, label above (not placeholder-only). Validation is inline below in bodySmall danger with the fix. Fields for paths, URLs, branch names and commands use mono with autocorrect and capitalization off. |
+| Inputs | (Forms. The agent message box follows its own rule: see "Agents as blocks, and the message box" below.) Container fill, outline edge at 3:1, 2dp accent edge on focus, 8dp radius, label above (not placeholder-only). Validation is inline below in bodySmall danger with the fix. Fields for paths, URLs, branch names and commands use mono with autocorrect and capitalization off. |
 | Empty states | Left-aligned in the content area, not centered marketing. A headline that states the situation ("No projects yet"), one sentence of why or what, and one primary action at screen center ("Clone a repo") plus one secondary ("Create empty project"). No illustration unless it is product-specific. Never hide the destination ([HIG tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars); [Vercel: no dead ends](https://vercel.com/design/guidelines)). |
 | Loading | Nothing under ~1s. Skeleton rows that mirror the final layout for the repo list, file tree and commit log. The M3 loading indicator for a single module under ~5s. A determinate bar or streaming log for clone, package install and setup ([NN/g](https://nngroup.com/articles/skeleton-screens/)). Use a show-delay and a minimum visible time so indicators never flicker ([Vercel guidelines](https://vercel.com/design/guidelines)). |
 | Errors | Inline and persistent, next to the cause or as a failed block in the session. Never a toast. The block shows the error text in mono, the exit code, and actions: "Retry", "Copy error", "Ask agent to fix". Snackbars are only for passive success with optional Undo ([NN/g](https://www.nngroup.com/articles/indicators-validations-notifications/)). |
@@ -238,6 +240,94 @@ Write in sentence case everywhere: "New session", "Clone repo". Fluent and Googl
   - **Sessions:** sessions resume after a restart when the agent supports `session/load`.
   - **Workspace:** when a project has both blocks and terminals, the Agent tab switches between them, and both stay running. Sign-in still happens in the agent's own UI ("Sign in" opens it).
 - **Open:** blocks for plain shell commands (OSC 133 marks) are not built.
+
+## What we learned and applied
+
+What each round of research taught us, where it came from, and what it changed in the app. Where this section and the proposals above differ (the input rule, the haptics table), this section is what was built. The flow and onboarding rules have their own table in [USERFLOW.md §7](USERFLOW.md#7-design-principles-we-follow).
+
+### Identity: look like a tool, not like generated UI
+
+| Learned | Source | Applied in aiterm |
+|---|---|---|
+| Generated UI is a stack of defaults: mono everywhere, all-caps tracked labels, outlined card stacks, a sparkle for AI | Designer critiques collected above ("Generated UI is a stack of unexamined defaults") | Mono only for machine text; sentence case everywhere; groups by tone, not borders; a robot, not a sparkle, for agents |
+| Distinct apps win with one constraint and one signature mechanic, not decoration | Linear, Raycast, Warp (blocks), Things 3 | The signature is blocks (optional); the constraint is "mono means machine" |
+| Platforms converge on content-first restraint; on Android, follow M3 by default | Material 3 / M3 Expressive research (46 studies), Fluent 2, One UI | Native components and predictive back; custom work only for blocks, the terminal and agent surfaces |
+| Glass, blur and gradients are platform identity, not guidance for apps | Apple Liquid Glass, One UI 7 | No glass, no blur, no gradients; elevation is tone |
+| M3 Expressive helps on a few key actions; a calmer design suits a strong minority | Google's Expressive research | Emphasis only on the primary action of each screen |
+
+### Type, color and contrast
+
+| Learned | Source | Applied in aiterm |
+|---|---|---|
+| A humanist sans for the app and a mono for literal text makes identifiers scannable | Typography research above; GitHub Primer | IBM Plex Sans for the app, JetBrains Mono for paths, branches, commands and code (`codeStyle`) |
+| Generate colour in a perceptual space from a few inputs, and give every token one job | Linear (LCH, three inputs), Vercel Geist, Primer | An OKLCH palette tinted toward teal (172°); `AppColors` roles; the accent rationed to five jobs; success is its own green |
+| Body text needs 4.5:1 and control edges 3:1; high-contrast themes target 7:1 | WCAG 2.2 (1.4.3, 1.4.11); Primer's high-contrast themes | Contrast tests for every theme; a High contrast setting at 7:1 text and 4.5:1 outlines, with edged groups |
+| Dynamic colour must keep its contrast | M3 HCT tonal palettes | Wallpaper colors reuse the teal's tones at any hue, tested every 15° |
+| Colour is never the only signal | WCAG 1.4.1; Vercel guidelines | Diffs show + and − marks; statuses have glyphs and labels |
+| Terminal colours should come from the same system | Design research above | `TerminalPalette` from the same generator; Always dark and Black background options |
+
+### Layout, touch and navigation
+
+| Learned | Source | Applied in aiterm |
+|---|---|---|
+| Grips change constantly, and the screen centre is the most accurate place to touch; "put everything at the bottom" overstates the evidence | Hoober's field studies (UXmatters); NN/g on bottom sheets | Content owns the centre; one bottom strip (navigation or the message box); destructive actions in menus |
+| Touch targets of 48 dp at least; rows of 9–10 mm are comfortable | Material 3, Apple HIG, Hoober | 48 dp minimum, checked by the accessibility guideline tests; 56/72 dp rows, with a Compact option at 48/64 dp that never shrinks hit areas |
+| 3–5 labelled destinations in thumb reach | Material 3 navigation bar, Apple HIG tab bars, One UI | Bottom tabs with labels, hidden while typing; the selected icon fills in |
+| Sheets should be one level, closable and readable | NN/g bottom sheets; One UI | One `AppSheet` frame: title, visible Close, a 640 dp cap, lifts above the keyboard |
+| Text must survive 200% scaling | One UI typography; Apple HIG accessibility | Widget tests lay out the main screens at 200%, and found four real overflows |
+| Visible first, gestures second | NN/g; your rule | Every long-press has a visible twin (⋮ menus) |
+
+### Feedback: errors, loading and motion
+
+| Learned | Source | Applied in aiterm |
+|---|---|---|
+| People miss toasts; errors belong next to their cause | NN/g on indicators, validations and notifications | Inline errors (git init, clone, paste); snackbars only for success and Undo |
+| Undo beats confirmation for reversible actions; confirm only what can't be undone | NN/g on confirmation dialogs | Remove project with Undo; Delete asks first, naming the consequence |
+| Animate only what changed; repeated actions get none; respect reduced motion | Fluent motion, M3 motion, Android | `Motion` tokens; quick fades between tabs; all app transitions stop when the system's "Remove animations" setting is on |
+| Show progress you can trust, and no fake bars | NN/g on skeleton screens; composer teardowns | Real install progress; the thinking orb's motion and label follow what the agent is actually doing |
+
+### Haptics, as built
+
+Android: "less is more"; clear clicks, never buzzy ("given the choice of buzzy or none, choose none"); predefined constants; strength follows importance; in sync with what's on screen. One UI: distinct patterns per event, with two quick pulses for an error, and avoiding overstimulation. Latency studies: within 30–50 ms of the visual reads as instant. Sources: [Android haptics principles](https://developer.android.com/develop/ui/views/haptics/haptics-principles), [One UI haptics](https://developer.samsung.com/one-ui/sound-and-haptic/haptic.html), [Immersion: haptic latency](https://www.immersion.com/wp-content/uploads/2015/10/ux-impact_haptic-latency-in-auto_jul13v1.pdf).
+
+| Moment | Haptic | Why |
+|---|---|---|
+| A switch flipped | TOGGLE_ON / TOGGLE_OFF | The system's own pattern for switches |
+| Send, pick a mode, open a block, attachments added, a "/" command picked | A tick | A small confirmation of a choice |
+| The agent asks permission | Attention (a firm click) | The one moment that needs you |
+| A turn finishes / allowed / committed | CONFIRM | Something finished well |
+| A turn fails / rejected | REJECT | Failure, felt differently from success |
+| A long press opens a menu | LONG_PRESS | Platform convention |
+| Streaming text, terminal output, scrolling, typing, your own Stop | None | Too frequent, or you already got a tick |
+
+Rules: haptics fire only while that screen is visible and the app is in front. They use `View.performHapticFeedback`, so Android's own setting applies, and **Settings → Haptic feedback** turns them off.
+
+### Agents as blocks, and the message box
+
+| Learned | Source | Applied in aiterm |
+|---|---|---|
+| Agents report structured work over the Agent Client Protocol, the standard editors use; scraping terminal output is fragile | [agentclientprotocol.com](https://agentclientprotocol.com), Zed, JetBrains, the official adapters | Blocks speak ACP: Gemini natively, Claude Code and Codex through the official adapters |
+| The adapters can reuse the agents already installed | The adapters' `CLAUDE_CODE_EXECUTABLE` and `CODEX_PATH` settings | `--omit=optional` skips a 240 MB second copy of Claude Code; one sign-in |
+| The agents' own interfaces are good | Your on-device use | Blocks are optional and off by default |
+| Commands and their output read best grouped as units | Warp ("blocks") | Messages, tool calls, plans and permissions as blocks; tool output collapses, and an open block stays open while the agent streams |
+| A composer works best as one container: attachments, growing text, attach and send inside; text grows to a cap, then scrolls | Google Messages, Gemini, Claude, WhatsApp; composer teardowns; Material's enclosed-field usability studies; Apple: a text view for longer input | One 24 dp rounded container on the surface tone, with a hairline edge that strengthens on focus; up to six lines; a 40 dp send/stop circle with a 48 dp touch area |
+| Show the context going into the next message, removable | Composer teardowns | Attachment chips inside the box, each with × |
+| Put mode and model controls before sending, when they change cost or behaviour | Composer teardowns (Claude) | Mode in the chat bar, model in the menu, both remembered per agent |
+| Don't make people wait on a starting process | Laws of UX (Doherty threshold) | You can type while the agent starts; New chat reuses the running agent |
+| A large dark accent circle reads as a black blob in light mode | Your on-device test | Send is tonal mint (`accentContainer`) in light mode and the bright accent in dark |
+| A pending turn needs a living, honest indicator | Composer guides (pulsing, shimmer); [thinking-orbs](https://pub.dev/packages/flutter_thinking_orbs) (MIT, a port of Jakub Antalik's orbs) | A monochrome thinking orb whose motion matches the activity; a still frame when animations are off |
+| Streaming must not shake what you're reading | Your on-device test | Replies parse once; a layer per block; the rows you're reading hold still; an arrow returns you to the latest |
+
+### Engineering lessons that shaped the experience
+
+| Learned | Applied |
+|---|---|
+| Debug builds don't tree-shake icon fonts; the full Material Symbols set would add about 30 MB | `tool/icons/generate.py` subsets the variable font to the app's icons (about 100 KB) and generates `AppIcons` |
+| `gh auth login` is reliable without a terminal; scraping its prompts wasn't | Sign-in runs on plain pipes and reads the code and URL |
+| git and executables break on the phone's FUSE storage | Projects live in Linux; phone files come in by import |
+| Settings written in quick succession overlapped and could corrupt the file | One atomic write at a time (caught by a test) |
+| Tests at 200% text and the accessibility guidelines catch what screenshots miss | Both run on every CI test run |
+| A corrupted NDK download once failed a build | The NDK installs up front, with retries |
 
 ## Conclusion
 

@@ -114,7 +114,7 @@ Settings → Agent settings → **Blocks** shows an agent's work as native block
 
 ### Design and accessibility
 
-The rules and their evidence are in [DESIGN.md](DESIGN.md). In short:
+The rules and their evidence are in [DESIGN.md](DESIGN.md). Its section [What we learned and applied](DESIGN.md#what-we-learned-and-applied) pairs each research finding (platform guidelines, studies, admired apps, your on-device tests) with what it changed. The flow and onboarding rules are in [USERFLOW.md §7](USERFLOW.md#7-design-principles-we-follow). In short:
 
 - **Type:** two voices. IBM Plex Sans for the app; JetBrains Mono only for literal text (paths, branches, commands, code).
 - **Structure:** tone, not borders, separates groups. Sentence case everywhere.
