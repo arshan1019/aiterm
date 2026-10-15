@@ -747,6 +747,8 @@ class AgentChat extends ChangeNotifier implements AcpSessionHandler {
     }
     final call = params['toolCall'];
     final tool = call is Map ? _tool(call.cast<String, Object?>()) : null;
+    // Its block opens while it waits, showing what it would do.
+    tool?.open ??= true;
     final choices = [
       for (final o in (params['options'] as List? ?? const []).whereType<Map>())
         if (o['optionId'] is String)

@@ -674,7 +674,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byTooltip('Send'));
       await pumpChat(tester);
-      await tester.tap(find.widgetWithText(FilledButton, 'Allow'));
+      await tester.tap(find.text('Allow'));
       await pumpChat(tester);
       await tester.pumpAndSettle();
       await tester.pageBack();
@@ -740,23 +740,26 @@ void main() {
     expect(find.text('Add a forecast view', skipOffstage: false), findsOneWidget); // the user's block
     expect(find.text('Plan', skipOffstage: false), findsOneWidget);
     expect(find.text('Add the forecast view', skipOffstage: false), findsOneWidget);
-    // Asks first: the edit, and the agent's choices.
+    // Asks first: the edit (its block opened above, showing the diff), and
+    // the agent's choices as one compact list.
     expect(find.text('Always allow'), findsOneWidget);
+    expect(find.textContaining('new line', findRichText: true, skipOffstage: false), findsOneWidget);
     expect(find.byTooltip('Stop'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Allow'));
+    await tester.tap(find.text('Allow'));
     await pumpChat(tester);
     await tester.pumpAndSettle();
     expect(find.text('Always allow'), findsNothing);
     expect(find.textContaining('view.', findRichText: true), findsOneWidget);
     expect(find.byTooltip('Send'), findsOneWidget);
 
-    // The edit's block opens to its diff, + and − beside the colors.
+    // The edit's block stays open on its diff, + and − beside the colors;
+    // a tap folds it.
     expect(find.text('+1'), findsOneWidget);
     expect(find.text('−1'), findsOneWidget);
+    expect(find.textContaining('old line', findRichText: true), findsOneWidget);
     await tester.tap(find.text('Edit lib/app.dart'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('new line', findRichText: true), findsOneWidget);
-    expect(find.textContaining('old line', findRichText: true), findsOneWidget);
+    expect(find.textContaining('old line', findRichText: true), findsNothing);
 
     // A terminal too: the tab switches between them.
     services.tabs.open(cwd: '/root/app', project: '/root/app');

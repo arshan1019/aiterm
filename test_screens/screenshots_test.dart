@@ -298,9 +298,7 @@ void main() {
     await tester.tap(find.byTooltip('Send'));
     await settle(tester);
     await shot(tester, '33-blocks-permission');
-    await tester.tap(find.widgetWithText(FilledButton, 'Allow'));
-    await settle(tester);
-    await tester.tap(find.text('Edit lib/forecast.dart'));
+    await tester.tap(find.text('Allow'));
     await settle(tester);
     await shot(tester, '34-blocks-turn');
     s.settings.theme = ThemeChoice.light;

@@ -48,24 +48,30 @@ class BlocksView extends StatelessWidget {
       chat: chat,
       child: ListenableBuilder(
         listenable: chat,
-        builder: (context, _) => Column(
-          children: [
-            _ChatBar(
-              chat: chat,
-              chats: chats,
-              onSelect: onSelect,
-              onNew: onNew,
-              onTerminal: onTerminal,
-              onClose: onClose,
-            ),
-            Expanded(child: _body(context)),
-            if (chat.asks.firstOrNull case final ask?)
-              switch (ask) {
-                PermissionRequest() => _PermissionCard(key: ObjectKey(ask), chat: chat, request: ask),
-                QuestionRequest() => _QuestionCard(key: ObjectKey(ask), chat: chat, request: ask),
-              },
-            _Composer(key: ValueKey(chat), chat: chat),
-          ],
+        builder: (context, _) => LayoutBuilder(
+          // The room this view really has (the keyboard already taken off).
+          builder: (context, box) => Column(
+            children: [
+              _ChatTabs(
+                chat: chat,
+                chats: chats,
+                onSelect: onSelect,
+                onNew: onNew,
+                onTerminal: onTerminal,
+                onClose: onClose,
+              ),
+              Expanded(child: _body(context)),
+              if (chat.asks.firstOrNull case final ask?)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: box.maxHeight * 0.45),
+                  child: switch (ask) {
+                    PermissionRequest() => _PermissionCard(key: ObjectKey(ask), chat: chat, request: ask),
+                    QuestionRequest() => _QuestionCard(key: ObjectKey(ask), chat: chat, request: ask),
+                  },
+                ),
+              _Composer(key: ValueKey(chat), chat: chat),
+            ],
+          ),
         ),
       ),
     );
@@ -145,9 +151,12 @@ class _Centered extends StatelessWidget {
   );
 }
 
-/// The agent (or a chip per agent), its mode, and the chat's menu.
-class _ChatBar extends StatelessWidget {
-  const _ChatBar({
+/// The project's chats as tabs, like the terminal's (Material secondary
+/// tabs; Cursor's chat tabs): a dot when one works (accent) or waits for
+/// you (amber), × on the active one; tap it (or long-press any) for its
+/// menu. New and History at the end.
+class _ChatTabs extends StatelessWidget {
+  const _ChatTabs({
     required this.chat,
     required this.chats,
     required this.onSelect,
@@ -163,17 +172,15 @@ class _ChatBar extends StatelessWidget {
   final ValueChanged<AgentChat> onTerminal;
   final ValueChanged<AgentChat> onClose;
 
-  void _menu(BuildContext context) {
+  void _menu(BuildContext context, AgentChat of) {
     showActionSheet(
       context,
-      title: chat.name,
+      title: of.name,
       actions: [
-        for (final o in chat.options)
-          if (o.id != 'mode') SheetAction(AppIcons.tune, '${o.name}: ${o.valueName}', () => _choose(context, chat, o)),
-        SheetAction(AppIcons.add, 'New chat', chat.restart),
-        SheetAction(AppIcons.terminal, 'Open in terminal', () => onTerminal(chat)),
+        SheetAction(AppIcons.refresh, 'Clear chat', of.restart),
+        SheetAction(AppIcons.terminal, 'Open in terminal', () => onTerminal(of)),
         null,
-        SheetAction(AppIcons.close, 'Close', () => onClose(chat)),
+        SheetAction(AppIcons.close, 'Close', () => onClose(of)),
       ],
     );
   }
@@ -181,78 +188,224 @@ class _ChatBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final mode = chat.options.where((o) => o.id == 'mode').firstOrNull;
     return Container(
-      height: 52,
-      padding: const EdgeInsets.only(left: 8, right: 4),
+      height: 44,
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: c.border, width: 0.5)),
       ),
       child: Row(
         children: [
           Expanded(
-            child: chats.length > 1
-                ? ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (final other in chats)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: Center(
-                            child: ChoiceChip(
-                              label: Text(other.name),
-                              selected: other == chat,
-                              showCheckmark: false,
-                              onSelected: (_) => onSelect(other),
-                            ),
-                          ),
-                        ),
-                    ],
-                  )
-                : Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            chat.name,
-                            style: Theme.of(context).textTheme.titleSmall,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        // Starting: the chat is already usable meanwhile.
-                        if (chat.state == ChatState.starting || chat.state == ChatState.preparing) ...[
-                          const SizedBox(width: 10),
-                          const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5)),
-                        ],
-                      ],
-                    ),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(6, 5, 0, 5),
+              children: [
+                for (final other in chats)
+                  _ChatTab(
+                    key: ObjectKey(other),
+                    chat: other,
+                    active: other == chat,
+                    onTap: () => other == chat ? _menu(context, other) : onSelect(other),
+                    onLongPress: () {
+                      Haptics.longPress();
+                      _menu(context, other);
+                    },
+                    onClose: () => onClose(other),
                   ),
-          ),
-          // The mode gives way first on a narrow screen (its label truncates).
-          if (mode != null)
-            Flexible(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 150),
-                child: TextButton.icon(
-                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
-                  onPressed: () => _choose(context, chat, mode),
-                  icon: const Icon(AppIcons.tune, size: 18),
-                  label: Text(mode.valueName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-              ),
+              ],
             ),
-          IconButton(
-            tooltip: 'History',
-            icon: const Icon(AppIcons.history),
-            onPressed: () => openChatHistory(context, cwd: chat.cwd, agent: chat.agent.id),
           ),
-          IconButton(tooltip: 'New', icon: const Icon(AppIcons.add), onPressed: onNew),
-          IconButton(tooltip: 'Chat actions', icon: const Icon(AppIcons.moreVert), onPressed: () => _menu(context)),
+          SizedBox(
+            width: 42,
+            child: IconButton(
+              tooltip: 'History',
+              iconSize: 20,
+              icon: Icon(AppIcons.history, color: c.textMuted),
+              onPressed: () => openChatHistory(context, cwd: chat.cwd, agent: chat.agent.id),
+            ),
+          ),
+          SizedBox(
+            width: 42,
+            child: IconButton(
+              tooltip: 'New',
+              iconSize: 20,
+              icon: Icon(AppIcons.add, color: c.textMuted),
+              onPressed: onNew,
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _ChatTab extends StatelessWidget {
+  const _ChatTab({
+    super.key,
+    required this.chat,
+    required this.active,
+    required this.onTap,
+    required this.onLongPress,
+    required this.onClose,
+  });
+  final AgentChat chat;
+  final bool active;
+  final VoidCallback onTap, onLongPress, onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: chat,
+      builder: (context, _) {
+        final waiting = chat.asks.isNotEmpty;
+        final working = chat.busy || chat.state == ChatState.starting || chat.state == ChatState.preparing;
+        return Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Semantics(
+            button: true,
+            selected: active,
+            label: chat.name,
+            child: GestureDetector(
+              onTap: onTap,
+              onLongPress: onLongPress,
+              child: AnimatedContainer(
+                duration: Motion.standard,
+                curve: Motion.enter,
+                padding: const EdgeInsets.only(left: 10, right: 4),
+                decoration: BoxDecoration(
+                  color: active ? c.surface : c.bg,
+                  borderRadius: BorderRadius.circular(Radii.medium),
+                  border: Border.all(color: active ? c.border : c.bg, width: 0.5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (waiting || working) ...[
+                      Semantics(
+                        label: waiting ? 'Needs input' : 'Working',
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: waiting ? c.warning : c.accent),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      chat.name,
+                      style: TextStyle(
+                        color: active ? c.text : c.textMuted,
+                        fontSize: 12,
+                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                    if (active)
+                      Semantics(
+                        button: true,
+                        label: 'Close ${chat.name}',
+                        excludeSemantics: true,
+                        onTap: onClose,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onClose,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+                            child: Icon(AppIcons.close, size: 16, color: c.textMuted),
+                          ),
+                        ),
+                      )
+                    else
+                      const SizedBox(width: 6, height: 26),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// A setting in the message box (mode, model): its value and a caret, the
+/// label truncating before the row overflows.
+class _OptionChip extends StatelessWidget {
+  const _OptionChip({required this.label, required this.tooltip, required this.onPressed});
+  final String label, tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Tooltip(
+      message: tooltip,
+      child: TextButton(
+        style: TextButton.styleFrom(
+          foregroundColor: c.textMuted,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          minimumSize: const Size(48, 40),
+          tapTargetSize: MaterialTapTargetSize.padded,
+        ),
+        onPressed: onPressed,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+            ),
+            const SizedBox(width: 2),
+            const Icon(AppIcons.expandMore, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The model, and any other setting the agent offers (effort…), in one
+/// sheet, each a group of choices.
+void _chooseSettings(BuildContext context, AgentChat chat) {
+  showAppSheet<void>(
+    context,
+    title: 'Model',
+    inset: false,
+    builder: (sheet) => ListenableBuilder(
+      listenable: chat,
+      builder: (sheet, _) {
+        final settings = [
+          for (final o in chat.options)
+            if (o.id != 'mode') o,
+        ];
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final o in settings) ...[
+              if (settings.length > 1)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                  child: Text(
+                    o.name,
+                    style: Theme.of(sheet).textTheme.titleSmall?.copyWith(color: sheet.colors.textMuted),
+                  ),
+                ),
+              for (final (value, name) in o.choices)
+                ListTile(
+                  title: Text(name),
+                  trailing: value == o.value ? Icon(AppIcons.check, color: sheet.colors.accent) : null,
+                  onTap: () {
+                    Haptics.tick();
+                    chat.choose(o, value);
+                    if (settings.length == 1) Navigator.pop(sheet);
+                  },
+                ),
+            ],
+          ],
+        );
+      },
+    ),
+  );
 }
 
 /// Picks a mode or model from the agent's choices.
@@ -879,68 +1032,63 @@ class _AskFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final media = MediaQuery.of(context);
-    // At most half the room above the keyboard, so the conversation keeps
-    // its share; content and choices each scroll inside when it's tight.
-    final room = (media.size.height - media.viewInsets.bottom) * 0.5;
+    // Sized by the view (at most 45% of the room it really has); content
+    // and choices each scroll inside when it's tight.
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: room),
-        child: Material(
-          color: c.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(Radii.large),
-            side: BorderSide(color: c.warning, width: 1.5),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, size: 18, color: c.warning)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: literal ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ),
-                  ],
-                ),
-                if (content != null)
-                  Flexible(
-                    flex: 3,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: SingleChildScrollView(child: content),
+      child: Material(
+        color: c.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.large),
+          side: BorderSide(color: c.warning, width: 1.5),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(icon, size: 18, color: c.warning),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: literal ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
+                ],
+              ),
+              if (content != null)
                 Flexible(
-                  flex: 2,
+                  flex: 3,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final (i, choice) in choices.indexed) ...[
-                            if (i > 0) const SizedBox(height: 8),
-                            choice,
-                          ],
-                        ],
-                      ),
+                    padding: const EdgeInsets.only(top: 10),
+                    child: SingleChildScrollView(child: content),
+                  ),
+                ),
+              Flexible(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final (i, choice) in choices.indexed) ...[if (i > 0) const SizedBox(height: 8), choice],
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -948,26 +1096,59 @@ class _AskFrame extends StatelessWidget {
   }
 }
 
-/// A full-width choice: the agent's preferred one filled, the rest outlined,
-/// declines in the danger color.
-Widget _choice(
-  BuildContext context,
-  String label,
-  VoidCallback onPressed, {
-  bool primary = false,
-  bool decline = false,
-}) {
-  final c = context.colors;
-  final style = ButtonStyle(
-    minimumSize: const WidgetStatePropertyAll(Size.fromHeight(48)),
-    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
-    alignment: Alignment.center,
-    foregroundColor: decline && !primary ? WidgetStatePropertyAll(c.danger) : null,
-  );
-  final text = Text(label, textAlign: TextAlign.center);
-  return primary
-      ? FilledButton(style: style, onPressed: onPressed, child: text)
-      : OutlinedButton(style: style, onPressed: onPressed, child: text);
+/// The agent's choices as one compact list (Claude Code's own numbered
+/// prompt, as rows): its preferred choice first and emphasized, declines in
+/// the danger color, each row 48dp and wholly tappable.
+class _ChoiceList extends StatelessWidget {
+  const _ChoiceList({required this.choices});
+
+  /// (label, on tap, preferred, decline).
+  final List<(String, VoidCallback, bool, bool)> choices;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: c.surfaceAlt,
+      borderRadius: BorderRadius.circular(Radii.medium),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, (label, onTap, preferred, decline)) in choices.indexed) ...[
+            if (i > 0) Divider(height: 0.5, thickness: 0.5, color: c.border),
+            InkWell(
+              onTap: onTap,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 20 / 14,
+                            fontWeight: preferred ? FontWeight.w600 : FontWeight.w400,
+                            color: decline ? c.danger : (preferred ? c.accent : c.text),
+                          ),
+                        ),
+                      ),
+                      if (preferred) Icon(AppIcons.chevronRight, size: 18, color: c.accent),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 /// The agent asks before a tool runs: what it wants to do (the command,
@@ -985,36 +1166,17 @@ class _PermissionCard extends StatelessWidget {
       chat.answer(request, choice);
     }
 
-    final texts = [
-      for (final t in tool?.content ?? const <ToolContent>[])
-        if (t is ToolText) t.text,
-    ];
-    final diffs = [
-      for (final d in tool?.content ?? const <ToolContent>[])
-        if (d is ToolDiff) d,
-    ];
-    final command = tool?.command;
     final title = tool?.title.isNotEmpty == true ? tool!.title : 'Permission';
+    // What it would do (the diff, the plan, the command) is in the tool's
+    // block just above, opened while it waits; the card stays compact.
     return _AskFrame(
       icon: tool == null ? AppIcons.lock : _kindIcon(tool.kind),
       title: title,
-      literal: command != null && command == title,
-      content: texts.isEmpty && diffs.isEmpty && (command == null || command == title)
-          ? null
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (command != null && command != title) CodeBox(command),
-                for (final d in diffs) ...[
-                  const SizedBox(height: 6),
-                  _DiffBox(path: d.path, lines: lineDiff(d.oldText, d.newText)),
-                ],
-                for (final t in texts) ...[const SizedBox(height: 6), MarkdownView(t)],
-              ],
-            ),
+      literal: tool?.command != null && tool!.command == title,
       choices: [
-        for (final (i, o) in request.choices.indexed)
-          _choice(context, o.name, () => pick(o), primary: i == 0, decline: !o.allows),
+        _ChoiceList(
+          choices: [for (final (i, o) in request.choices.indexed) (o.name, () => pick(o), i == 0, !o.allows)],
+        ),
       ],
     );
   }
@@ -1124,14 +1286,22 @@ class _QuestionCardState extends State<_QuestionCard> {
         ],
       ),
       choices: [
-        if (!_instant || answered) _choice(context, 'Answer', answered ? _submit : () {}, primary: answered),
-        TextButton(
-          style: TextButton.styleFrom(minimumSize: const Size.fromHeight(48), foregroundColor: c.textMuted),
-          onPressed: () {
-            Haptics.tick();
-            widget.chat.skipQuestion(request);
-          },
-          child: const Text('Skip'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: c.textMuted),
+              onPressed: () {
+                Haptics.tick();
+                widget.chat.skipQuestion(request);
+              },
+              child: const Text('Skip'),
+            ),
+            if (!_instant || answered) ...[
+              const SizedBox(width: 8),
+              FilledButton(onPressed: answered ? _submit : null, child: const Text('Answer')),
+            ],
+          ],
         ),
       ],
     );
@@ -1275,6 +1445,12 @@ class _ComposerState extends State<_Composer> {
           ].take(5).toList()
         : const <(String, String)>[];
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final mode = chat.options.where((o) => o.id == 'mode').firstOrNull;
+    final settings = [
+      for (final o in chat.options)
+        if (o.id != 'mode') o,
+    ];
+    final model = settings.where((o) => o.id == 'model').firstOrNull;
     return Material(
       color: c.bg,
       child: SafeArea(
@@ -1335,63 +1511,90 @@ class _ComposerState extends State<_Composer> {
                           ],
                         ),
                       ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          tooltip: 'Attach',
-                          onPressed: ready && !_picking ? _attach : null,
-                          icon: _picking
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Icon(AppIcons.attach, color: c.textMuted),
+                    // The text gets the full width; the controls sit in
+                    // a row below (Claude's composer: + on the left, the
+                    // model by Send on the right).
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 2, 12, 0),
+                      child: TextField(
+                        controller: _text,
+                        focusNode: _focus,
+                        enabled: ready,
+                        minLines: 1,
+                        maxLines: 6,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                        decoration: InputDecoration(
+                          hintText: 'Message ${chat.name}',
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        Expanded(
-                          child: TextField(
-                            controller: _text,
-                            focusNode: _focus,
-                            enabled: ready,
-                            minLines: 1,
-                            maxLines: 6,
-                            textCapitalization: TextCapitalization.sentences,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            decoration: InputDecoration(
-                              hintText: 'Message ${chat.name}',
-                              filled: false,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              disabledBorder: InputBorder.none,
-                              isDense: true,
-                              // 24dp line + 12 + 12: as tall as the buttons.
-                              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 0, 4, 4),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            tooltip: 'Attach',
+                            onPressed: ready && !_picking ? _attach : null,
+                            icon: _picking
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Icon(AppIcons.attach, color: c.textMuted),
                           ),
-                        ),
-                        chat.busy
-                            ? IconButton(
-                                tooltip: 'Stop',
-                                style: _roundButton(background: c.text, foreground: c.bg, c: c),
-                                onPressed: () {
-                                  Haptics.tick();
-                                  chat.cancel();
-                                },
-                                icon: const Icon(AppIcons.stop, fill: 1, size: 20),
-                              )
-                            : IconButton(
-                                tooltip: 'Send',
-                                // Mint either way: the bright accent on dark,
-                                // the tonal pair on light.
-                                style: dark
-                                    ? _roundButton(background: c.accent, foreground: c.bg, c: c)
-                                    : _roundButton(
-                                        background: c.accentContainer,
-                                        foreground: c.onAccentContainer,
-                                        c: c,
-                                      ),
-                                onPressed: canSend ? _send : null,
-                                icon: const Icon(AppIcons.arrowUpward, size: 22),
+                          if (mode != null)
+                            Flexible(
+                              child: _OptionChip(
+                                label: mode.valueName,
+                                tooltip: 'Mode',
+                                onPressed: () => _choose(context, chat, mode),
                               ),
-                      ],
+                            ),
+                          const Spacer(),
+                          if (settings.isNotEmpty)
+                            Flexible(
+                              child: _OptionChip(
+                                label: model?.valueName ?? settings.first.valueName,
+                                tooltip: 'Model',
+                                onPressed: () => _chooseSettings(context, chat),
+                              ),
+                            ),
+                          const SizedBox(width: 4),
+                          chat.busy
+                              ? IconButton(
+                                  tooltip: 'Stop',
+                                  style: _roundButton(background: c.text, foreground: c.bg, c: c),
+                                  onPressed: () {
+                                    Haptics.tick();
+                                    chat.cancel();
+                                  },
+                                  icon: const Icon(AppIcons.stop, fill: 1, size: 20),
+                                )
+                              : IconButton(
+                                  tooltip: 'Send',
+                                  // Mint either way: the bright accent on dark,
+                                  // the tonal pair on light.
+                                  style: dark
+                                      ? _roundButton(background: c.accent, foreground: c.bg, c: c)
+                                      : _roundButton(
+                                          background: c.accentContainer,
+                                          foreground: c.onAccentContainer,
+                                          c: c,
+                                        ),
+                                  onPressed: canSend ? _send : null,
+                                  icon: const Icon(AppIcons.arrowUpward, size: 22),
+                                ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1533,6 +1736,8 @@ class _ChatHapticsState extends State<_ChatHaptics> {
     final seen = _seen;
     if (seen) {
       if (asks > _asks) {
+        // The card needs the screen: the keyboard steps aside.
+        FocusManager.instance.primaryFocus?.unfocus();
         Haptics.attention();
       } else if (failed && !_failed) {
         Haptics.reject();

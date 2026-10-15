@@ -52,13 +52,14 @@ Settings → Agent settings → **Blocks** shows an agent's work as native block
   - Your messages, and the agent's replies as Markdown, with code in mono.
   - Tool calls: status, kind icon, the command or path in mono, +/− counts, and diffs or output when tapped.
   - The plan with progress. Thinking, when turned on.
-- **Permission requests** stay pinned above the message box in one fixed layout: what the agent wants to do (the command, the edit's diff, the plan), then its choices as full-width buttons, one per row, in the agent's own order. The agent's preferred choice is filled and declines are in red. Some of Claude's safety checks deliberately lead with No.
+- **Permission requests** stay pinned above the message box as a compact card: the action, then the agent's choices as one list of rows in its own order (its preferred choice emphasised, declines in red; some of Claude's safety checks deliberately lead with No). What it would do (the diff, the plan, the command) shows in the tool's own block just above, opened while it waits. The card takes at most 45% of the space the view really has, and the keyboard closes when it appears.
 - **Questions:** Claude's AskUserQuestion arrives as an ACP form (aiterm advertises `elicitation.form`). Its options are tappable rows, with an optional "Other" box and Skip; a single pick-one question answers on tap.
+- **Chat tabs:** the project's chats sit in a tab strip like the terminal's: a dot shows working (accent) or waiting for you (amber), × closes the active one, and tapping it (or long-pressing any) opens its menu (Clear chat, Open in terminal, Close). History and + sit at the end.
 - **Several chats per agent in a project** ("Claude Code", "Claude Code 2", …), from + → New Claude Code chat. They share one adapter process (ACP multiplexes sessions), so another chat costs a session, not another Node process. The first chat resumes the remembered session; the others start fresh.
 - **History** (the clock icon, top right of the chat bar) lists the project's past chats by title, newest first, grouped by date as in Chrome (Today, Yesterday, Previous 7 days, then months), with search once the list is long. Tapping one opens it as blocks in that agent, replaying it with `session/load`, or goes to it if it's already open. The list comes from the agent's `session/list`; listing alone doesn't leave the agent running.
-- **The agent's mode** sits in the chat bar and its model in the menu. The last choice of each is remembered per agent.
+- **The agent's mode and model** sit in the message box's control row. The last choice of each is remembered per agent.
 - **Message box:**
-  - Attachments, growing text, and Attach and Send inside one rounded container. Attach, the text's first line and Send share one 48 dp line; as the text grows, both buttons stay with the last line.
+  - Attachments, growing text, and the controls inside one rounded container: the text full width, then a row with attach and the mode on the left, and the model (one sheet for model and effort) by Send on the right, as in Claude's own composer.
   - Typing "/" lists the agent's commands.
   - Messages typed while the agent starts go out once it's ready.
 - **Attachments:** files are copied to `~/.cache/aiterm/attachments`, which is granted to the session. Images go inline (scaled below the API cap); other files go as links.
