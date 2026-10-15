@@ -114,25 +114,30 @@ class _TerminalPainter extends CustomPainter {
     // The frame and title bar.
     paint.color = color;
     canvas.drawPath(Path.combine(PathOperation.difference, Path()..addRRect(outer), Path()..addRect(inner)), paint);
-    // The screen, filling in.
+    // The screen fills left to right, as Material Symbols' fill axis
+    // sweeps the other tabs' icons.
+    final filled = Rect.fromLTRB(inner.left, inner.top, inner.left + inner.width * fill, inner.bottom);
+    if (fill > 0) canvas.drawRect(filled, paint);
+    // ">_": ink, and cut out (the pill's color) where the fill has reached.
+    final prompt = Path()
+      ..moveTo(7.5, 17)
+      ..lineTo(6.1, 15.6)
+      ..lineTo(8.675, 13)
+      ..lineTo(6.075, 10.4)
+      ..lineTo(7.5, 9)
+      ..lineTo(11.5, 13)
+      ..close()
+      ..addRect(const Rect.fromLTRB(12, 15, 18, 17));
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(filled.right, 0, 24, 24));
+    canvas.drawPath(prompt, paint..color = color);
+    canvas.restore();
     if (fill > 0) {
-      paint.color = color.withValues(alpha: color.a * fill);
-      canvas.drawRect(inner, paint);
+      canvas.save();
+      canvas.clipRect(Rect.fromLTRB(0, 0, filled.right, 24));
+      canvas.drawPath(prompt, paint..color = cutout);
+      canvas.restore();
     }
-    // ">_", from ink to cut-out.
-    paint.color = Color.lerp(color, cutout, fill)!;
-    canvas.drawPath(
-      Path()
-        ..moveTo(7.5, 17)
-        ..lineTo(6.1, 15.6)
-        ..lineTo(8.675, 13)
-        ..lineTo(6.075, 10.4)
-        ..lineTo(7.5, 9)
-        ..lineTo(11.5, 13)
-        ..close(),
-      paint,
-    );
-    canvas.drawRect(const Rect.fromLTRB(12, 15, 18, 17), paint);
   }
 
   @override
