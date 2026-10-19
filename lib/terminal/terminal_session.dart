@@ -476,7 +476,7 @@ class TerminalSession {
 /// xterm's own mapping misses Ctrl+Space and friends and sends Alt+b as
 /// ESC B; the Termux rules apply to the key bar and hardware keyboards.
 class _AppTerminal extends Terminal {
-  _AppTerminal() : super(maxLines: 10000);
+  _AppTerminal() : super(maxLines: 5000);
 
   @override
   bool charInput(int charCode, {bool alt = false, bool ctrl = false}) {

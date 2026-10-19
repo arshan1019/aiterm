@@ -114,7 +114,7 @@ In order. Each item is in [TODO.md](../TODO.md).
 - [ ] **P3. Build app tabs lazily.** Build Terminal, Files and Settings on first visit (like `_built` in the workspace), keeping each one's state afterwards.
 - [ ] **P4. Narrow the workspace rebuilds.** Give each bottom-tab badge its own listener, keep the app bar on `_repo` only, and stop rebuilding the terminal deck on activity changes. Expose a separate notifier for "any tab needs input" instead of routing every activity change through `TerminalTabs`.
 - [ ] **P5. Start only what the first frame needs.** After the first frame (`addPostFrameCallback`), start keep-alive, SSH keys, phone grants, port polling and agent-session loading.
-- [ ] **P6. Lower the terminal scrollback** to 5,000 lines (or make it a setting). Check that agents' long output still scrolls back far enough.
+- [x] **P6. Lower the terminal scrollback** to 5,000 lines (or make it a setting). Check that agents' long output still scrolls back far enough.
 - [ ] **P7. Poll ports less when nothing runs.** Back off to around 10 s when no port has been seen or hinted, and check at once when a session mentions a port, as now.
 - [ ] **P8. Cheaper tab transitions.** Use `FadeTransition` with a short duration, or no fade for top-level tabs, so the whole screen isn't redrawn offscreen.
 - [ ] **P9. Show frame timings on the phone.** A "Show frame timings" switch in Settings → About sets `MaterialApp.showPerformanceOverlay`, so frame times can be checked in release builds on the phone. Optionally, a manual CI workflow that builds a profile APK for DevTools sessions.
