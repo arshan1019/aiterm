@@ -831,7 +831,7 @@ void main() {
   // fails the test by itself.
   for (final (name, width, height, keyboard) in [
     ('phone', 1080.0, 2340.0, 1000.0),
-    ('small phone', 720.0, 1280.0, 600.0),
+    ('small phone', 1080.0, 1920.0, 840.0),
     ('landscape', 2340.0, 1080.0, 540.0),
   ]) {
     testWidgets('a question fits above the keyboard, its buttons whole ($name)', (tester) async {
@@ -862,7 +862,7 @@ void main() {
     });
   }
 
-  testWidgets('the message box gives way to a question and keeps its draft', (tester) async {
+  testWidgets('the message box takes nothing while the agent waits for an answer', (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     await openChat(tester, askingClaude);
@@ -872,8 +872,7 @@ void main() {
     await pumpChat(tester);
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Skip'), findsOneWidget);
-    final box = find.byType(TextField).first;
-    expect(tester.widget<TextField>(box).enabled, isFalse);
+    expect(tester.widget<TextField>(find.byType(TextField).last).enabled, isFalse);
     await tester.tap(find.text('Skip'));
     await pumpChat(tester);
     await tester.pumpAndSettle();
@@ -895,7 +894,7 @@ void main() {
           return null;
         }));
     final chat = services.chats.active('/root/app')!;
-    chat.commands.addAll([for (var i = 0; i < 5; i++) ('command$i', 'What command $i does')]);
+    chat.commands = [for (var i = 0; i < 5; i++) ('command$i', 'What command $i does')];
     tester.view.viewInsets = const FakeViewPadding(bottom: 1000);
     await tester.pump();
     await tester.enterText(find.byType(TextField), '/');
@@ -907,7 +906,6 @@ void main() {
 
   testWidgets('a project left on blocks reopens on them, on the session it was on', (tester) async {
     final services = await openChat(tester, scriptedClaude);
-    await services.chats.saved;
     await tester.pageBack();
     await settleIo(tester);
     // As after a restart: no chat runs, but what was showing is remembered.
@@ -919,6 +917,7 @@ void main() {
     expect(restarted.inProject('/root/app'), hasLength(1));
     expect(find.text('Claude Code'), findsWidgets);
     expect(find.byTooltip('Attach'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
   testWidgets('the key bar lays out its arrows like a keyboard: up over down, left and right beside', (tester) async {

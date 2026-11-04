@@ -53,9 +53,10 @@ class BlocksView extends StatelessWidget {
           builder: (context, box) {
             final ask = chat.asks.firstOrNull;
             final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
-            // Typing an answer: the card gets the room. The message box
-            // can't send while the agent waits, and keeps its draft.
-            final answering = ask != null && keyboard;
+            // Typing an answer, or just short of room (landscape): the card
+            // gets it all. The message box can't send while the agent waits,
+            // and keeps its draft.
+            final answering = ask != null && (keyboard || box.maxHeight < _askNeedsRoom);
             return Column(
               children: [
                 if (!answering && box.maxHeight >= _tabsNeedRoom)
@@ -74,7 +75,7 @@ class BlocksView extends StatelessWidget {
                         Expanded(child: _body(context)),
                         if (ask != null)
                           ConstrainedBox(
-                            constraints: BoxConstraints(maxHeight: keyboard ? room.maxHeight : room.maxHeight * 0.6),
+                            constraints: BoxConstraints(maxHeight: answering ? room.maxHeight : room.maxHeight * 0.6),
                             child: switch (ask) {
                               PermissionRequest() => _PermissionCard(key: ObjectKey(ask), chat: chat, request: ask),
                               QuestionRequest() => _QuestionCard(key: ObjectKey(ask), chat: chat, request: ask),
@@ -101,6 +102,9 @@ class BlocksView extends StatelessWidget {
 
   /// Below this (landscape, keyboard up) the message box needs the tabs' room.
   static const _tabsNeedRoom = 240.0;
+
+  /// Below this a card and the message box don't both fit.
+  static const _askNeedsRoom = 360.0;
 
   Widget _body(BuildContext context) {
     final c = context.colors;
