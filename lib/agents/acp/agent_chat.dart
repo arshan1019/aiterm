@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../shared/line_diff.dart';
 import 'acp_agents.dart';
 import 'acp_connection.dart';
 import 'acp_host.dart';
@@ -70,10 +71,14 @@ class ToolText extends ToolContent {
 
 /// A file change: [oldText] null for a new file.
 class ToolDiff extends ToolContent {
-  const ToolDiff(this.path, this.oldText, this.newText);
+  ToolDiff(this.path, this.oldText, this.newText);
   final String path;
   final String? oldText;
   final String newText;
+
+  /// Worked out once, the first time it's shown: chats rebuild every frame
+  /// while a reply streams.
+  late final List<DiffLine> lines = lineDiff(oldText, newText);
 }
 
 /// A tool call: reading, editing, running a command…

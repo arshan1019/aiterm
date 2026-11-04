@@ -321,6 +321,18 @@ class _FilesScreenState extends State<FilesScreen> {
     );
   }
 
+  void _showAdd() {
+    showActionSheet(context, title: 'Add', actions: [
+      SheetAction(AppIcons.description, 'New file', () => _add('file')),
+      SheetAction(AppIcons.folderNew, 'New folder', () => _add('folder')),
+      if (_browser.location.kind == LocationKind.linux) ...[
+        null,
+        SheetAction(AppIcons.download, 'Import files from phone', () => _add('phone-files')),
+        SheetAction(AppIcons.download, 'Import folder from phone', () => _add('phone-folder')),
+      ],
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -380,25 +392,21 @@ class _FilesScreenState extends State<FilesScreen> {
       // Nothing can be created among the chosen folders themselves.
       floatingActionButton: ListenableBuilder(
         listenable: _browser,
-        builder: (context, _) => _onPhoneChoicesRoot ? const SizedBox.shrink() : PopupMenuButton<String>(
-        onSelected: _add,
-        offset: const Offset(0, -110),
-        itemBuilder: (context) => [
-          const PopupMenuItem(value: 'file', child: Text('New file')),
-          const PopupMenuItem(value: 'folder', child: Text('New folder')),
-          if (_browser.location.kind == LocationKind.linux) ...[
-            const PopupMenuDivider(),
-            const PopupMenuItem(value: 'phone-files', child: Text('Import files from phone')),
-            const PopupMenuItem(value: 'phone-folder', child: Text('Import folder from phone')),
-          ],
-        ],
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(16)),
-          child: Icon(AppIcons.add, color: c.bg),
-        ),
-      ),
+        builder: (context, _) => _onPhoneChoicesRoot
+            ? const SizedBox.shrink()
+            : Material(
+                color: c.accent,
+                borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _showAdd,
+                  child: SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: Icon(AppIcons.add, semanticLabel: 'Add', color: c.bg),
+                  ),
+                ),
+              ),
       ),
     );
   }

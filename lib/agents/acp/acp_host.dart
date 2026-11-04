@@ -45,7 +45,8 @@ class AcpHost {
   /// arriving meanwhile share the start. [onProgress] gets install output.
   /// Throws a [String] or [AcpError] when it can't.
   Future<void> ensure({void Function(String line)? onProgress}) {
-    if (alive) return Future.value();
+    // Connected isn't started: [capabilities] arrive with `initialize`.
+    if (alive && _starting == null) return Future.value();
     if (onProgress != null) _progress.add(onProgress);
     return _starting ??= _boot().whenComplete(() {
       _starting = null;

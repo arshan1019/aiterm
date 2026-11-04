@@ -6,8 +6,9 @@ import '../terminal_session.dart';
 import '../../app/icons.dart';
 
 /// Keys a phone keyboard lacks: two rows of equal-width keys, so the bar
-/// lines up on every screen width. Keys act on touch-down like a real
-/// keyboard; arrows repeat while held.
+/// lines up on every screen width. The arrows sit like a computer's, up
+/// above down with left and right beside it. Keys act on touch-down like a
+/// real keyboard; arrows repeat while held.
 class ExtraKeysBar extends StatelessWidget {
   const ExtraKeysBar({super.key, required this.session, required this.onAsk});
 
@@ -47,8 +48,8 @@ class ExtraKeysBar extends StatelessWidget {
                 key('ESC', TerminalKey.escape),
                 text('/', () => session.sendText('/')),
                 text('-', () => session.sendText('-')),
-                text('|', () => session.sendText('|')),
                 arrow(AppIcons.keyboardUp, 'Up', TerminalKey.arrowUp),
+                text('|', () => session.sendText('|')),
               ]),
               _row([
                 key('TAB', TerminalKey.tab),

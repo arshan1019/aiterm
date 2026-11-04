@@ -13,8 +13,8 @@ enum AgentView { blocks, terminal }
 typedef ChatFactory = AgentChat Function(String agent, String cwd, AcpHost host, int number);
 
 /// The open agent chats (any number per agent per project, sharing one
-/// agent process each), each project's view, and the sessions to pick up
-/// again after a restart.
+/// agent process each), and what to pick up again after a restart: each
+/// project's view and agent, and the sessions.
 class AgentChats extends ChangeNotifier implements ChatSessions {
   AgentChats(this._file, {required AcpHost Function(String agent, String cwd) host, required ChatFactory chat})
       : _newHost = host,
@@ -29,6 +29,9 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
   final _numbers = <AgentChat, int>{};
   final _active = <String, AgentChat>{};
   final _views = <String, AgentView>{};
+
+  /// The agent each project's chat was on (none once its chats are closed).
+  final _agents = <String, String>{};
   var _sessions = <String, String>{};
   Future<void> _saving = Future.value();
 
@@ -36,7 +39,15 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
 
   Future<void> load() async {
     try {
-      _sessions = (jsonDecode(await _file.readAsString()) as Map).cast<String, String>();
+      final saved = jsonDecode(await _file.readAsString()) as Map;
+      // Older files hold only the sessions.
+      _sessions = ((saved['sessions'] ?? saved) as Map).cast<String, String>();
+      if (saved['views'] case final Map views) {
+        for (final MapEntry(:key, :value) in views.entries) {
+          if (AgentView.values.asNameMap()[value] case final view?) _views[key as String] = view;
+        }
+      }
+      if (saved['agents'] case final Map agents) _agents.addAll(agents.cast<String, String>());
     } catch (_) {
       // None yet, or unreadable: start fresh.
     }
@@ -53,7 +64,16 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
   void show(String cwd, AgentView view) {
     if (_views[cwd] == view) return;
     _views[cwd] = view;
+    _save();
     notifyListeners();
+  }
+
+  /// The agent to reopen when project [cwd] opens with no chat running: it
+  /// was left on blocks, or on a terminal ([terminals]) that's since gone.
+  String? agentToResume(String cwd, {required bool terminals}) {
+    if (inProject(cwd).isNotEmpty) return null;
+    if (terminals && _views[cwd] == AgentView.terminal) return null;
+    return _agents[cwd];
   }
 
   /// Opens [agent] in [cwd] and shows it: back to its latest chat there, or
@@ -84,6 +104,8 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
     }
     _active[cwd] = chat;
     _views[cwd] = AgentView.blocks;
+    _agents[cwd] = agent;
+    _save();
     notifyListeners();
     return chat;
   }
@@ -108,6 +130,8 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
 
   void select(AgentChat chat) {
     _active[chat.cwd] = chat;
+    _agents[chat.cwd] = chat.agent.id;
+    _save();
     notifyListeners();
   }
 
@@ -123,6 +147,14 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
     chat.dispose();
     final key = _key(chat.agent.id, chat.cwd);
     if (!_chats.any((c) => _key(c.agent.id, c.cwd) == key)) _hosts.remove(key)?.dispose();
+    if (active(chat.cwd) case final next?) {
+      _agents[chat.cwd] = next.agent.id;
+    } else {
+      // Closed on purpose: it doesn't come back by itself.
+      _agents.remove(chat.cwd);
+      _views.remove(chat.cwd);
+    }
+    _save();
     notifyListeners();
   }
 
@@ -177,7 +209,15 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
     } else {
       _sessions[key] = sessionId;
     }
-    final json = jsonEncode(_sessions);
+    _save();
+  }
+
+  void _save() {
+    final json = jsonEncode({
+      'sessions': _sessions,
+      'views': {for (final MapEntry(:key, :value) in _views.entries) key: value.name},
+      'agents': _agents,
+    });
     _saving = _saving.then((_) => writeFileAtomic(_file.path, json)).catchError((Object _) {});
   }
 

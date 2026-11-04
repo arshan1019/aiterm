@@ -218,7 +218,18 @@ class AppServices {
   /// Opens [project]'s workspace (and remembers it as most recent).
   void showProject(Project project, {WorkspaceTab? tab}) {
     projects.opened(project).ignore();
+    _resumeChat(project.path);
     navigation.showProject(ProjectRef(project.id, project.path), tab: tab);
+  }
+
+  /// A project left on blocks opens on them again, on the same session.
+  /// (Its terminals come back by themselves, with the tabs.)
+  void _resumeChat(String path) {
+    final agent = chats.agentToResume(path, terminals: tabs.inScope(path).isNotEmpty);
+    if (agent == null || !linux.installed || linux.usesAndroidShell) return;
+    if (!settings.blocksFor(agent) || AcpAgent.of(agent) == null) return;
+    if (agents.stateOf(agent).status == AgentStatus.notInstalled) return;
+    chats.open(agent, path);
   }
 
   void _reconcileTabs() {

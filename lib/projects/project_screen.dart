@@ -114,22 +114,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
     final chat = _s.chats.active(p.path);
     return Column(
       children: [
-        if (chats.isNotEmpty && terminals)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<AgentView>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: AgentView.blocks, icon: Icon(AppIcons.agent, size: 16), label: Text('Blocks')),
-                  ButtonSegment(value: AgentView.terminal, icon: Icon(AppIcons.terminal, size: 16), label: Text('Terminal')),
-                ],
-                selected: {view},
-                onSelectionChanged: (v) => _s.chats.show(p.path, v.first),
-              ),
-            ),
-          ),
+        if (chats.isNotEmpty && terminals) _ViewSwitch(view: view, onChanged: (v) => _s.chats.show(p.path, v)),
         Expanded(
           // Both stay mounted, so terminals keep running behind the blocks.
           child: IndexedStack(
@@ -239,6 +224,34 @@ class _ProjectScreenState extends State<ProjectScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Blocks or terminal. Gives its room to the keyboard, like the bottom tabs.
+class _ViewSwitch extends StatelessWidget {
+  const _ViewSwitch({required this.view, required this.onChanged});
+
+  final AgentView view;
+  final ValueChanged<AgentView> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.viewInsetsOf(context).bottom > 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<AgentView>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: AgentView.blocks, icon: Icon(AppIcons.agent, size: 16), label: Text('Blocks')),
+            ButtonSegment(value: AgentView.terminal, icon: Icon(AppIcons.terminal, size: 16), label: Text('Terminal')),
+          ],
+          selected: {view},
+          onSelectionChanged: (v) => onChanged(v.first),
+        ),
+      ),
     );
   }
 }

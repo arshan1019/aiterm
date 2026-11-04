@@ -41,7 +41,9 @@ class FakeAgent implements AcpTransport {
     }
   }
 
-  void _push(Map<String, Object?> m) => _out.add(jsonEncode(m));
+  void _push(Map<String, Object?> m) {
+    if (!_out.isClosed) _out.add(jsonEncode(m));
+  }
 
   void update(String sessionId, Map<String, Object?> update) => _push({
         'jsonrpc': '2.0',

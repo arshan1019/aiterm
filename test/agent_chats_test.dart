@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aiterm/agents/acp/acp_agents.dart';
@@ -146,5 +147,93 @@ void main() {
     final again = registry([]);
     await again.load();
     expect(again.sessionFor('claude', '/root/app'), 'claude-1');
+  });
+
+  test('a project opens the way it was left, blocks or terminal, after a restart', () async {
+    final chats = registry([]);
+    final chat = chats.open('claude', '/root/app');
+    chats.open('gemini', '/root/site');
+    await settle();
+    await chats.saved;
+
+    Future<AgentChats> restart() async {
+      final again = registry([]);
+      await again.load();
+      return again;
+    }
+
+    // Left on blocks: its agent comes back, even beside a terminal.
+    var again = await restart();
+    expect(again.viewOf('/root/app'), AgentView.blocks);
+    expect(again.agentToResume('/root/app', terminals: true), 'claude');
+    expect(again.agentToResume('/root/site', terminals: false), 'gemini');
+    expect(again.agentToResume('/root/other', terminals: false), isNull);
+
+    // Left on a terminal: that shows, unless the terminal is gone.
+    chats.show('/root/app', AgentView.terminal);
+    await chats.saved;
+    again = await restart();
+    expect(again.viewOf('/root/app'), AgentView.terminal);
+    expect(again.agentToResume('/root/app', terminals: true), isNull);
+    expect(again.agentToResume('/root/app', terminals: false), 'claude');
+
+    // Running already: nothing to bring back.
+    chats.show('/root/app', AgentView.blocks);
+    expect(chats.agentToResume('/root/app', terminals: false), isNull);
+
+    // Closed on purpose: it stays closed.
+    chats.close(chat);
+    await chats.saved;
+    again = await restart();
+    expect(again.agentToResume('/root/app', terminals: false), isNull);
+    expect(again.sessionFor('claude', '/root/app'), 'claude-1', reason: 'still in History and for next time');
+  });
+
+  test('files from before views were kept still load their sessions', () async {
+    File('${dir.path}/agent_sessions.json').writeAsStringSync('{"claude\\n/root/app":"old"}');
+    final chats = registry([]);
+    await chats.load();
+    expect(chats.sessionFor('claude', '/root/app'), 'old');
+    expect(chats.agentToResume('/root/app', terminals: false), isNull);
+  });
+
+  test('History opened while the agent is still starting waits for it, and lists the chats', () async {
+    final initialized = Completer<void>();
+    late AgentChats chats;
+    chats = AgentChats(
+      File('${dir.path}/agent_sessions.json'),
+      host: (id, cwd) => AcpHost(
+        agent: AcpAgent.of(id)!,
+        cwd: cwd,
+        start: (a, cwd) async => FakeAgent((f, method, p) async {
+          if (method == 'initialize') {
+            await initialized.future;
+            return {
+              'protocolVersion': 1,
+              'agentCapabilities': {
+                'sessionCapabilities': {'list': {}},
+              },
+            };
+          }
+          if (method == 'session/new') return {'sessionId': 's1'};
+          if (method == 'session/list') {
+            return {
+              'sessions': [
+                {'sessionId': 'old-1', 'cwd': p['cwd'], 'title': 'Fix the login bug'},
+              ],
+            };
+          }
+          return null;
+        }),
+        prepare: (a, o) async => null,
+      ),
+      chat: (id, cwd, host, number) => AgentChat(agent: host.agent, name: id, cwd: cwd, host: host, sessions: chats),
+    );
+    chats.open('claude', '/root/app');
+    await settle(); // connected, `initialize` not answered yet
+    final list = chats.history('claude', '/root/app');
+    await settle();
+    initialized.complete();
+    expect((await list)?.map((c) => c.title), ['Fix the login bug']);
   });
 }

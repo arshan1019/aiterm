@@ -772,6 +772,185 @@ void main() {
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });
 
+  /// A chat asking a question with options and a box for your own answer.
+  FakeAgent askingClaude({int options = 4}) => FakeAgent((a, method, p) async {
+        switch (method) {
+          case 'initialize':
+            return {'protocolVersion': 1, 'agentCapabilities': {}};
+          case 'session/new':
+            return claudeOptions;
+          case 'session/set_config_option':
+            return {};
+          case 'session/prompt':
+            await a.ask('elicitation/create', {
+              'mode': 'form',
+              'sessionId': 's1',
+              'message': 'Which database should the forecast view read from when it starts up, and why?',
+              'requestedSchema': {
+                'type': 'object',
+                'properties': {
+                  'question_0': {
+                    'type': 'string',
+                    'oneOf': [
+                      for (var i = 0; i < options; i++)
+                        {'const': 'db$i', 'title': 'Database $i', 'description': 'A longer description of option $i'},
+                    ],
+                  },
+                  'question_0_custom': {'type': 'string', 'title': 'Other'},
+                },
+              },
+            });
+            return {'stopReason': 'end_turn'};
+        }
+        return null;
+      });
+
+  Future<AppServices> openChat(WidgetTester tester, FakeAgent Function() agent) async {
+    addTearDown(tester.view.reset);
+    Directory('${dir.path}/alpine/root/app').createSync(recursive: true);
+    File('${dir.path}/alpine/.aiterm-installed').writeAsStringSync('x');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    File('${dir.path}/projects.json').writeAsStringSync(
+        jsonEncode([{'id': '1', 'name': 'Weather app', 'path': '/root/app', 'created': now, 'opened': now}]));
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);
+    final services = (await tester.runAsync(AppServices.load))!;
+    services.gitTools = GitTools(run: (script, onLine) async => 0);
+    services.git = GitRegistry(_FakeGit());
+    services.settings.blocks = true;
+    services.chats = fakeChats(services, agent);
+    await tester.pumpWidget(AiTermApp(services: services));
+    await settleIo(tester);
+    await tester.tap(find.text('Weather app'));
+    await settleIo(tester);
+    services.chats.open('claude', '/root/app');
+    await pumpChat(tester);
+    return services;
+  }
+
+  // The window above the keyboard must hold the whole card. An overflow also
+  // fails the test by itself.
+  for (final (name, width, height, keyboard) in [
+    ('phone', 1080.0, 2340.0, 1000.0),
+    ('small phone', 720.0, 1280.0, 600.0),
+    ('landscape', 2340.0, 1080.0, 540.0),
+  ]) {
+    testWidgets('a question fits above the keyboard, its buttons whole ($name)', (tester) async {
+      tester.view.physicalSize = Size(width, height);
+      tester.view.devicePixelRatio = 3;
+      await openChat(tester, askingClaude);
+      await tester.enterText(find.byType(TextField), 'Add a forecast view');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Send'));
+      await pumpChat(tester);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Typing an answer in the card brings up the keyboard.
+      tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull);
+
+      final bottomEdge = (height - keyboard) / 3;
+      final skip = tester.getRect(find.text('Skip'));
+      expect(skip.bottom, lessThanOrEqualTo(bottomEdge));
+      expect(skip.top, greaterThanOrEqualTo(0));
+      // Hit-testable, not clipped away: the tap answers.
+      await tester.tap(find.text('Skip'));
+      await pumpChat(tester);
+      await tester.pumpAndSettle();
+      expect(find.text('Skip'), findsNothing);
+    });
+  }
+
+  testWidgets('the message box gives way to a question and keeps its draft', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    await openChat(tester, askingClaude);
+    await tester.enterText(find.byType(TextField), 'Add a forecast view');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Send'));
+    await pumpChat(tester);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Skip'), findsOneWidget);
+    final box = find.byType(TextField).first;
+    expect(tester.widget<TextField>(box).enabled, isFalse);
+    await tester.tap(find.text('Skip'));
+    await pumpChat(tester);
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
+  });
+
+  testWidgets('with the keyboard up, the / list scrolls and the message box stays whole', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    final services = await openChat(tester, () => FakeAgent((a, method, p) async {
+          switch (method) {
+            case 'initialize':
+              return {'protocolVersion': 1, 'agentCapabilities': {}};
+            case 'session/new':
+              return claudeOptions;
+            case 'session/set_config_option':
+              return {};
+          }
+          return null;
+        }));
+    final chat = services.chats.active('/root/app')!;
+    chat.commands.addAll([for (var i = 0; i < 5; i++) ('command$i', 'What command $i does')]);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 1000);
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), '/');
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('/command0'), findsOneWidget);
+    expect(tester.getRect(find.byTooltip('Attach')).bottom, lessThanOrEqualTo((2340 - 1000) / 3));
+  });
+
+  testWidgets('a project left on blocks reopens on them, on the session it was on', (tester) async {
+    final services = await openChat(tester, scriptedClaude);
+    await services.chats.saved;
+    await tester.pageBack();
+    await settleIo(tester);
+    // As after a restart: no chat runs, but what was showing is remembered.
+    final restarted = fakeChats(services, scriptedClaude);
+    await tester.runAsync(restarted.load);
+    services.chats = restarted;
+    await tester.tap(find.text('Weather app'));
+    await settleIo(tester);
+    expect(restarted.inProject('/root/app'), hasLength(1));
+    expect(find.text('Claude Code'), findsWidgets);
+    expect(find.byTooltip('Attach'), findsOneWidget);
+  });
+
+  testWidgets('the key bar lays out its arrows like a keyboard: up over down, left and right beside', (tester) async {
+    await boot(tester);
+    Finder key(IconData icon) => find.byWidgetPredicate((w) => w is Icon && w.icon == icon);
+    final up = tester.getCenter(key(AppIcons.keyboardUp));
+    final down = tester.getCenter(key(AppIcons.keyboardDown));
+    final left = tester.getCenter(key(AppIcons.keyboardLeft));
+    final right = tester.getCenter(key(AppIcons.keyboardRight));
+    expect(up.dx, down.dx);
+    expect(up.dy, lessThan(down.dy));
+    expect(left.dy, down.dy);
+    expect(right.dy, down.dy);
+    expect(down.dx - left.dx, right.dx - down.dx);
+    expect(left.dx, lessThan(down.dx));
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
+  testWidgets('Files: + opens a sheet, clear of the bottom navigation', (tester) async {
+    await boot(tester);
+    await tester.tap(navTab('Files'));
+    await settleIo(tester);
+    await tester.tap(find.byIcon(AppIcons.add).last);
+    await tester.pumpAndSettle();
+    expect(find.text('New file'), findsOneWidget);
+    expect(find.byType(PopupMenuItem<String>), findsNothing);
+    await tester.tap(find.text('New folder'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, 'Create'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
   testWidgets('settings: agent settings turn blocks on; agents keep their own UI by default', (tester) async {
     final services = await boot(tester);
     expect(services.settings.blocks, isFalse);

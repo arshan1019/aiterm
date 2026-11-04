@@ -124,7 +124,7 @@ List<InlineSpan> markdownSpans(String text, AppColors c, {TextStyle? base}) {
 
 /// Markdown from an agent: prose in the sans, code in mono (the rule:
 /// mono means machine text).
-class MarkdownView extends StatelessWidget {
+class MarkdownView extends StatefulWidget {
   const MarkdownView(this.source, {super.key, this.color});
 
   final String source;
@@ -133,42 +133,78 @@ class MarkdownView extends StatelessWidget {
   final Color? color;
 
   @override
-  Widget build(BuildContext context) {
+  State<MarkdownView> createState() => _MarkdownViewState();
+}
+
+class _MarkdownViewState extends State<MarkdownView> {
+  /// Each block as built: while a reply streams only its last block
+  /// changes, so the rest skip rebuilding and layout.
+  var _built = <String, Widget>{};
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _built = {}; // the theme changed
+  }
+
+  @override
+  void didUpdateWidget(MarkdownView old) {
+    super.didUpdateWidget(old);
+    if (old.color != widget.color) _built = {};
+  }
+
+  Widget _block(MdBlock b, double top) {
     final c = context.colors;
     final theme = Theme.of(context).textTheme;
+    final color = widget.color;
     final body = theme.bodyLarge!.copyWith(color: color ?? c.text);
     Widget rich(String text, TextStyle style) => Text.rich(TextSpan(style: style, children: markdownSpans(text, c, base: style)));
-    final blocks = parsedMarkdown(source);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final (i, b) in blocks.indexed)
-          Padding(
-            padding: EdgeInsets.only(top: i == 0 ? 0 : (b is MdItem && blocks[i - 1] is MdItem ? 4 : 10)),
-            child: switch (b) {
-              MdParagraph(:final text) => rich(text, body),
-              MdHeading(:final level, :final text) =>
-                rich(text, (level <= 2 ? theme.titleMedium : theme.titleSmall)!.copyWith(color: color ?? c.text)),
-              MdItem(:final marker, :final text, :final indent) => Padding(
-                  padding: EdgeInsets.only(left: 16.0 * indent),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(width: marker == '•' ? 18 : 26, child: Text(marker, style: body.copyWith(color: c.textMuted))),
-                      Expanded(child: rich(text, body)),
-                    ],
-                  ),
-                ),
-              MdQuote(:final text) => Container(
-                  padding: const EdgeInsets.only(left: 12),
-                  decoration: BoxDecoration(border: Border(left: BorderSide(color: c.border, width: 3))),
-                  child: rich(text, body.copyWith(color: c.textMuted)),
-                ),
-              MdCode(:final code) => CodeBox(code),
-            },
+    return Padding(
+      padding: EdgeInsets.only(top: top),
+      child: switch (b) {
+        MdParagraph(:final text) => rich(text, body),
+        MdHeading(:final level, :final text) =>
+          rich(text, (level <= 2 ? theme.titleMedium : theme.titleSmall)!.copyWith(color: color ?? c.text)),
+        MdItem(:final marker, :final text, :final indent) => Padding(
+            padding: EdgeInsets.only(left: 16.0 * indent),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: marker == '•' ? 18 : 26, child: Text(marker, style: body.copyWith(color: c.textMuted))),
+                Expanded(child: rich(text, body)),
+              ],
+            ),
           ),
-      ],
+        MdQuote(:final text) => Container(
+            padding: const EdgeInsets.only(left: 12),
+            decoration: BoxDecoration(border: Border(left: BorderSide(color: c.border, width: 3))),
+            child: rich(text, body.copyWith(color: c.textMuted)),
+          ),
+        MdCode(:final code) => CodeBox(code),
+      },
     );
+  }
+
+  static String _signature(MdBlock b) => switch (b) {
+        MdParagraph(:final text) => 'p$text',
+        MdHeading(:final level, :final text) => 'h$level$text',
+        MdItem(:final marker, :final text, :final indent) => 'i$indent$marker $text',
+        MdQuote(:final text) => 'q$text',
+        MdCode(:final code) => 'c$code',
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = parsedMarkdown(widget.source);
+    final built = <String, Widget>{};
+    final children = <Widget>[];
+    for (final (i, b) in blocks.indexed) {
+      final top = i == 0 ? 0.0 : (b is MdItem && blocks[i - 1] is MdItem ? 4.0 : 10.0);
+      final signature = '$top${_signature(b)}';
+      children.add(built[signature] ??= _built[signature] ?? _block(b, top));
+    }
+    _built = built;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
   }
 }
 

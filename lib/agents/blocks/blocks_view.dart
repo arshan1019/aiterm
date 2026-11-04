@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_thinking_orbs/flutter_thinking_orbs.dart';
 
@@ -13,6 +12,7 @@ import '../../shared/markdown_view.dart';
 import '../../shared/sheet.dart';
 import '../acp/agent_chat.dart';
 import '../acp/attachments.dart';
+import 'chat_sliver.dart';
 import 'history_screen.dart';
 
 import 'dart:io';
@@ -50,32 +50,57 @@ class BlocksView extends StatelessWidget {
         listenable: chat,
         builder: (context, _) => LayoutBuilder(
           // The room this view really has (the keyboard already taken off).
-          builder: (context, box) => Column(
-            children: [
-              _ChatTabs(
-                chat: chat,
-                chats: chats,
-                onSelect: onSelect,
-                onNew: onNew,
-                onTerminal: onTerminal,
-                onClose: onClose,
-              ),
-              Expanded(child: _body(context)),
-              if (chat.asks.firstOrNull case final ask?)
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: box.maxHeight * 0.45),
-                  child: switch (ask) {
-                    PermissionRequest() => _PermissionCard(key: ObjectKey(ask), chat: chat, request: ask),
-                    QuestionRequest() => _QuestionCard(key: ObjectKey(ask), chat: chat, request: ask),
-                  },
+          builder: (context, box) {
+            final ask = chat.asks.firstOrNull;
+            final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
+            // Typing an answer: the card gets the room. The message box
+            // can't send while the agent waits, and keeps its draft.
+            final answering = ask != null && keyboard;
+            return Column(
+              children: [
+                if (!answering && box.maxHeight >= _tabsNeedRoom)
+                  _ChatTabs(
+                    chat: chat,
+                    chats: chats,
+                    onSelect: onSelect,
+                    onNew: onNew,
+                    onTerminal: onTerminal,
+                    onClose: onClose,
+                  ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, room) => Column(
+                      children: [
+                        Expanded(child: _body(context)),
+                        if (ask != null)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxHeight: keyboard ? room.maxHeight : room.maxHeight * 0.6),
+                            child: switch (ask) {
+                              PermissionRequest() => _PermissionCard(key: ObjectKey(ask), chat: chat, request: ask),
+                              QuestionRequest() => _QuestionCard(key: ObjectKey(ask), chat: chat, request: ask),
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              _Composer(key: ValueKey(chat), chat: chat),
-            ],
-          ),
+                Offstage(
+                  offstage: answering,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: box.maxHeight),
+                    child: _Composer(key: ValueKey(chat), chat: chat, room: box.maxHeight),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
+  /// Below this (landscape, keyboard up) the message box needs the tabs' room.
+  static const _tabsNeedRoom = 240.0;
 
   Widget _body(BuildContext context) {
     final c = context.colors;
@@ -133,7 +158,7 @@ class BlocksView extends StatelessWidget {
           ],
         );
       default:
-        return _Entries(chat: chat);
+        return _Entries(key: ObjectKey(chat), chat: chat);
     }
   }
 }
@@ -439,7 +464,7 @@ void _choose(BuildContext context, AgentChat chat, ChatOption option) {
 /// read, growth below is offset so what they're reading stays put. The
 /// arrow glides back to the latest.
 class _Entries extends StatefulWidget {
-  const _Entries({required this.chat});
+  const _Entries({super.key, required this.chat});
   final AgentChat chat;
 
   @override
@@ -448,12 +473,12 @@ class _Entries extends StatefulWidget {
 
 class _EntriesState extends State<_Entries> {
   final _scroll = ScrollController();
-
-  /// Laid-out heights by row id, and last frame's (to measure growth).
-  final _heights = <Object, double>{};
-  var _before = <Object, double>{};
-  var _order = <Object>[];
   var _away = false;
+  var _dragging = false;
+
+  /// Each reply as built, with its length: while one streams, the others
+  /// aren't parsed or rebuilt again.
+  final _replies = <Object, (int, Widget)>{};
 
   @override
   void initState() {
@@ -470,36 +495,24 @@ class _EntriesState extends State<_Entries> {
     super.dispose();
   }
 
-  /// Keeps the rows on screen still when rows below them (the newest)
-  /// grow or arrive while the user reads further up.
-  void _hold(List<Object> ids) {
-    final old = _order, before = _before;
-    _order = ids;
-    _before = Map.of(_heights);
-    if (!_scroll.hasClients || old.isEmpty) return;
-    final position = _scroll.position;
-    if (position.pixels <= 1) return; // at the latest: follow it
-    final anchor = old.where((id) => id != 'working' && ids.contains(id)).firstOrNull;
-    if (anchor == null) return;
-    double? below(List<Object> order, Map<Object, double> heights) {
-      var sum = 0.0;
-      for (final id in order) {
-        final h = heights[id];
-        if (h == null) return null;
-        sum += h;
-        if (id == anchor) return sum;
-      }
-      return null;
-    }
-
-    final was = below(old, before), now = below(ids, _heights);
-    if (was == null || now == null || (now - was).abs() < 0.5) return;
-    position.jumpTo((position.pixels + now - was).clamp(0.0, position.maxScrollExtent + (now - was).abs()));
-  }
-
   void _latest() {
     Haptics.tick();
     _scroll.animateTo(0, duration: Motion.standard * 2, curve: Motion.enter);
+  }
+
+  Widget _reply(MessageEntry e) {
+    final length = e.text.length;
+    if (_replies[e.id] case (final built, final view) when built == length) return view;
+    final view = MarkdownView(e.text.toString());
+    _replies[e.id] = (length, view);
+    return view;
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0) return false;
+    if (n is ScrollStartNotification && n.dragDetails != null) _dragging = true;
+    if (n is ScrollEndNotification) _dragging = false;
+    return false;
   }
 
   @override
@@ -511,49 +524,69 @@ class _EntriesState extends State<_Entries> {
         if (e is! ThoughtEntry || thinking) e,
     ];
     final working = chat.busy && chat.asks.isEmpty;
-    final items = [if (working) null, ...shown.reversed];
-    final ids = [for (final e in items) e?.id ?? 'working'];
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _hold(ids);
-    });
-    if (items.isEmpty) {
+    if (shown.isEmpty && !working) {
       return Center(child: Icon(AppIcons.agent, size: 40, color: context.colors.border));
     }
+    // The working row stays in the list and folds away, so the end of a
+    // turn doesn't drop everything by its height at once.
+    final items = [null, ...shown.reversed];
+    final ids = [for (final e in items) e?.id ?? 'working'];
     return Stack(
       children: [
-        SelectionArea(
-          child: ListView.builder(
-            controller: _scroll,
-            reverse: true,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            itemCount: items.length,
-            // Rows keep their identity as new blocks arrive below them.
-            findChildIndexCallback: (key) {
-              final i = ids.indexOf((key as ValueKey).value as Object);
-              return i < 0 ? null : i;
-            },
-            itemBuilder: (context, i) {
-              final e = items[i];
-              final id = ids[i];
-              return _Measured(
-                key: ValueKey(id),
-                onHeight: (h) => _heights[id] = h,
-                child: RepaintBoundary(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: switch (e) {
-                      null => _Working(chat: chat),
-                      UserEntry() => _UserBlock(entry: e),
-                      MessageEntry() => MarkdownView(e.text.toString()),
-                      ThoughtEntry() => _ThoughtBlock(entry: e),
-                      ToolEntry() => _ToolBlock(entry: e),
-                      PlanEntry() => _PlanBlock(entry: e),
-                      NoticeEntry() => _NoticeBlock(entry: e),
-                    },
+        NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: SelectionArea(
+            child: CustomScrollView(
+              controller: _scroll,
+              reverse: true,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  sliver: ChatSliver(
+                    dragging: () => _dragging,
+                    glide: !Motion.reduced,
+                    delegate: SliverChildBuilderDelegate(
+                      childCount: items.length,
+                      // Rows keep their identity as new blocks arrive below them.
+                      findChildIndexCallback: (key) {
+                        final i = ids.indexOf((key as ValueKey).value as Object);
+                        return i < 0 ? null : i;
+                      },
+                      (context, i) {
+                        final e = items[i];
+                        final id = ids[i];
+                        if (e == null) {
+                          return AnimatedSize(
+                            key: ValueKey(id),
+                            duration: Motion.standard,
+                            curve: Motion.move,
+                            alignment: Alignment.bottomCenter,
+                            child: working
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6),
+                                    child: _Working(chat: chat),
+                                  )
+                                : const SizedBox(width: double.infinity),
+                          );
+                        }
+                        return Padding(
+                          key: ValueKey(id),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: switch (e) {
+                            UserEntry() => _UserBlock(entry: e),
+                            MessageEntry() => _reply(e),
+                            ThoughtEntry() => _ThoughtBlock(entry: e),
+                            ToolEntry() => _ToolBlock(entry: e),
+                            PlanEntry() => _PlanBlock(entry: e),
+                            NoticeEntry() => _NoticeBlock(entry: e),
+                          },
+                        );
+                      },
+                    ),
                   ),
                 ),
-              );
-            },
+              ],
+            ),
           ),
         ),
         Positioned(
@@ -577,29 +610,6 @@ class _EntriesState extends State<_Entries> {
         ),
       ],
     );
-  }
-}
-
-/// Reports its child's laid-out height (no rebuilds).
-class _Measured extends SingleChildRenderObjectWidget {
-  const _Measured({super.key, required this.onHeight, super.child});
-  final ValueChanged<double> onHeight;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) => _RenderMeasured(onHeight);
-
-  @override
-  void updateRenderObject(BuildContext context, _RenderMeasured renderObject) => renderObject.onHeight = onHeight;
-}
-
-class _RenderMeasured extends RenderProxyBox {
-  _RenderMeasured(this.onHeight);
-  ValueChanged<double> onHeight;
-
-  @override
-  void performLayout() {
-    super.performLayout();
-    onHeight(size.height);
   }
 }
 
@@ -795,7 +805,7 @@ class _ToolBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final diffs = [for (final d in entry.content.whereType<ToolDiff>()) (d, lineDiff(d.oldText, d.newText))];
+    final diffs = [for (final d in entry.content.whereType<ToolDiff>()) (d, d.lines)];
     var added = 0, removed = 0;
     for (final (_, lines) in diffs) {
       final (a, r) = diffCounts(lines);
@@ -1020,20 +1030,22 @@ class _NoticeBlock extends StatelessWidget {
 /// the choices stay in reach), then the choices, always last, full width,
 /// one per row.
 class _AskFrame extends StatelessWidget {
-  const _AskFrame({required this.icon, required this.title, this.literal = false, this.content, required this.choices});
+  const _AskFrame({required this.icon, required this.title, this.literal = false, required this.content, this.actions});
   final IconData icon;
   final String title;
 
   /// The title is a command or path (mono).
   final bool literal;
-  final Widget? content;
-  final List<Widget> choices;
+  final Widget content;
+
+  /// Stays whole below the content, however little room there is.
+  final Widget? actions;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    // Sized by the view (at most 45% of the room it really has); content
-    // and choices each scroll inside when it's tight.
+    // Sized by the view; everything but the actions scrolls inside when
+    // it's tight.
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: Material(
@@ -1048,46 +1060,36 @@ class _AskFrame extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 1),
-                    child: Icon(icon, size: 18, color: c.warning),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: literal ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
-                ],
-              ),
-              if (content != null)
-                Flexible(
-                  flex: 3,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: SingleChildScrollView(child: content),
-                  ),
-                ),
               Flexible(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (final (i, choice) in choices.indexed) ...[if (i > 0) const SizedBox(height: 8), choice],
-                      ],
-                    ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Icon(icon, size: 18, color: c.warning),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: literal ? 3 : null,
+                              overflow: literal ? TextOverflow.ellipsis : null,
+                              style: literal ? codeStyle(c.text) : Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      content,
+                    ],
                   ),
                 ),
               ),
+              if (actions != null) Padding(padding: const EdgeInsets.only(top: 8), child: actions),
             ],
           ),
         ),
@@ -1173,11 +1175,9 @@ class _PermissionCard extends StatelessWidget {
       icon: tool == null ? AppIcons.lock : _kindIcon(tool.kind),
       title: title,
       literal: tool?.command != null && tool!.command == title,
-      choices: [
-        _ChoiceList(
-          choices: [for (final (i, o) in request.choices.indexed) (o.name, () => pick(o), i == 0, !o.allows)],
-        ),
-      ],
+      content: _ChoiceList(
+        choices: [for (final (i, o) in request.choices.indexed) (o.name, () => pick(o), i == 0, !o.allows)],
+      ),
     );
   }
 }
@@ -1285,25 +1285,23 @@ class _QuestionCardState extends State<_QuestionCard> {
           ],
         ],
       ),
-      choices: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: c.textMuted),
-              onPressed: () {
-                Haptics.tick();
-                widget.chat.skipQuestion(request);
-              },
-              child: const Text('Skip'),
-            ),
-            if (!_instant || answered) ...[
-              const SizedBox(width: 8),
-              FilledButton(onPressed: answered ? _submit : null, child: const Text('Answer')),
-            ],
+      actions: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: c.textMuted),
+            onPressed: () {
+              Haptics.tick();
+              widget.chat.skipQuestion(request);
+            },
+            child: const Text('Skip'),
+          ),
+          if (!_instant || answered) ...[
+            const SizedBox(width: 8),
+            FilledButton(onPressed: answered ? _submit : null, child: const Text('Answer')),
           ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1378,14 +1376,20 @@ class _Option extends StatelessWidget {
 /// The message box: send, or stop while the agent works. "/" lists the
 /// agent's commands.
 class _Composer extends StatefulWidget {
-  const _Composer({super.key, required this.chat});
+  const _Composer({super.key, required this.chat, required this.room});
   final AgentChat chat;
+
+  /// The height it may take at most.
+  final double room;
 
   @override
   State<_Composer> createState() => _ComposerState();
 }
 
 class _ComposerState extends State<_Composer> {
+  /// Everything in the message box but the lines of text.
+  static const _controlsHeight = 92.0;
+
   final _text = TextEditingController();
   final _focus = FocusNode();
   bool get _focused => _focus.hasFocus;
@@ -1435,9 +1439,15 @@ class _ComposerState extends State<_Composer> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final chat = widget.chat;
-    final ready = chat.accepting;
+    // Nothing can be sent while the agent waits for an answer; the keyboard
+    // closes and the draft stays.
+    final ready = chat.accepting && chat.asks.isEmpty;
     final typed = _text.text;
     final canSend = ready && (typed.trim().isNotEmpty || _files.isNotEmpty);
+    final textStyle = Theme.of(context).textTheme.bodyLarge!;
+    final line = MediaQuery.textScalerOf(context).scale(textStyle.fontSize! * (textStyle.height ?? 1.2));
+    // As many lines as fit beside the controls and padding.
+    final maxLines = ((widget.room - _controlsHeight) / line).floor().clamp(1, 6);
     final matches = typed.startsWith('/') && !typed.contains(' ')
         ? [
             for (final cmd in chat.commands)
@@ -1463,27 +1473,31 @@ class _ComposerState extends State<_Composer> {
             children: [
               // The agent's commands for what's typed after "/".
               if (matches.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Material(
-                    color: c.surface,
-                    shape: cardShape(c),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        for (final (name, description) in matches)
-                          ListTile(
-                            title: Text('/$name', style: codeStyle(c.text)),
-                            subtitle: description.isEmpty
-                                ? null
-                                : Text(description, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            onTap: () {
-                              Haptics.tick();
-                              _text.text = '/$name ';
-                              _text.selection = TextSelection.collapsed(offset: _text.text.length);
-                            },
-                          ),
-                      ],
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: c.surface,
+                      shape: cardShape(c),
+                      clipBehavior: Clip.antiAlias,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            for (final (name, description) in matches)
+                              ListTile(
+                                title: Text('/$name', style: codeStyle(c.text)),
+                                subtitle: description.isEmpty
+                                    ? null
+                                    : Text(description, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                onTap: () {
+                                  Haptics.tick();
+                                  _text.text = '/$name ';
+                                  _text.selection = TextSelection.collapsed(offset: _text.text.length);
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1521,9 +1535,9 @@ class _ComposerState extends State<_Composer> {
                         focusNode: _focus,
                         enabled: ready,
                         minLines: 1,
-                        maxLines: 6,
+                        maxLines: maxLines,
                         textCapitalization: TextCapitalization.sentences,
-                        style: Theme.of(context).textTheme.bodyLarge,
+                        style: textStyle,
                         decoration: InputDecoration(
                           hintText: 'Message ${chat.name}',
                           filled: false,
