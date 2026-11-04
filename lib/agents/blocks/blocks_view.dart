@@ -57,9 +57,12 @@ class BlocksView extends StatelessWidget {
             // gets it all. The message box can't send while the agent waits,
             // and keeps its draft.
             final answering = ask != null && (keyboard || box.maxHeight < _askNeedsRoom);
+            final tabs = !answering && box.maxHeight >= _tabsNeedRoom;
+            // Room for the tabs and a little of the chat (the / list scrolls).
+            final composerRoom = tabs ? box.maxHeight * 0.7 : box.maxHeight;
             return Column(
               children: [
-                if (!answering && box.maxHeight >= _tabsNeedRoom)
+                if (tabs)
                   _ChatTabs(
                     chat: chat,
                     chats: chats,
@@ -88,8 +91,8 @@ class BlocksView extends StatelessWidget {
                 Offstage(
                   offstage: answering,
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: box.maxHeight),
-                    child: _Composer(key: ValueKey(chat), chat: chat, room: box.maxHeight),
+                    constraints: BoxConstraints(maxHeight: composerRoom),
+                    child: _Composer(key: ValueKey(chat), chat: chat, room: composerRoom),
                   ),
                 ),
               ],

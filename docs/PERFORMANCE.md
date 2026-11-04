@@ -110,7 +110,7 @@ Found:
 In order. Each item is in [TODO.md](../TODO.md).
 
 - [ ] **P1. Ship release builds (AOT).** Switch `build.yml` to `flutter build apk --release` with the same key. Add R8 keep rules for our Kotlin plugins and JNI classes (`com.aiterm.aiterm.**`: PtyPlugin, NeedlePlugin, PhoneFilesPlugin, keep-alive, backup, SSH) so shrinking can't rename what native code and channels look up. Keep the signature check. Measure the APK before and after, and check on a device that the terminal, Linux install, agents, phone files, the editor and SSH still work.
-- [ ] **P2. Compute each diff once.** Keep the result of `lineDiff` with its `ToolDiff` (computed when the update arrives, or memoised on first build); move very large diffs to an isolate (`compute`).
+- [x] **P2. Compute each diff once.** (Very large diffs aren't on an isolate yet.) Keep the result of `lineDiff` with its `ToolDiff` (computed when the update arrives, or memoised on first build); move very large diffs to an isolate (`compute`).
 - [ ] **P3. Build app tabs lazily.** Build Terminal, Files and Settings on first visit (like `_built` in the workspace), keeping each one's state afterwards.
 - [ ] **P4. Narrow the workspace rebuilds.** Give each bottom-tab badge its own listener, keep the app bar on `_repo` only, and stop rebuilding the terminal deck on activity changes. Expose a separate notifier for "any tab needs input" instead of routing every activity change through `TerminalTabs`.
 - [ ] **P5. Start only what the first frame needs.** After the first frame (`addPostFrameCallback`), start keep-alive, SSH keys, phone grants, port polling and agent-session loading.
