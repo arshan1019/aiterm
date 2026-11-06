@@ -10,7 +10,14 @@ import 'agent_chat_test.dart' show FakeAgent;
 void main() {
   late Directory dir;
   setUp(() => dir = Directory.systemTemp.createTempSync('chats'));
-  tearDown(() => dir.deleteSync(recursive: true));
+  final open = <AgentChats>[];
+  tearDown(() async {
+    // A save still being written would race the delete.
+    await Future<void>.delayed(Duration.zero);
+    await Future.wait([for (final chats in open) chats.saved]);
+    open.clear();
+    dir.deleteSync(recursive: true);
+  });
 
   /// Each agent process numbers its sessions; `session/list` returns two
   /// past chats; a prompt answers with which session it ran in.
@@ -74,6 +81,7 @@ void main() {
         remembers: number == 1,
       ),
     );
+    open.add(chats);
     return chats;
   }
 
