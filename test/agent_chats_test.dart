@@ -194,7 +194,7 @@ void main() {
     final chats = registry([]);
     await chats.load();
     expect(chats.sessionFor('claude', '/root/app'), 'old');
-    expect(chats.agentToResume('/root/app', terminals: false), isNull);
+    expect(chats.agentToResume('/root/app', terminals: false), 'claude', reason: 'it was on blocks before the update');
   });
 
   test('History opened while the agent is still starting waits for it, and lists the chats', () async {

@@ -47,7 +47,15 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
           if (AgentView.values.asNameMap()[value] case final view?) _views[key as String] = view;
         }
       }
-      if (saved['agents'] case final Map agents) _agents.addAll(agents.cast<String, String>());
+      if (saved['agents'] case final Map agents) {
+        _agents.addAll(agents.cast<String, String>());
+      } else {
+        // Older files: a project with a session was on that agent's blocks.
+        for (final key in _sessions.keys) {
+          final at = key.indexOf('\n');
+          if (at > 0) _agents.putIfAbsent(key.substring(at + 1), () => key.substring(0, at));
+        }
+      }
     } catch (_) {
       // None yet, or unreadable: start fresh.
     }
@@ -67,6 +75,9 @@ class AgentChats extends ChangeNotifier implements ChatSessions {
     _save();
     notifyListeners();
   }
+
+  /// The agent project [cwd]'s chat was last on.
+  String? lastAgent(String cwd) => _agents[cwd];
 
   /// The agent to reopen when project [cwd] opens with no chat running: it
   /// was left on blocks, or on a terminal ([terminals]) that's since gone.

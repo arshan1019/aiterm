@@ -112,9 +112,21 @@ class _ProjectScreenState extends State<ProjectScreen> {
     if (chats.isEmpty && !terminals) return _AgentLauncher(project: p, onTerminal: () => _openTerminal(p));
     final view = chats.isEmpty ? AgentView.terminal : (terminals ? _s.chats.viewOf(p.path) : AgentView.blocks);
     final chat = _s.chats.active(p.path);
+    // Blocks stay one tap away when only terminals are running.
+    final idleAgent = chats.isEmpty ? _s.blocksAgentFor(p) : null;
     return Column(
       children: [
-        if (chats.isNotEmpty && terminals) _ViewSwitch(view: view, onChanged: (v) => _s.chats.show(p.path, v)),
+        if (terminals && (chats.isNotEmpty || idleAgent != null))
+          _ViewSwitch(
+            view: view,
+            onChanged: (v) {
+              if (v == AgentView.blocks && idleAgent != null) {
+                _s.chats.open(idleAgent, p.path);
+              } else {
+                _s.chats.show(p.path, v);
+              }
+            },
+          ),
         Expanded(
           // Both stay mounted, so terminals keep running behind the blocks.
           child: IndexedStack(
@@ -177,7 +189,7 @@ class _ProjectScreenState extends State<ProjectScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     return ListenableBuilder(
-      listenable: Listenable.merge([_s.projects, _nav, _s.tabs, _s.agents, _s.preview, _s.chats, ?_repo]),
+      listenable: Listenable.merge([_s.projects, _nav, _s.tabs, _s.agents, _s.settings, _s.preview, _s.chats, ?_repo]),
       builder: (context, _) {
         final p = _project;
         if (p == null) return const Scaffold();

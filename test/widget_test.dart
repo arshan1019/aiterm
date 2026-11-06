@@ -19,6 +19,7 @@ import 'package:aiterm/agents/acp/acp_agents.dart';
 import 'package:aiterm/agents/acp/agent_chat.dart';
 import 'package:aiterm/agents/acp/acp_host.dart';
 import 'package:aiterm/agents/acp/agent_chats.dart';
+import 'package:aiterm/agents/agent_installer.dart';
 import 'agent_chat_test.dart' show FakeAgent, claudeOptions;
 
 // Widget tests overflow the stack inside the Acode sandbox this project is
@@ -916,6 +917,45 @@ void main() {
     await settleIo(tester);
     expect(restarted.inProject('/root/app'), hasLength(1));
     expect(find.text('Claude Code'), findsWidgets);
+    expect(find.byTooltip('Attach'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3)); // the debounced tab save
+  });
+
+  testWidgets('a project with only a terminal running still offers blocks', (tester) async {
+    final services = await openChat(tester, scriptedClaude);
+    services.agents = AgentInstaller(
+      run: (script, onOutput) async {
+        onOutput('claude');
+        return 0;
+      },
+      launch: (_, _, _, _) {},
+    );
+    await tester.runAsync(services.agents.refresh);
+    await tester.pageBack();
+    await settleIo(tester);
+    services.tabs.open(cwd: '/root/app', project: '/root/app');
+    services.chats.show('/root/app', AgentView.terminal);
+    await settleIo(tester);
+    // As after a restart: the terminal is back, but no chat runs.
+    final restarted = fakeChats(services, scriptedClaude);
+    await tester.runAsync(restarted.load);
+    services.chats = restarted;
+    await tester.tap(find.text('Weather app'));
+    await settleIo(tester);
+    expect(restarted.inProject('/root/app'), isEmpty);
+    expect(find.text('Blocks'), findsOneWidget);
+
+    // Only when there are blocks to go to.
+    services.settings.blocks = false;
+    await tester.pump();
+    expect(find.text('Blocks'), findsNothing);
+    services.settings.blocks = true;
+    await tester.pump();
+
+    await tester.tap(find.text('Blocks'));
+    await pumpChat(tester);
+    expect(restarted.inProject('/root/app'), hasLength(1));
+    expect(restarted.viewOf('/root/app'), AgentView.blocks);
     expect(find.byTooltip('Attach'), findsOneWidget);
     await tester.pump(const Duration(seconds: 3)); // the debounced tab save
   });

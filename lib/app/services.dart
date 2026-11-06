@@ -232,6 +232,15 @@ class AppServices {
     chats.open(agent, path);
   }
 
+  /// The agent [project] can show blocks with right now: the one it was
+  /// last on, else its own, else any. Null when blocks aren't available.
+  String? blocksAgentFor(Project project) {
+    if (!linux.installed || linux.usesAndroidShell) return null;
+    return [chats.lastAgent(project.path), project.agentId, for (final a in agents.installed) a.id]
+        .where((id) => id != null && settings.blocksFor(id) && AcpAgent.of(id) != null && agents.stateOf(id).status == AgentStatus.installed)
+        .firstOrNull;
+  }
+
   void _reconcileTabs() {
     for (final path in {for (final t in tabs.tabs) ?t.project}) {
       if (projects.byPath(path) == null) tabs.detachProject(path);
